@@ -3,6 +3,17 @@ include $(GNUSTEP_MAKEFILES)/common.make
 PACKAGE_NAME = Frameworks
 
 #
+# Release options
+#
+
+export bookmarkkit = no
+export iconkit = no
+export etoileextensionskit = no
+export extendedworkspacekit = no
+export servicesbarkit = no
+export trackerkit = no
+
+#
 # Variables check
 #
 
@@ -15,7 +26,7 @@ ifeq ($(etoile), no)
 
 endif
 
-ifeq ($(etoile), no)
+ifeq ($(etoile), yes)
 
     export desktop-base ?= yes
     export etoile-extensions ?= yes
