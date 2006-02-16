@@ -3,6 +3,13 @@ PACKAGE_NAME = Bundles
 include $(GNUSTEP_MAKEFILES)/common.make
 
 #
+# Release options
+# 
+
+export camaelon = no
+export wildmenus = no
+
+#
 # Variables check
 #
 
@@ -11,14 +18,14 @@ export etoile ?= yes
 ifeq ($(etoile), no)
 
     export desktop-base ?= yes
-	#export etoile-extensions ?= no
+    export etoile-extensions ?= no
 
 endif
 
 ifeq ($(etoile), yes)
 
     export desktop-base ?= yes
-	#export etoile-extensions ?= yes
+    export etoile-extensions ?= yes
 
 endif
 
@@ -31,18 +38,13 @@ ifeq ($(desktop-base), yes)
 
 endif
 
-#export etoile-extensions ?= yes
+export etoile-extensions ?= yes
 
-#
-# At this time, SQLiteClient is not built by default by being not part of
-# etoile-extensions because it introduces too many dependencies.
-#
+ifeq ($(etoile-extensions), yes)
 
-#ifeq ($(etoile-extensions), yes)
-#
-#    export sqliteclient ?= yes
-#
-#endif
+    export sqliteclient ?= yes
+
+endif
 
 #
 # Subprojects choice
@@ -53,7 +55,9 @@ ifeq ($(camaelon), yes)
 endif
 
 ifeq ($(sqliteclient), yes)
+  ifeq ($(FOUNDATION_LIB), apple) # Cocoa only module
     SUBPROJECTS += SQLiteClient
+  endif
 endif
 
 ifeq ($(wildmenus), yes)
