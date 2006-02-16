@@ -78,6 +78,6 @@ endif
 # Subprojects choice
 #
 
-SUBPROJECTS = Frameworks Bundles Services Developer #Documentation
+SUBPROJECTS = Frameworks Bundles Developer #Documentation
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
