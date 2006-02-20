@@ -2,12 +2,13 @@
 Étoilé 0.1 Released
 ===================
 
-February 16, 2006 (From Internet). The Étoilé project today released the first 
-preview release of Étoilé User Environment, the next generation Desktop 
-Environment (based on GNUstep) for Linux and other Unix operating systems. 
-Étoilé 0.1 introduces Étoilé environment to public as a developer platform. This 
-release is mostly targeted at GNUstep/Cocoa developers and introduces several 
-frameworks that settle foundations for the future developments of the project.
+February 16, 2006 (From Internet). Today, the Étoilé Core Team releases the 
+first developer preview release of the Étoilé user environment. Étoilé is a 
+GNUstep-based desktop environment for Linux and other Unix operating systems 
+which aims to improve project workflow for users. 
+Étoilé 0.1 consists of several frameworks which lay the foundation for the 
+future developments of the project. This release is targeted at current GNUstep 
+and Cocoa developers.
 
 
 Key Features of Étoilé 0.1 for developers
@@ -15,16 +16,17 @@ Key Features of Étoilé 0.1 for developers
 
 	* LuceneKit 0.1
 	
-	Lucene is a high-performance, full-featured text search engine library in Java. 
-	LuceneKit is a class-to-class port of Lucene in GNUstep. It is a technology 
-	suitable for nearly any application that requires full-text search.
+	Lucene is a high-performance, full-featured text search engine library 
+	originally developed in Java. LuceneKit is a class-to-class port of Lucene in 
+	GNUstep. It is a technology suitable for nearly any application that requires 
+	full-text search.
 	
 	* OgreKit 1.0 (GNUstep version)
 	
 	OgreKit is an OniGuruma regular expression framework for Cocoa. OniGuruma 
 	supports different styles of regular expression (POSIX, Perl, Ruby, etc.). 
-	OgreKit (GNUstep) only port the non-GUI part of original OgreKit, which can do 
-	searching and replacing with regular expression.
+	The GNUstep version of OgreKit is a port of the non-GUI portion of the original 
+    OgreKit, and is able to do searching and replacing with regular expression.
 	
 	* PreferencesKit 0.1
 	
@@ -33,17 +35,17 @@ Key Features of Étoilé 0.1 for developers
 
 	* SQLiteClient 0.1 (Cocoa only)
     
-    SQLiteClient is a SQLClient/SQLite port from SQLClient library in GNUstep/devl-libs. 
+    SQLiteClient is a SQLClient/SQLite port from SQLClient library in GNUstep/dev-libs. 
     It uses sqlite3 library and is supposed to work only on Mac OS X.
     
 	* UnitKit 1.1 (GNUstep version)
 	
 	UnitKit is a unit test framework for Objective-C. It is a port of latest Cocoa 
-	version with few new features.
+	version, and contains few additional new features.
 
 	* Developer Examples
 	
-More detailed Release Notes may be found here : 
+More detailed Release Notes may be found here: 
 <http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Latest_Release_Notes>
 
 	
@@ -51,32 +53,35 @@ Availability
 ------------
 
 Étoilé 0.1 is currently available in code source form only and may be downloaded 
-at <http://download.gna.org/etoile/> 
-Instructions to compile and install it are located at 
+at :
+<http://download.gna.org/etoile/> 
+
+Instructions to compile and install it are located at: 
 <http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Install>
-For developer related documentation, visit 
+
+For developer related documentation, visit:
 <http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Frameworks_Suite>
 
 
 About Étoilé
 ------------
 
-Étoilé is an independent project of various people like developers, artists and 
-other wanderers to create an open source and innovative GNUstep based Desktop 
-Environment. 
-More precisely, it intends to be a user environment built from the ground up 
-on highly modular and light components with project and document orientation in 
-mind, in order to allow users to create their own workflow by reshaping or 
-recombining provided Services (aka Applications), Components etc. Flexibility 
-and modularity on both User Interface and code level should allow it to scale 
-from PDA to computer environment.
+Étoilé is an independent project of various developers and artists which aims
+to create an open source and innovative GNUstep-based desktop environment.
+
+The Étoilé environment is document- and project-centric, and built from the ground up
+on light, highly modular components. Étoilé's emphasis on modularity encourages
+users to create personalized workflows by reshaping and recombining provided
+Services and Components. This plug-in model of building applications and workflows
+allows for a natural flexibility which is suitable for scaling from PDAs to high-end
+workstations.
 
 
 More Information
 ----------------
 
 Visit our website: <http://www.etoile-project.org/>
-Mail contact: qmathe@gna.org
+Email the project lead: qmathe@gna.org
 
 
 References
