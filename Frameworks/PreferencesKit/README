@@ -28,6 +28,14 @@ Mac OS X support
 PreferencesKit is compatible with Cocoa (Xcode project included).
 
 
+Known issues
+------------
+
+    * Matrix presentation is not in a usable state currently.
+    * Table view (in Table presentation) doesn't always highlight the selected row on GNUstep.
+    * Preference panes linked against Cocoa PreferencePanes framework cannot be loaded (should be fixed in next version)
+
+
 Developer notes
 ===============
 
