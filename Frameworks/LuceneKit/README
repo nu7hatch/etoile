@@ -35,12 +35,12 @@ framework.
 Developer notes
 ================
 
-Tests suite
------------
+Tests suite (gnustep-make)
+--------------------------
 
 UnitKit (bundled with Etoile) is required.
 
-   Steps to produce a test bundle and run tests suite:
+    Steps to produce a test bundle and run tests suite:
 
     * make test=yes 
 
@@ -52,7 +52,11 @@ Dependency
 
     * zlib: compression/decompression
     
-    * OgreKit: regular expression searching and replacing
+    * OgreKit: regular expression searching and replacing 
+    
+When you are building against Cocoa, it is important to install OgreKit version 
+available on the following page <http://www8.ocn.ne.jp/~sonoisa/OgreKit/> and 
+not the GNUstep specific version bundled with Etoile.
 
 
 Contribute 
