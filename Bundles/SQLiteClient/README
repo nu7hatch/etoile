@@ -21,11 +21,18 @@ Build and Install
 Read INSTALL document.
 
 
+Mac OS X support
+----------------
+
+Take note only GNUstep build system (known as gnustep-make) is supported to 
+build SQLiteClient against Cocoa.
+
+
 Developers notes
 ================
 
 Dependency
 ----------
 
-sqlite3: <http://www.sqlite3.org>.
+    * sqlite3: <http://www.sqlite3.org>
 
