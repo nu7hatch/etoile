@@ -1,5 +1,9 @@
 2006-02-21  Quentin Mathe <qmathe@club-internet.fr>
 
+    * INSTALL: Included Mac OS X / Cocoa specific notes.
+
+2006-02-21  Quentin Mathe <qmathe@club-internet.fr>
+
     * README: Updated to include known issues.
     
 2006-02-14  Quentin Mathe <qmathe@club-internet.fr>

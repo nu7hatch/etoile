@@ -16,7 +16,7 @@ compile and use PreferencesKit. The core packages are, at a minimum:
 
    * gnustep-back
 
-   See <http://www.gnustep.org/> for further information.
+See <http://www.gnustep.org/> for further information.
 
 
 Build and Install
@@ -25,6 +25,16 @@ Build and Install
    Steps to build:
 
    * make install
+
+
+Required software (Mac OS X / Cocoa)
+------------------------------------
+
+   * Xcode or gnustep-make
+
+Take note it is supported to rely on GNUstep build system (known as 
+gnustep-make) to build PreferencesKit against Cocoa. See 
+<http://www.gnustep.org/> for further information.
 
 
 Trouble
