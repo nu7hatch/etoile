@@ -1,0 +1,22 @@
+======================
+UnitKit (GNUstep) NEWS
+======================
+
+1.1
+---
+
+    * Updated UnitKit 1.0 GNUstep port to UnitKit 1.1 source code
+    
+    * Fixed new Cocoa specific code in UnitKit 1.1 (to have proper GNUstep 
+    support)
+    
+    * Added two delegate methods -initForTest and -releaseForTest which makes a 
+    lot easier custom initializations for objects to test (by avoiding to 
+    duplicate such code across many tests). -initForTest and -releaseForTest are 
+    similar to JUnit -setUp and -tearDown methods
+
+
+1.0
+---
+
+    First GNUstep release.
