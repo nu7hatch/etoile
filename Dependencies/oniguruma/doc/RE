@@ -1,4 +1,4 @@
-Oniguruma Regular Expressions Version 4.2.0    2006/07/18
+Oniguruma Regular Expressions Version 4.3.0    2006/08/17
 
 syntax: ONIG_SYNTAX_RUBY (default)
 
@@ -226,6 +226,8 @@ syntax: ONIG_SYNTAX_RUBY (default)
 
 
   back reference with nest level
+
+    (This function is disabled in Ruby 1.9.)
 
     \k<name+n>     n: 0, 1, 2, ...
     \k<name-n>     n: 0, 1, 2, ...
