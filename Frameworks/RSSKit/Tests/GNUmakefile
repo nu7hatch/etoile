@@ -13,14 +13,21 @@ else
 	RSSKitTests_OBJC_LIBS = -lUnitKit -lRSSKit
 endif
 
-RSSKitTests_RESOURCE_FILES = 
+RSSKitTests_RESOURCE_FILES = \
+Resources/tests/wellformed/rdf/rdf_channel_description.xml \
+Resources/tests/wellformed/rdf/rdf_channel_title.xml \
+Resources/tests/wellformed/rdf/rdf_channel_link.xml \
+Resources/tests/wellformed/rdf/rdf_item_description.xml \
+Resources/tests/wellformed/rdf/rdf_item_link.xml \
+Resources/tests/wellformed/rdf/rdf_item_rdf_about.xml \
+Resources/tests/wellformed/rdf/rdf_item_title.xml \
+Resources/tests/wellformed/rss/channel_title.xml \
+Resources/tests/wellformed/rss/channel_title_apos.xml \
+Resources/tests/wellformed/rss/channel_title_gt.xml \
+Resources/tests/wellformed/rss/channel_title_lt.xml \
 
-TOOL_NAME = rss_parser
 
-rss_parser_OBJC_FILES = FeedParser.m
-rss_parser_OBJC_LIBS = -lRSSKit
 
 include $(GNUSTEP_MAKEFILES)/bundle.make
-include $(GNUSTEP_MAKEFILES)/tool.make
 
  
