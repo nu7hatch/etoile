@@ -1,0 +1,367 @@
+2007-03-18  Yen-Ju Chen <yjchenx gmail>
+
+	* Create stable branch for relatively stable components.
+
+2007-03-17  Quentin Mathe <qmathe@club-internet.fr>
+
+	* etoile.make: 
+	Fixed a typo which prevented real frameworks like PopplerKit to export its 
+	headers and library file properly, then any applications which depend on it 
+	to compile.
+	Added code to have a symbolic libFrameworkName.so pointing on 
+	frameworkName.framework/Versions/Current/libFrameworkName.so.
+	As a side effect repository build should be fixed (after being broken for a
+	while... too bad). 
+	Modified $(PROJECT_NAME) references to be always prefixed by 'lib' on 
+	library cleaning. It might correct clean or distclean only done partially.
+	Also corrected issue #8484 by removing commented out debug statements in 
+	the code, therefore the repository should build on SuSE too now.
+
+2007-02-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Frameworks/Services/User: Removed Mollusk reference since it is not part 
+	trunk anymore.
+
+2007-02-16  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Frameworks/GNUmakefile: Modified to include SystemConfig in the build
+	process since Hardware now uses it. This should fix the repository 
+	build.
+
+2007-02-16  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Bundles/WildMenus: Moved to Deprecated.
+
+2007-02-08  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Services/User/GNUmakefile: Included Vindaloo by default in Etoile build 
+	process.
+
+2007-02-08  Quentin Mathe <qmathe@club-internet.fr>
+
+	Warning: 
+	1) Run ./setdown.sh on your system before updating or remove all 
+	gnustep lib links in /usr/lib, ditto for gnustep  tools in 
+	/usr/local/bin
+	2) Now the environment should be launched with /usr/local/bin/etoile 
+	or ~/etoile and not path/etoile_system anymore.
+	* setup.sh: Replaced linking libs into /usr/lib by new script 'etoile' 
+	which takes care of sourcing GNUstep.h as an equivalent yet better
+	solution. The script is generated on the fly and finally installed in 
+	/usr/local/bin or ~/bin.
+	* setdown.sh: Symetrical update to match the aforementioned 
+	modifications.
+
+2007-02-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Services/Private/GNUmakefile: Included AZBackground in the build 
+	process by default.
+
+2007-02-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* setup.sh: Modified to look for AppKit bundles in Local by default 
+	(temporary fix).
+	* setdown.sh: Removed a line with no purpose.
+	* GNUmakefile: Swapped Languages and Frameworks compile order because 
+	Io now depends on DistributedView (the last fix to restore repository 
+	build).
+
+2007-02-06  Quentin Mathe <qmathe@club-internet.fr>
+
+    * INSTALL.Ubuntu: Major update to take in account Edgy Eft and refreshed formatting.
+
+2007-01-11  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Frameworks/ExtendedWorkspaceKit:
+    * Frameworks/TrackerKit:
+    * GNUmakefile:
+    * Frameworks/GNUmakefile: 
+    Moved TrackerKit and ExtendedWorkspaceKit frameworks to Deprecated.
+
+2006-12-18  Quentin Mathe <qmathe@club-internet.fr>
+
+    * setup.sh:
+    * setdown.sh:
+    Updated to set NSUseRunningCopy to YES by default.
+
+2006-12-17  Quentin Mathe <qmathe@club-internet.fr>
+
+    * HACKING: Updated repository build section with more details.
+
+2006-12-17  Quentin Mathe <qmathe@club-internet.fr>
+
+    * HACKING: Added.
+
+2006-12-11  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Bundles/GNUmakefile: Updated to include EtoileBehavior in the build 
+    process.
+    * setup.sh: Modified to set EtoileBehavior as an AppKit bundle with defaults.
+
+2006-12-06  Quentin Mathe <qmathe@club-internet.fr>
+
+    * setup.sh:
+    * setdown.sh:
+    Updated both scripts to link libXWindowServerKit.so and 
+    libWorkspaceCommKit.so in /usr/lib. This is rather ugly but necessary
+    for my next System update. This commit also includes the draft code based
+    on ldconfig (as suggested by Richard Frith-Macdonald). This commented out 
+    code should ultimately replace my ugly hack.
+
+2006-12-03  Quentin Mathe <qmathe@club-internet.fr>
+
+    * setup.sh:
+    * setdown.sh:
+    Updated both scripts to support System/SystemTaskList.plist deployment. 
+    This is important, otherwise etoile_system won't launch any processes.
+    
+2006-11-30  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Added automatic export of common variable values, so they 
+    are not repeated over and over in each module.
+
+2006-11-30  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Fixed /bin/sh complaining about a missing argument on line 
+    7. This has been corrected by quoting $LIBRARY_NAME and $FRAMEWORK_NAME in
+    the elif test which follows. This means an undefined variable results in an
+    empty string and not anymore in 'no value at all' (the root of the issue).
+    Commented out debug logging.
+
+2006-11-28  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Modified to include better support for library/framework 
+    build. Now creates automatically a temporary header directory matching the 
+    project name.
+    
+2006-11-19  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Deprecated/Workspace: Moved Services/Private/Workspace here to deprecate
+    it.
+
+2006-11-19  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Deprecated: Added a new directory to store deprecated modules in a 
+    temporary manner.
+
+2006-11-19  Quentin Mathe <qmathe@club-internet.fr>
+
+    * pmkfile: Removed this deprecated file.
+
+2006-11-15  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Frameworks/GNUmakefile: Updated to build PaneKit and not PreferencesKit
+    anymore. This fixes repository compilation by the way.
+
+2006-10-31  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Frameworks/GNUmakefile: Included EtoileFoundation, EtoileUI and 
+    DistributedView in Etoile build process by default.
+
+2006-10-19  Quentin Mathe <qmathe@club-internet.fr>
+
+    * setup.sh:
+    * setdown.sh:
+    Updated to link libgnustep-gui.so in /usr/lib as a temporary solution since
+    etoile_system relies on AppKit currently.
+    
+2006-10-01  Quentin Mathe <qmathe@club-internet.fr>
+
+    * GNUmakefile: Modified to build Languages subproject.
+    * Languages/GNUmakefile: Added to include Io by default in Etoile build process.
+
+2006-09-27  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Improved to export library made available in Source/obj too 
+    (was only exporting library put in the immediate 'obj' subdirectory).
+
+2006-09-27  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Updated to properly link frameworks in Build directory.
+    The framework resulting of a project compilation is located in the project 
+    directory itself and not in the 'obj' subdirectory.
+    
+2006-09-26  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Simplified the dependency handling furthermore by getting
+    rid of DEPENDENCIES variable. No need to declare anymore dependencies with
+    this variable on per module basis. By including 'etoile.make' the result 
+    of the module compilation is automatically exported in common directory 
+    named 'Build'. Moreover this directory is searched for libraries, 
+    frameworks, headers, bundles etc. when etoile.make is included in a module, 
+    this allows to handle related dependencies transparently.
+
+2006-09-23  Quentin Mathe <qmathe@club-internet.fr>
+
+    * INSTALL.Ubuntu: New file listing dependencies to install on Ubuntu in
+    order to build both GNUstep and Etoile "manually".
+
+2006-09-23  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Frameworks/GNUmakefile: Included new PopplerKit and AddressesKit 
+    frameworks by default in Etoile build process.
+
+2006-09-13  Quentin Mathe <qmathe@club-internet.fr>
+
+    * setup.sh: Fixed etoile_system deployment by taking in account that 
+    products built by gnustep-make are now always located in 'obj' and not
+    anymore in 'shared_obj' too. This is related to latest Nicola Pero
+    modifications in gnustep-make (in the days following gnustep-make 1.13 
+    release).
+
+2006-09-12  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Services/User/GNUmakefile: Included Typewriter in Etoile build process by
+    default.
+
+2006-09-03  Quentin Mathe <qmathe@club-internet.fr>
+
+    * README: Updated url in Contribute section and added new authors.
+    * INSTALL: Updated GNUstep libraries requirements to match latest releases,
+    this choice avoids the pain to support older versions for now. Added a tip 
+    about OniGuruma now available in the repository. Modified Install section
+    to discuss new setup.sh script. Added Uninstall section, discussing 
+    setdown.sh script too. Added a warning in Custom Build and Install section 
+    to outline the important bug that prevents to a build a single module as 
+    documented.
+
+2006-08-31  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Services/User/GNUmakefile: Included Grr in Etoile build process by 
+    default now.
+
+2006-08-23  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Fixed the library related flag in ADDITIONAL_LIB_DIRS to 
+    safely reference shared_obj directory. Updated to include several
+    checks that test path related variables are set and won't translate into 
+    bad suprises with 'rm'. Removed $(DEPENDENCIES) from target prerequisites
+    since this variable isn't a target that results in an error (unless a 
+    file with the same name exists); now, we just check the variable is set
+    before trying to run dependency related code.
+
+2006-08-22  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Bundles/GNUmakefile: Updated build process to include WorkspaceSwitcher
+    by default. 
+
+2006-08-22  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.make: Added new makefile to provide various extensions specific to 
+    Etoile. When used, it currently enables smoother build process by taking of
+    care of including and linking internal dependencies automatically. It's not
+    necessary anymore to have a bunch of boilerplate code in each project to
+    handle each dependency.
+
+2006-08-21  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * setup.sh: Added more comments about /usr/share/xsessions path variations
+    depending on the host system and the display manager.
+
+2006-08-07  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * setup.sh: Replaced incorrect reference EtoileWildMenus by 
+    EtoileMenus.bundle in GSAppKitUserBundles, this allows EtoileWildMenus 
+    bundle to be loaded now. Added code to remove repeated slash in 'bundledir'
+    path, 'defaults' command was stumbling on it. 
+    Improved to take in account when the bundles have been installed in the 
+    user Library (well, logically when setup.sh is run without sudo or root 
+    permissions).
+
+2006-08-07  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * setup.sh:
+    * setdown.sh:
+    Major update to setup related scripts, setup.sh now includes the 
+    possibility to choose between a user deployment (without any privileges) 
+    and a system deployment (with sudo access or root).
+    Futhermore it takes now care to set the necessary defaults for bundles like
+    Camaelon and EtoileWildMenus (the update occurs in the defaults of the user
+    account which runs the script). By the way, the script handles Nesedah theme
+    deployment too.
+    setdown.sh has been updated in a symetric way allowing to revert from 
+    setup.sh effect.
+
+2006-08-06  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * setup.sh: New postinstall script which links or copies some stuff at the 
+    right locations to make Etoile first use a straightforward experience and 
+    not a nightmare anymore :-).
+    * setdown.sh: New uninstall script to reverse the effect of setup.sh.
+
+2006-06-05  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Frameworks/GNUmakefile: Updated to include XWindowServerKit in the build
+    process.
+
+2006-05-11  Nicolas Roard <nicolas@roard.com>
+
+    * Themes/Nesedah: Created the Themes directory and imported
+    the last version of the Nesedah theme.
+
+2006-02-16  Yen-Ju <yjchenx at gmail>
+
+    * Frameworks/GNUmakefile:
+    Do not compile ServicesBarKit on mac. 
+
+2006-02-16  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * ANNOUNCE: Added Etoile 0.1 press release.
+
+2006-01-18  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * INSTALL:
+    * README: 
+    Word wrapped the whole text to 80 characters, removed erratic 
+    tabs. Added Michael Hanni (WildMenus) in README Authors list.
+
+2006-01-18  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * GNUmakefile: Removed superfluous license notice and PMK mention.
+
+2005-11-29  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * INSTALL: Added (part of the much needed Build Guide).
+
+2005-11-29  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * README: Added (part of the much needed Build Guide).
+
+2005-11-09  Quentin Mathe <qmathe@club-internet.fr>
+    
+    Note: pmkfile is deprecated.
+    * GNUmakefile: Improved clarity for 'etoile' option.
+    * pmkfile: Updated (this file will be removed soon).
+
+2005-06-07  Quentin Mathe <qmathe@club-internet.fr>
+	
+	Warning! pmkfile not usable (unlike GNUmakefile now).
+	* GNUmakefile: Updated to force UnitKit build with 'developer-base=no' 
+	when 'make test=yes' is used.
+
+2005-05-21  Quentin Mathe <qmathe@club-internet.fr>
+	
+	Warning! pmkfile not usable (unlike GNUmakefile now).
+	* GNUmakefile: Updated to take in account developer examples.
+
+2005-03-20  Quentin Mathe <qmathe@club-internet.fr>
+	
+	Warning! pmkfile not usable (unlike GNUmakefile now).
+	* GNUmakefile: Updated to take in account user services.
+
+2005-03-12  Quentin Mathe <qmathe@club-internet.fr>
+	
+	Warning! pmkfile not usable (unlike GNUmakefile now).
+	* GNUmakefile: Added with the whole build support.
+
+2005-03-10  Quentin Mathe <qmathe@club-internet.fr>
+	
+	Warning! pmkfile and GNUmakefile not usable.
+	* pmkfile: Improved and updated to match new pmk versions.
+
+2005-01-04  Quentin Mathe <qmathe@club-internet.fr>
+	
+	Warning! pmkfile not usable.
+	* pmkfile: Added a pmkfile (pmk 0.8.2 needed) in order to check installation 
+	environment and control Etoile build options. To know more about pmk and 
+	install it : http://pmk.sourceforge.net/
