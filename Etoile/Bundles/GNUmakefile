@@ -28,23 +28,11 @@ ifeq ($(desktop-base), yes)
 
     export camaelon ?= yes
     export etoilewildmenus ?= yes
-    export workspaceswitcher ?= yes
     export etoilebehavior ?= yes
 
 endif
 
 #export etoile-extensions ?= yes
-
-#
-# At this time, SQLiteClient is not built by default by being not part of
-# etoile-extensions because it introduces too many dependencies.
-#
-
-#ifeq ($(etoile-extensions), yes)
-#
-#    export sqliteclient ?= yes
-#
-#endif
 
 #
 # Subprojects choice
@@ -54,17 +42,8 @@ ifeq ($(camaelon), yes)
     SUBPROJECTS += Camaelon
 endif
 
-ifeq ($(sqliteclient), yes)
-    SUBPROJECTS += SQLiteClient
-endif
-
 ifeq ($(etoilewildmenus), yes)
     SUBPROJECTS += EtoileWildMenus
-endif
-
-ifeq ($(workspaceswitcher), yes)
-    # In prepare to be removed in favor of using AZDock for workspace switching.
-    #SUBPROJECTS += WorkspaceSwitcher
 endif
 
 ifeq ($(etoilebehavior), yes)

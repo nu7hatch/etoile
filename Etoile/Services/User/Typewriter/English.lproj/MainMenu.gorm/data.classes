@@ -1,0 +1,27 @@
+{
+    "## Comment" = "Do NOT change this file, Gorm maintains it";
+    FirstResponder = {
+	Actions = (
+	    "printDocument:",
+	    "showCharacterPanel:",
+	    "showFindPanel:"
+	);
+	Super = NSObject;
+    };
+    OgreTextFinder = {
+	Actions = (
+	    "showFindPanel:"
+	);
+	Outlets = (
+	);
+	Super = NSObject;
+    };
+    TWController = {
+	Actions = (
+	    "showCharacterPanel:"
+	);
+	Outlets = (
+	);
+	Super = NSObject;
+    };
+}

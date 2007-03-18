@@ -1,0 +1,363 @@
+2007-03-17  Quentin Mathe <qmathe@club-internet.fr>
+
+	Last part of the update to support both sequential and parallel launch of
+	tasks.
+	* EtoileSystem.h:
+	* EtoileSystem.m:
+	New config file keys Priority and OnStart.
+	Written documentation for the keys supported in the config file.
+	New ivars _launchQueue, _launchGroup.
+	(-initWithArguments:): Added _launchQueue ivar init and moved config file
+	monitoring start to -run.
+	(-run): Moved the process starting to -applicationDidFinishLaunching:
+	(-applicationDidFinishLaunching:): Heavily modified to include config file
+	monitoring start and main method calls to launch processes by priority 
+	order. Also registers for task termination notifications.
+	(-noteApplicationLaunched:, 
+	-processQueueWithProcesses:, 
+	-processGroupQueueWithProcessQueue:, 
+	-startProcessesSequentiallyByPriorityOrder:,
+	startProcessesParallely:): New methods.
+	(-synchronizeProcessesWithConfigFile): Updated to take in account new keys
+	Priority and OnStart when creating task objects.
+	Improved or modified a bit logging statements across the file.
+	* SCTask.h:
+	* SCTask.m: 
+	New ivar launchFinished.
+	(+taskWithLaunchPath:priority:onStart:onDemand:withUserName:): Modified to
+	observe not all termination notifications but only the one related to 
+	ourself.
+	(-taskLaunched:): Modified to update new launchFinished flag.
+	(-taskTerminated:): Modified to take in account when a task exits before 
+	having finished to launch.
+	(-postTaskLaunched): New method.
+	* SystemTaskList.plist: Updated to include Priority number and OnStart 
+	boolean. Removed background process.
+	As a side effect, this update should fix bug #8729 and #8695
+
+2007-02-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	First part of an update to support both sequential and parallel launch of
+	tasks.
+	* SCTask.h:
+	* SCTask.m: 
+	New ivars launchPriority, launchOnStart and isNSApplication.
+	(+taskWithLaunchPath:): Updated to take in account name change of the 
+	designated factory method.
+	(+taskWithLaunchPath:priority:onStart:onDemand:withUserName:): Renamed and
+	updated +taskWithLaunchPath:onDemand:withUserName: to take two additional
+	parameters.
+	(-launch): Modified to synthetize a fake 
+	NSWorkspaceApplicationDidLaunchNotification for tool tasks.
+	(-launchPriority, -launchOnStart): Added accessors to match new ivars.
+	(-description, -taskLaunched:, -copyWithZone:): New methods.
+
+2007-02-08  Quentin Mathe <qmathe@club-internet.fr>
+
+	* EtoileSystem.m 
+	(-run): Modified to set NSApp delegate.
+	(-applicationDidFinishLaunching:): New method for debugging purpose 
+	currently.
+	(-findConfigFileAndStartUpdateMonitoring): NS_MESSAGE fix yet another
+	time. This corrects bizarre crash happening every time System tries to
+	display an alert panel.
+	* etoile.desktop: Modified to reference etoile script rather than 
+	etoile_system itself. (More to come about this in a next commit)
+
+
+2007-02-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ApplicationManager.m (-init):
+	Fixed a crash that often prevents to run the session more than few 
+	seconds. The problem lays in NS_MESSAGE use, that's why I replaced it
+	by the usual verbose code (as I already did for 
+	-checkTerminatingLaterApplicationWithName: invocation).
+	* SystemTaskList.plist: Modified to take care of AZBackground launch.
+
+2006-12-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ApplicationManager.h:
+	* ApplicationManager.m:
+	Minor code cleaning (better coding style conformance). Added or improved 
+	most of method documentation (involved some markup changes to use gsdoc 
+	format).
+
+2006-12-17  Yen-Ju Chen <yjchenx gmail>
+
+	* main.m: Avoid app icon.
+
+2006-12-17  Quentin Mathe <qmathe@club-internet.fr>
+
+	* SCTask.h:
+	* SCTask.m:
+	New ivars launchDate, runTime, launchFailureCount.
+	(-dealloc):
+	Updated for new ivars.
+	(+taskWithLaunchPath:onDemand:withUserName:): Updated to get notified 
+	itself of its own termination.
+	(+taskWithTask:):
+	(-runInterval):
+	(-launchFailureCount):
+	(-taskTerminated:):
+	New methods.
+	(-launch:): Overriden NSTask method.
+	* EtoileSystem.m (-startProcessWithDomain:error:): Modified to relaunch 
+	automatically system processes that exit prematurely (like on a crash), 
+	yet without getting stuck in starting a process that continously fails to
+	launch.
+
+2006-12-16  Quentin Mathe <qmathe@club-internet.fr>
+
+	* SCTask.h:
+	* SCTask.m:
+	New files. Moved SCTask code out of EtoileSystem.m.
+
+2006-12-11  Quentin Mathe <qmathe@club-internet.fr>
+
+	The commit r1334 introduces full log out support.
+	* ApplicationManager.h:
+	* ApplicationManager.m:
+	New SCSession protocol.
+	Removed terminateAllLock ivar. Added replyLock and logOut ivars.
+	Extended NSApplication informal protocol with Etoile category, it now
+	includes methods defined in EtoileBehavior.
+	(-dealloc):
+	(-init:):
+	ivars related update.
+	(+sharedIntance): Now returns instance created by +setUpServerInstance:.
+	This is temporary.
+	(+setUpServerInstance:):
+	(-userApplications): 
+	New methods.
+	(-noteApplicationTerminated:): Added code to finish the log out when the 
+	last running user application exits.
+	(-checkTerminatingLaterApplicationWithName:): Fixed and included clean up
+	code on log out cancellation.
+	(-terminateAllApplicationsOnOperation:): Finished the method that initiates
+	the log out. Reworked to act in a purely asynchronous way and match SCSession 
+	protocol implemented in EtoileBehavior.
+	(-replyToTerminate:info:): New method to let user applications reply to log
+	out request.
+	* EtoileSystem.h:
+	* EtoileSystem.m:
+	New ivars clientConnection and serverConnection (not yet used).
+	(-[SCTask name]): Updated to return application name with extension 
+	stripped out (this fixes applications tracking).
+	(+setUpServerInstance:): Modified to use our own connection rather than the
+	default one, this avoids any conflicts if we open more connections.
+	(-run): Modified to start NSApplication run loop, this is needed to display
+	alert panels.
+	(-maskedProcesses): Put ourself in masked processes.
+	(-logOutAndPowerOff:) Removed immediate call to -replyToLogOutOrPowerOff: 
+	in order to trigger the full log out procedure.
+	(-replyToLogOutOrPowerOff:): Now takes a dictionary as a parameter rather 
+	than a string. Error description is now picked in info parameter.
+	* main.m: Disabled our own run loop since we now use NSApplication one.
+
+2006-12-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ApplicationManager.h:
+	* ApplicationManager.m:
+	New ivars waitedApplications, terminateLaterTimers, terminateAllLock.
+	(-dealloc):
+	(-init:):
+	ivars related update.
+	(-checkTerminatingLaterApplicationWithName:): New method to check delayed
+	replies and triggered by a timer bound to each application requesting later
+	termination.
+	(-gracefullyTerminateAllApplicationsOnOperation:): Renamed
+	-terminateAllApplicationsOnOperation:. Lot of work to have a proper log out
+	support with a delay when an application doesn't reply, before cancelling 
+	the log out. Still work in progress and not yet enabled.
+	* EtoileSystem.h:
+	* EtoileSystem.m: 
+	Major SCTask rewrite to avoid opentool and openapp for launching. Now smart
+	enough to find the executable even with a simple app or tool name.
+	(-[SCTask launchWithOpentoolUtility]):
+	(-[SCTask launchWithOpenappUtility]):
+	Removed.
+	(-[SCTask launchForDomain:]): Cleant to match the changes.
+	(-[SCTask pathForName:): New method.
+	(-[SCTask taskWithLaunchPath:onDemand:withUserName:]): Made smarter :-)...
+	specially by looking for executable in application bundle. 
+	(-stopProcessWithDomain:error:): Modified to terminate tasks more carefully
+	and added log statements for debugging purpose.
+	(-gracefullyTerminateAllProcessesOnOperation:): Renamed
+	-terminateAllProcessesOnOperation: and fixed broken behavior by simply 
+	using -stopProcessWithDomain:error:.
+	(-logOutAndPowerOff:): Fixed limited log out support currently available. 
+	Modified to support asynchronous replies needed by ApplicationManager.
+	(-replyToLogOutOrPowerOff:): New method called asynchronously by 
+	ApplicationManager to let System knows it should finish or cancel log out.
+
+2006-12-03  Quentin Mathe <qmathe@club-internet.fr>
+
+	* EtoileWorkspaceServerInfo.plist: Removed.
+	* SystemTaskList.plist: Added.
+	* EtoileSystem.h:
+	* EtoileSystem.m: 
+	Updated to use SystemTaskList (the system tasks aren't harcoded anymore in 
+	SCSystem).
+
+2006-10-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* WorkspaceCommKit/GNUmakefile.preamble: Modified to redefine PROJECT_DIR 
+	properly, so WorkspaceCommKit is exported by etoile.make (patch by Frederic
+	Point). Services/Private/GNUmakefile modified too.
+
+2006-10-22  Quentin Mathe <qmathe@club-internet.fr>
+
+	This update enables requesting running applications the possibility to
+	log out, if they don't reply, they get killed. Very experimental!
+	* Controller.h:
+	* Controller.m:
+	Deleted.
+	* ApplicationManager.h:
+	* ApplicationManager.m:
+	Added LGPL license notices.
+	(-applicationShouldTerminateOnOperation:)
+	(-gracefullyTerminateAllApplicationsOnOperation:): 
+	Updated to match SCSystem changes. Now retrieve SCSystem instance directly
+	by calling -serverInstance instead of -sharedInstance which doesn't work
+	locally at this time.
+	(-gracefullyTerminateAllApplicationsOnOperation:): Modified to use private
+	NSWorkspace method -_connectApplication: instead of WorkspaceCommKit 
+	similarly named method.
+	* EtoileSystem.h:
+	* EtoileSystem.m:
+	Added some debugging logs. New 'path' ivar in SCTask. New constant 
+	EtoileSystemServerName, was EtoileWorkspaceServerAppName previously in
+	Controller.m.
+	(-[SCTask dealloc]):
+	(-[SCTask path]):
+	(-[SCTask name]):
+	New methods.
+	(-[SCSystem startProcessWithDomain:error:]): Improved to avoid starting 
+	several processes per domain.
+	(-[SCSystem maskedProcesses]): Renamed -hiddenProcesses method since such
+	tasks could be visible to the user (like MenuServer), they should just be
+	invisible to ApplicationManager.
+	(-[SCSystem gracefullyTerminateAllProcessesOnOperation:): Added early code 
+	skeleton.
+
+2006-10-19  Quentin Mathe <qmathe@club-internet.fr>
+
+    Update to provide basic session management. At this time only 'log out' is
+    supported in an unclean way (just by telling etoile_system to exit without
+    asking running applications to quit), yet the implementation for such
+    features is already here. This commit also introduces far more evolved 
+    process handling, system related tasks can now be controlled at run time 
+    with a config plist file.
+    * Controller.h:
+    * Controller.m:
+    * ApplicationManager.h:
+    * ApplicationManager.m:
+    * EtoileWorkspaceServerInfo.plist:
+    * NSArrayAdditions.h:
+    * NSArrayAdditions.m:
+    * NSDictionaryAdditions.h:
+    * NSDictionaryAdditions.m:
+    * NSSetAdditions.h:
+    * NSSetAdditions.m:
+    Added code written by Saso Kiselkov modified to fit into System.
+    * WorkspaceCommKit:
+    Added a private framework to allow communication between MenuServer and 
+    System. Should be replaced/merged into CoreObject once available. This 
+    small framework was written by Saso Kiselkov too.
+    * main.m: Modified to use the default run loop rather than a new one.
+    * GNUmakefile: Updated to take care of WorkspaceCommKit as a subproject and
+    to link gnustep-gui as a temporary solution (giving access to NSWorkspace
+    and applications related stuff).
+    * EtoileSystem.h:
+    * EtoileSystem.m:
+    Massive update including new ivars and a bunch of new methods taken from
+    Saso code.
+    (SetNonNullError()): New helper function to report error.
+    (-[SCTask  isHidden]):
+    (-[SCTask isStopped]):
+    New methods with related ivars.
+    (+[SCTask taskWithLaunchPath:onDemand:withUserName:): Updated to init new 
+    ivars.
+    (-[SCTask terminate]): Overriden NSTask method to set 'stopped' ivar value
+    properly on termination request.
+    (+setUpServerInstance:): Modified to set the connection delegate.
+    (-initWithArguments:): Modified to call 
+    -findConfigFileAndStartUpdateMonitoring and 
+    -synchronizeProcessesWithConfigFile. Removed gdomap from launched processes
+    since it needs to be run as root and this isn't true for etoile_system at
+    this time.
+    (-startProcessWithDomain:)
+    (-restartProcessWithDomain:)
+    (-stopProcessWithDomain:)
+    (-suspendProcessWithDomain:):
+    Modified the methods to take an error paramater in the form of an extra
+    'error: (NSError **)error' part at the end of the signature.
+    (-startProcessWithDomain:): Don't start a process already running and 
+    add notifications observing to have feedback when the process will die.
+    (-loadConfigList): Updated to call -checkConfigFileUpdate.
+    (-hiddenProcess)
+    (-gracefullyTerminateAllProcessesOnOperation:)
+    (-logOutAndPowerOff:):
+    (-startProcessWithUserFeedbackForDomain:)
+    (-findConfigFileAndStartUpdateMonitoring)
+    (-checkConfigFileUpdate)
+    (-synchronizeProcessesWithConfigFile)
+    (-processTerminated:):
+    New methods.
+    
+2006-08-06  Quentin Mathe <qmathe@club-internet.fr>
+
+    * etoile.desktop: Added xsessions file following Freedesktop 'Desktop Entry' 
+    spec and to be used with GDM, KDM etc. Trying Etoile should be enjoyable 
+    now :-)
+
+2006-08-06  Quentin Mathe <qmathe@club-internet.fr>
+
+    * EtoileSystem.h: Documented Task/Process Info Dictionary Schema (used for 
+    config files stored in plist form). Removed superfluous SCEtoileSystem
+    protocol.
+    (-loadConfigList):
+    (-saveConfigList):
+    (+serverInstance):
+    (+setUpServerInstance:):
+    Declared new methods.
+    * EtoileSystem.m: Documented Main System Process List. Morphed NSTask
+    category in a new SCTask class and replaced dot separator in domains by the 
+    usual slash.
+    (+[SCTask taskWithLaunchPath:]): Updated.
+    (+[SCTask taskWithLaunchPath:onDemand:withUserName]):
+    (-[SCTask launchForDomain:]): Replaced dot separator in domains by the 
+    usual slash.
+    (-[SCTask launchOnDemand]):
+    (+[SCSystem initialize]):
+    (+[SCSystem serverInstance]):
+    (+[SCSystem setUpServerInstance:]):
+    New methods.
+    (+[SCSystem sharedInstance]): Fixed to return a singleton (or precisely a
+    proxy for the singleton located on the server side), was wrongly returning
+    a simple instance.
+    (-[SCSystem init]): Updated to use SCTask now and replaced dot separator in
+    domains by the usual slash.
+    (-[SCSystem run]): Modified to launch only tasks not used on demand.
+    (-[SCSystem startProcessWithDomain:]): Removed a bunch of error logging 
+    code that isn't useful. Replaced 'NSTask' references by 'SCTask'.
+    (-[SCSystem restartProcessWithDomain:): Introduced a new boolean 'stopped'
+    to make the code more readable.
+    (-[SCSystem registerProcessForDomain:): 
+    (-[SCSystem unregisterProcessForDomain:
+    Removed SCEtoileSytem protocol.
+    * main.m: Modified to properly set up a server instance for SCSystem and 
+    a run loop that avoids the daemon exits immediately.
+    * GNUmakefile: Minor update to disable direct install in /usr/local/bin, we
+    rather let the setup script (to be committed in trunk/Etoile) creating a 
+    link in /usr/local/bin or elsewhere.
+
+2006-03-05  Quentin Mathe <qmathe@club-internet.fr>
+
+    * ChangeLog:
+    * COPYING:
+    * EtoileSystem.h:
+    * EtoileSystem.m:
+    * main.m:
+    * GNUmakefile:
+    Initial import of EtoileSystem tool which owns any running Etoile system.

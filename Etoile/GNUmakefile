@@ -77,6 +77,6 @@ endif
 #
 
 #SUBPROJECTS = Frameworks Languages Bundles Services Developer #Documentation
-SUBPROJECTS = Frameworks Languages Bundles
+SUBPROJECTS = Frameworks Languages Bundles Services
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
