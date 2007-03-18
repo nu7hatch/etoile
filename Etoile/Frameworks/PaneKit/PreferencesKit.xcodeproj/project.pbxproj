@@ -1,0 +1,803 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 42;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		600B9C68087296F70024A432 /* PKPreferencePane.m in Sources */ = {isa = PBXBuildFile; fileRef = 600B9BBC08721F5B0024A432 /* PKPreferencePane.m */; };
+		600B9D5B0872A1EB0024A432 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97325FDCFA39411CA2CEA /* Foundation.framework */; };
+		600B9DD80872A1EF0024A432 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97324FDCFA39411CA2CEA /* AppKit.framework */; };
+		600B9E9C0872A46F0024A432 /* UnitKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 600B9E9B0872A46F0024A432 /* UnitKit.framework */; };
+		600B9FAF0872BAE50024A432 /* PKPreferencePane.h in Headers */ = {isa = PBXBuildFile; fileRef = 600B9BBB08721F5B0024A432 /* PKPreferencePane.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		600B9FB00872BAE50024A432 /* PKPreferencesController.h in Headers */ = {isa = PBXBuildFile; fileRef = 600B9BE7087222120024A432 /* PKPreferencesController.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		600B9FB30872BAE50024A432 /* PKTableViewPresentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 600B9BE9087222120024A432 /* PKTableViewPresentation.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		600B9FB40872BAE50024A432 /* PKToolbarPresentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 600B9BE8087222120024A432 /* PKToolbarPresentation.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		600B9FB70872BAF80024A432 /* PKPreferencePane.m in Sources */ = {isa = PBXBuildFile; fileRef = 600B9BBC08721F5B0024A432 /* PKPreferencePane.m */; };
+		600B9FB80872BAF80024A432 /* PKPreferencesController.m in Sources */ = {isa = PBXBuildFile; fileRef = 600B9BE5087222120024A432 /* PKPreferencesController.m */; };
+		600B9FBB0872BAF80024A432 /* PKTableViewPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 600B9BE4087222120024A432 /* PKTableViewPresentation.m */; };
+		600B9FC20872BB230024A432 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		604A3877099A099B0082342D /* PKTableViewPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 600B9BE4087222120024A432 /* PKTableViewPresentation.m */; };
+		604A387A099A09C20082342D /* PKPreferencesController.m in Sources */ = {isa = PBXBuildFile; fileRef = 600B9BE5087222120024A432 /* PKPreferencesController.m */; };
+		606766A8096EBD1100AF2C8A /* PKToolbarPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 606766A7096EBD1100AF2C8A /* PKToolbarPresentation.m */; };
+		606766A9096EBD1100AF2C8A /* PKToolbarPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 606766A7096EBD1100AF2C8A /* PKToolbarPresentation.m */; };
+		606766CB096EBDAE00AF2C8A /* PKMatrixViewPresentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 606766CA096EBDAE00AF2C8A /* PKMatrixViewPresentation.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		606766CE096EBDCB00AF2C8A /* PKMatrixViewPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 606766CD096EBDCB00AF2C8A /* PKMatrixViewPresentation.m */; };
+		606766CF096EBDCB00AF2C8A /* PKMatrixViewPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 606766CD096EBDCB00AF2C8A /* PKMatrixViewPresentation.m */; };
+		606766D1096EBDE300AF2C8A /* PKMatrixView.m in Sources */ = {isa = PBXBuildFile; fileRef = 606766D0096EBDE300AF2C8A /* PKMatrixView.m */; };
+		606766D2096EBDE300AF2C8A /* PKMatrixView.m in Sources */ = {isa = PBXBuildFile; fileRef = 606766D0096EBDE300AF2C8A /* PKMatrixView.m */; };
+		606766D4096EBE1000AF2C8A /* PKMatrixView.h in Headers */ = {isa = PBXBuildFile; fileRef = 606766D3096EBE1000AF2C8A /* PKMatrixView.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		60676757096EC28100AF2C8A /* NSPreferencePane.h in Headers */ = {isa = PBXBuildFile; fileRef = 60676756096EC28100AF2C8A /* NSPreferencePane.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		6067677C096EC2B700AF2C8A /* NSPreferencePane.m in Sources */ = {isa = PBXBuildFile; fileRef = 6067677B096EC2B700AF2C8A /* NSPreferencePane.m */; };
+		6067677D096EC2B700AF2C8A /* NSPreferencePane.m in Sources */ = {isa = PBXBuildFile; fileRef = 6067677B096EC2B700AF2C8A /* NSPreferencePane.m */; };
+		608A97A909291261009145A7 /* PKPresentationBuilder.h in Headers */ = {isa = PBXBuildFile; fileRef = 608A97A709291261009145A7 /* PKPresentationBuilder.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		608A97AA09291261009145A7 /* PKPresentationBuilder.m in Sources */ = {isa = PBXBuildFile; fileRef = 608A97A809291261009145A7 /* PKPresentationBuilder.m */; };
+		608A97AC09291261009145A7 /* PKPresentationBuilder.m in Sources */ = {isa = PBXBuildFile; fileRef = 608A97A809291261009145A7 /* PKPresentationBuilder.m */; };
+		608A97BC092A0D1B009145A7 /* CocoaCompatibility.h in Headers */ = {isa = PBXBuildFile; fileRef = 608A97BA092A0D1A009145A7 /* CocoaCompatibility.h */; };
+		60F5FC1D092FEF4400683FCF /* CocoaCompatibility.m in Sources */ = {isa = PBXBuildFile; fileRef = 60F5FC1C092FEF4400683FCF /* CocoaCompatibility.m */; };
+		60F5FC1E092FEF4400683FCF /* CocoaCompatibility.m in Sources */ = {isa = PBXBuildFile; fileRef = 60F5FC1C092FEF4400683FCF /* CocoaCompatibility.m */; };
+		E81D60F30B02D52000811C3D /* PaneKit.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60ED0B02D52000811C3D /* PaneKit.h */; };
+		E81D60F40B02D52000811C3D /* PKPane.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60EE0B02D52000811C3D /* PKPane.h */; };
+		E81D60F50B02D52000811C3D /* PKPaneRegistry.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60EF0B02D52000811C3D /* PKPaneRegistry.h */; };
+		E81D60F60B02D52000811C3D /* PKPanesController.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60F00B02D52000811C3D /* PKPanesController.h */; };
+		E81D60F70B02D52000811C3D /* PKPlainPresentation.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60F10B02D52000811C3D /* PKPlainPresentation.h */; };
+		E81D60F80B02D52000811C3D /* PKPreferencePaneRegistry.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60F20B02D52000811C3D /* PKPreferencePaneRegistry.h */; };
+		E81D60F90B02D52000811C3D /* PaneKit.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60ED0B02D52000811C3D /* PaneKit.h */; };
+		E81D60FA0B02D52000811C3D /* PKPane.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60EE0B02D52000811C3D /* PKPane.h */; };
+		E81D60FB0B02D52000811C3D /* PKPaneRegistry.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60EF0B02D52000811C3D /* PKPaneRegistry.h */; };
+		E81D60FC0B02D52000811C3D /* PKPanesController.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60F00B02D52000811C3D /* PKPanesController.h */; };
+		E81D60FD0B02D52000811C3D /* PKPlainPresentation.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60F10B02D52000811C3D /* PKPlainPresentation.h */; };
+		E81D60FE0B02D52000811C3D /* PKPreferencePaneRegistry.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60F20B02D52000811C3D /* PKPreferencePaneRegistry.h */; };
+		E81D61050B02D53D00811C3D /* GNUstep.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60FF0B02D53D00811C3D /* GNUstep.h */; };
+		E81D61060B02D53D00811C3D /* PKPane.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61000B02D53D00811C3D /* PKPane.m */; };
+		E81D61070B02D53D00811C3D /* PKPaneRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61010B02D53D00811C3D /* PKPaneRegistry.m */; };
+		E81D61080B02D53D00811C3D /* PKPanesController.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61020B02D53D00811C3D /* PKPanesController.m */; };
+		E81D61090B02D53D00811C3D /* PKPlainPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61030B02D53D00811C3D /* PKPlainPresentation.m */; };
+		E81D610A0B02D53D00811C3D /* PKPreferencePaneRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61040B02D53D00811C3D /* PKPreferencePaneRegistry.m */; };
+		E81D610B0B02D53D00811C3D /* GNUstep.h in Headers */ = {isa = PBXBuildFile; fileRef = E81D60FF0B02D53D00811C3D /* GNUstep.h */; };
+		E81D610C0B02D53D00811C3D /* PKPane.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61000B02D53D00811C3D /* PKPane.m */; };
+		E81D610D0B02D53D00811C3D /* PKPaneRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61010B02D53D00811C3D /* PKPaneRegistry.m */; };
+		E81D610E0B02D53D00811C3D /* PKPanesController.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61020B02D53D00811C3D /* PKPanesController.m */; };
+		E81D610F0B02D53D00811C3D /* PKPlainPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61030B02D53D00811C3D /* PKPlainPresentation.m */; };
+		E81D61100B02D53D00811C3D /* PKPreferencePaneRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = E81D61040B02D53D00811C3D /* PKPreferencePaneRegistry.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
+		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
+		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
+		600B9BBB08721F5B0024A432 /* PKPreferencePane.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 0; name = PKPreferencePane.h; path = Headers/PKPreferencePane.h; sourceTree = "<group>"; };
+		600B9BBC08721F5B0024A432 /* PKPreferencePane.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; name = PKPreferencePane.m; path = Source/PKPreferencePane.m; sourceTree = "<group>"; };
+		600B9BE4087222120024A432 /* PKTableViewPresentation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; name = PKTableViewPresentation.m; path = Source/PKTableViewPresentation.m; sourceTree = "<group>"; };
+		600B9BE5087222120024A432 /* PKPreferencesController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; name = PKPreferencesController.m; path = Source/PKPreferencesController.m; sourceTree = "<group>"; };
+		600B9BE7087222120024A432 /* PKPreferencesController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 0; name = PKPreferencesController.h; path = Headers/PKPreferencesController.h; sourceTree = "<group>"; };
+		600B9BE8087222120024A432 /* PKToolbarPresentation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 0; name = PKToolbarPresentation.h; path = Headers/PKToolbarPresentation.h; sourceTree = "<group>"; };
+		600B9BE9087222120024A432 /* PKTableViewPresentation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 0; name = PKTableViewPresentation.h; path = Headers/PKTableViewPresentation.h; sourceTree = "<group>"; };
+		600B9E9B0872A46F0024A432 /* UnitKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UnitKit.framework; path = /Library/Frameworks/UnitKit.framework; sourceTree = "<absolute>"; };
+		600B9F8F0872BA230024A432 /* PreferencesKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; name = PreferencesKit.framework; path = /Users/yjchen/Etoile/Frameworks/PaneKit/build/Development/PreferencesKit.framework; sourceTree = "<absolute>"; };
+		604B431D0924BCA300127256 /* ChangeLog */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = ChangeLog; sourceTree = "<group>"; };
+		604B431F0924BDC400127256 /* PreferencesKit.xcclassmodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcclassmodel; path = PreferencesKit.xcclassmodel; sourceTree = "<group>"; };
+		606766A7096EBD1100AF2C8A /* PKToolbarPresentation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PKToolbarPresentation.m; path = Source/PKToolbarPresentation.m; sourceTree = "<group>"; };
+		606766CA096EBDAE00AF2C8A /* PKMatrixViewPresentation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PKMatrixViewPresentation.h; path = Headers/PKMatrixViewPresentation.h; sourceTree = "<group>"; };
+		606766CD096EBDCB00AF2C8A /* PKMatrixViewPresentation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PKMatrixViewPresentation.m; path = Source/PKMatrixViewPresentation.m; sourceTree = "<group>"; };
+		606766D0096EBDE300AF2C8A /* PKMatrixView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PKMatrixView.m; path = Source/PKMatrixView.m; sourceTree = "<group>"; };
+		606766D3096EBE1000AF2C8A /* PKMatrixView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PKMatrixView.h; path = Source/PKMatrixView.h; sourceTree = "<group>"; };
+		60676756096EC28100AF2C8A /* NSPreferencePane.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NSPreferencePane.h; path = Headers/NSPreferencePane.h; sourceTree = "<group>"; };
+		6067677B096EC2B700AF2C8A /* NSPreferencePane.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NSPreferencePane.m; path = Source/NSPreferencePane.m; sourceTree = "<group>"; };
+		608A97A709291261009145A7 /* PKPresentationBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PKPresentationBuilder.h; path = Headers/PKPresentationBuilder.h; sourceTree = "<group>"; };
+		608A97A809291261009145A7 /* PKPresentationBuilder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PKPresentationBuilder.m; path = Source/PKPresentationBuilder.m; sourceTree = "<group>"; };
+		608A97BA092A0D1A009145A7 /* CocoaCompatibility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CocoaCompatibility.h; path = Headers/CocoaCompatibility.h; sourceTree = "<group>"; };
+		60F5FC1C092FEF4400683FCF /* CocoaCompatibility.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = CocoaCompatibility.m; path = Source/CocoaCompatibility.m; sourceTree = "<group>"; };
+		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; lineEnding = 0; path = Info.plist; sourceTree = "<group>"; };
+		E81D60ED0B02D52000811C3D /* PaneKit.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PaneKit.h; path = Headers/PaneKit.h; sourceTree = "<group>"; };
+		E81D60EE0B02D52000811C3D /* PKPane.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PKPane.h; path = Headers/PKPane.h; sourceTree = "<group>"; };
+		E81D60EF0B02D52000811C3D /* PKPaneRegistry.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PKPaneRegistry.h; path = Headers/PKPaneRegistry.h; sourceTree = "<group>"; };
+		E81D60F00B02D52000811C3D /* PKPanesController.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PKPanesController.h; path = Headers/PKPanesController.h; sourceTree = "<group>"; };
+		E81D60F10B02D52000811C3D /* PKPlainPresentation.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PKPlainPresentation.h; path = Headers/PKPlainPresentation.h; sourceTree = "<group>"; };
+		E81D60F20B02D52000811C3D /* PKPreferencePaneRegistry.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PKPreferencePaneRegistry.h; path = Headers/PKPreferencePaneRegistry.h; sourceTree = "<group>"; };
+		E81D60FF0B02D53D00811C3D /* GNUstep.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = GNUstep.h; path = Source/GNUstep.h; sourceTree = "<group>"; };
+		E81D61000B02D53D00811C3D /* PKPane.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = PKPane.m; path = Source/PKPane.m; sourceTree = "<group>"; };
+		E81D61010B02D53D00811C3D /* PKPaneRegistry.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = PKPaneRegistry.m; path = Source/PKPaneRegistry.m; sourceTree = "<group>"; };
+		E81D61020B02D53D00811C3D /* PKPanesController.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = PKPanesController.m; path = Source/PKPanesController.m; sourceTree = "<group>"; };
+		E81D61030B02D53D00811C3D /* PKPlainPresentation.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = PKPlainPresentation.m; path = Source/PKPlainPresentation.m; sourceTree = "<group>"; };
+		E81D61040B02D53D00811C3D /* PKPreferencePaneRegistry.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = PKPreferencePaneRegistry.m; path = Source/PKPreferencePaneRegistry.m; sourceTree = "<group>"; };
+		E8E0463A0B02D66C001ACFF7 /* LuceneKitTest.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = LuceneKitTest.bundle; path = /Users/yjchen/Etoile/Frameworks/PaneKit/build/Development/LuceneKitTest.bundle; sourceTree = "<absolute>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		600B9BFC0872293E0024A432 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				600B9DD80872A1EF0024A432 /* AppKit.framework in Frameworks */,
+				600B9D5B0872A1EB0024A432 /* Foundation.framework in Frameworks */,
+				600B9E9C0872A46F0024A432 /* UnitKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		600B9F8D0872BA230024A432 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				600B9FC20872BB230024A432 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		080E96DDFE201D6D7F000001 /* Classes */ = {
+			isa = PBXGroup;
+			children = (
+				600B9F980872BA330024A432 /* PaneKit */,
+				E81D60FF0B02D53D00811C3D /* GNUstep.h */,
+				E81D61000B02D53D00811C3D /* PKPane.m */,
+				E81D61010B02D53D00811C3D /* PKPaneRegistry.m */,
+				E81D61020B02D53D00811C3D /* PKPanesController.m */,
+				E81D61030B02D53D00811C3D /* PKPlainPresentation.m */,
+				E81D61040B02D53D00811C3D /* PKPreferencePaneRegistry.m */,
+				60F5FC1C092FEF4400683FCF /* CocoaCompatibility.m */,
+				6067677B096EC2B700AF2C8A /* NSPreferencePane.m */,
+				600B9BBC08721F5B0024A432 /* PKPreferencePane.m */,
+				600B9BE5087222120024A432 /* PKPreferencesController.m */,
+				608A97A809291261009145A7 /* PKPresentationBuilder.m */,
+				606766A7096EBD1100AF2C8A /* PKToolbarPresentation.m */,
+				606766CD096EBDCB00AF2C8A /* PKMatrixViewPresentation.m */,
+				606766D0096EBDE300AF2C8A /* PKMatrixView.m */,
+				600B9BE4087222120024A432 /* PKTableViewPresentation.m */,
+			);
+			name = Classes;
+			sourceTree = "<group>";
+		};
+		1058C7A0FEA54F0111CA2CBB /* Linked Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				600B9E9B0872A46F0024A432 /* UnitKit.framework */,
+				1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */,
+			);
+			name = "Linked Frameworks";
+			sourceTree = "<group>";
+		};
+		1058C7A2FEA54F0111CA2CBB /* Other Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				29B97325FDCFA39411CA2CEA /* Foundation.framework */,
+				29B97324FDCFA39411CA2CEA /* AppKit.framework */,
+			);
+			name = "Other Frameworks";
+			sourceTree = "<group>";
+		};
+		19C28FACFE9D520D11CA2CBB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		29B97314FDCFA39411CA2CEA /* GSSystemPreferences */ = {
+			isa = PBXGroup;
+			children = (
+				604B431D0924BCA300127256 /* ChangeLog */,
+				604B431F0924BDC400127256 /* PreferencesKit.xcclassmodel */,
+				080E96DDFE201D6D7F000001 /* Classes */,
+				29B97315FDCFA39411CA2CEA /* Other Sources */,
+				29B97317FDCFA39411CA2CEA /* Resources */,
+				29B97323FDCFA39411CA2CEA /* Frameworks */,
+				19C28FACFE9D520D11CA2CBB /* Products */,
+			);
+			name = GSSystemPreferences;
+			sourceTree = "<group>";
+		};
+		29B97315FDCFA39411CA2CEA /* Other Sources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "Other Sources";
+			sourceTree = "<group>";
+		};
+		29B97317FDCFA39411CA2CEA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				8D1107310486CEB800E47090 /* Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		29B97323FDCFA39411CA2CEA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1058C7A0FEA54F0111CA2CBB /* Linked Frameworks */,
+				1058C7A2FEA54F0111CA2CBB /* Other Frameworks */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		600B9F980872BA330024A432 /* PaneKit */ = {
+			isa = PBXGroup;
+			children = (
+				E81D60ED0B02D52000811C3D /* PaneKit.h */,
+				E81D60EE0B02D52000811C3D /* PKPane.h */,
+				E81D60EF0B02D52000811C3D /* PKPaneRegistry.h */,
+				E81D60F00B02D52000811C3D /* PKPanesController.h */,
+				E81D60F10B02D52000811C3D /* PKPlainPresentation.h */,
+				E81D60F20B02D52000811C3D /* PKPreferencePaneRegistry.h */,
+				608A97BA092A0D1A009145A7 /* CocoaCompatibility.h */,
+				60676756096EC28100AF2C8A /* NSPreferencePane.h */,
+				600B9BBB08721F5B0024A432 /* PKPreferencePane.h */,
+				600B9BE7087222120024A432 /* PKPreferencesController.h */,
+				608A97A709291261009145A7 /* PKPresentationBuilder.h */,
+				600B9BE8087222120024A432 /* PKToolbarPresentation.h */,
+				606766CA096EBDAE00AF2C8A /* PKMatrixViewPresentation.h */,
+				606766D3096EBE1000AF2C8A /* PKMatrixView.h */,
+				600B9BE9087222120024A432 /* PKTableViewPresentation.h */,
+			);
+			name = PaneKit;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		600B9BF90872293E0024A432 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E81D60F90B02D52000811C3D /* PaneKit.h in Headers */,
+				E81D60FA0B02D52000811C3D /* PKPane.h in Headers */,
+				E81D60FB0B02D52000811C3D /* PKPaneRegistry.h in Headers */,
+				E81D60FC0B02D52000811C3D /* PKPanesController.h in Headers */,
+				E81D60FD0B02D52000811C3D /* PKPlainPresentation.h in Headers */,
+				E81D60FE0B02D52000811C3D /* PKPreferencePaneRegistry.h in Headers */,
+				E81D610B0B02D53D00811C3D /* GNUstep.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		600B9F8A0872BA230024A432 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				600B9FAF0872BAE50024A432 /* PKPreferencePane.h in Headers */,
+				600B9FB00872BAE50024A432 /* PKPreferencesController.h in Headers */,
+				600B9FB30872BAE50024A432 /* PKTableViewPresentation.h in Headers */,
+				600B9FB40872BAE50024A432 /* PKToolbarPresentation.h in Headers */,
+				608A97A909291261009145A7 /* PKPresentationBuilder.h in Headers */,
+				608A97BC092A0D1B009145A7 /* CocoaCompatibility.h in Headers */,
+				606766CB096EBDAE00AF2C8A /* PKMatrixViewPresentation.h in Headers */,
+				606766D4096EBE1000AF2C8A /* PKMatrixView.h in Headers */,
+				60676757096EC28100AF2C8A /* NSPreferencePane.h in Headers */,
+				E81D60F30B02D52000811C3D /* PaneKit.h in Headers */,
+				E81D60F40B02D52000811C3D /* PKPane.h in Headers */,
+				E81D60F50B02D52000811C3D /* PKPaneRegistry.h in Headers */,
+				E81D60F60B02D52000811C3D /* PKPanesController.h in Headers */,
+				E81D60F70B02D52000811C3D /* PKPlainPresentation.h in Headers */,
+				E81D60F80B02D52000811C3D /* PKPreferencePaneRegistry.h in Headers */,
+				E81D61050B02D53D00811C3D /* GNUstep.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		600B9BFE0872293E0024A432 /* PreferencesKitTest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 600B9C010872293F0024A432 /* Build configuration list for PBXNativeTarget "PreferencesKitTest" */;
+			buildPhases = (
+				600B9BF90872293E0024A432 /* Headers */,
+				600B9BFA0872293E0024A432 /* Resources */,
+				600B9BFB0872293E0024A432 /* Sources */,
+				600B9BFC0872293E0024A432 /* Frameworks */,
+				600B9BFD0872293E0024A432 /* ShellScript */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PreferencesKitTest;
+			productName = UnitKit;
+			productReference = E8E0463A0B02D66C001ACFF7 /* LuceneKitTest.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
+		600B9F8E0872BA230024A432 /* PaneKit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 600B9F910872BA250024A432 /* Build configuration list for PBXNativeTarget "PaneKit" */;
+			buildPhases = (
+				E8E046690B02DA59001ACFF7 /* ShellScript */,
+				600B9F8A0872BA230024A432 /* Headers */,
+				600B9F8B0872BA230024A432 /* Resources */,
+				600B9F8C0872BA230024A432 /* Sources */,
+				600B9F8D0872BA230024A432 /* Frameworks */,
+				E80441CA0B02DC8800A3DA4F /* ShellScript */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PaneKit;
+			productName = PreferencesKit;
+			productReference = 600B9F8F0872BA230024A432 /* PreferencesKit.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		29B97313FDCFA39411CA2CEA /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 600B9B95087213F90024A432 /* Build configuration list for PBXProject "PreferencesKit" */;
+			hasScannedForEncodings = 1;
+			mainGroup = 29B97314FDCFA39411CA2CEA /* GSSystemPreferences */;
+			projectDirPath = "";
+			targets = (
+				600B9F8E0872BA230024A432 /* PaneKit */,
+				600B9BFE0872293E0024A432 /* PreferencesKitTest */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		600B9BFA0872293E0024A432 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		600B9F8B0872BA230024A432 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		600B9BFD0872293E0024A432 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "/usr/local/bin/ukrun \"$TARGET_BUILD_DIR/$PRODUCT_NAME.$WRAPPER_EXTENSION\"";
+		};
+		E80441CA0B02DC8800A3DA4F /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "rm $SRCROOT/PaneKit";
+		};
+		E8E046690B02DA59001ACFF7 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "ln -fs $SRCROOT/Headers $SRCROOT/PaneKit";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		600B9BFB0872293E0024A432 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				604A387A099A09C20082342D /* PKPreferencesController.m in Sources */,
+				600B9C68087296F70024A432 /* PKPreferencePane.m in Sources */,
+				608A97AC09291261009145A7 /* PKPresentationBuilder.m in Sources */,
+				60F5FC1E092FEF4400683FCF /* CocoaCompatibility.m in Sources */,
+				606766A9096EBD1100AF2C8A /* PKToolbarPresentation.m in Sources */,
+				606766CF096EBDCB00AF2C8A /* PKMatrixViewPresentation.m in Sources */,
+				606766D2096EBDE300AF2C8A /* PKMatrixView.m in Sources */,
+				604A3877099A099B0082342D /* PKTableViewPresentation.m in Sources */,
+				6067677D096EC2B700AF2C8A /* NSPreferencePane.m in Sources */,
+				E81D610C0B02D53D00811C3D /* PKPane.m in Sources */,
+				E81D610D0B02D53D00811C3D /* PKPaneRegistry.m in Sources */,
+				E81D610E0B02D53D00811C3D /* PKPanesController.m in Sources */,
+				E81D610F0B02D53D00811C3D /* PKPlainPresentation.m in Sources */,
+				E81D61100B02D53D00811C3D /* PKPreferencePaneRegistry.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		600B9F8C0872BA230024A432 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				600B9FB70872BAF80024A432 /* PKPreferencePane.m in Sources */,
+				600B9FB80872BAF80024A432 /* PKPreferencesController.m in Sources */,
+				600B9FBB0872BAF80024A432 /* PKTableViewPresentation.m in Sources */,
+				608A97AA09291261009145A7 /* PKPresentationBuilder.m in Sources */,
+				60F5FC1D092FEF4400683FCF /* CocoaCompatibility.m in Sources */,
+				606766A8096EBD1100AF2C8A /* PKToolbarPresentation.m in Sources */,
+				606766CE096EBDCB00AF2C8A /* PKMatrixViewPresentation.m in Sources */,
+				606766D1096EBDE300AF2C8A /* PKMatrixView.m in Sources */,
+				6067677C096EC2B700AF2C8A /* NSPreferencePane.m in Sources */,
+				E81D61060B02D53D00811C3D /* PKPane.m in Sources */,
+				E81D61070B02D53D00811C3D /* PKPaneRegistry.m in Sources */,
+				E81D61080B02D53D00811C3D /* PKPanesController.m in Sources */,
+				E81D61090B02D53D00811C3D /* PKPlainPresentation.m in Sources */,
+				E81D610A0B02D53D00811C3D /* PKPreferencePaneRegistry.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		600B9B96087213F90024A432 /* Development */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_MODEL_TUNING = G4;
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				INFOPLIST_FILE = Info.plist;
+				LIBRARY_STYLE = DYNAMIC;
+				ZERO_LINK = YES;
+			};
+			name = Development;
+		};
+		600B9B97087213F90024A432 /* Deployment */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEPLOYMENT_LOCATION = YES;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DSTROOT = /;
+				GCC_MODEL_TUNING = G4;
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				PRIVATE_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/PrivateHeaders";
+				PRODUCT_NAME = PreferencesKit;
+				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers";
+			};
+			name = Deployment;
+		};
+		600B9B98087213F90024A432 /* Default */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_MODEL_TUNING = G4;
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				INFOPLIST_FILE = Info.plist;
+				LIBRARY_STYLE = DYNAMIC;
+			};
+			name = Default;
+		};
+		600B9C020872293F0024A432 /* Development */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Foundation.framework/Headers/Foundation.h";
+				GCC_PREPROCESSOR_DEFINITIONS = HAVE_UKTEST;
+				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = NO;
+				INFOPLIST_FILE = "";
+				INSTALL_PATH = "$(USER_LIBRARY_DIR)/Bundles";
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+				);
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = LuceneKitTest;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = "-Wmost";
+			};
+			name = Development;
+		};
+		600B9C030872293F0024A432 /* Deployment */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Foundation.framework/Headers/Foundation.h";
+				GCC_PREPROCESSOR_DEFINITIONS = HAVE_UKTEST;
+				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = NO;
+				INFOPLIST_FILE = "";
+				INSTALL_PATH = "$(USER_LIBRARY_DIR)/Bundles";
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+				);
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = LuceneKitTest;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = "-Wmost";
+			};
+			name = Deployment;
+		};
+		600B9C040872293F0024A432 /* Default */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Foundation.framework/Headers/Foundation.h";
+				GCC_PREPROCESSOR_DEFINITIONS = HAVE_UKTEST;
+				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = NO;
+				INFOPLIST_FILE = "";
+				INSTALL_PATH = "$(USER_LIBRARY_DIR)/Bundles";
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+				);
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = LuceneKitTest;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = "-Wmost";
+			};
+			name = Default;
+		};
+		600B9F920872BA250024A432 /* Development */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_MODEL_TUNING = G4;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/AppKit.framework/Headers/AppKit.h";
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				HEADER_SEARCH_PATHS = (
+					..,
+					.,
+				);
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_MODE_FLAG = "a+rwX";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				MACH_O_TYPE = mh_dylib;
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+					"-framework",
+					AppKit,
+				);
+				OTHER_REZFLAGS = "";
+				PREBINDING = NO;
+				PRIVATE_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/PrivateHeaders";
+				PRODUCT_NAME = PaneKit;
+				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = NO;
+				WARNING_CFLAGS = (
+					"-Wmost",
+					"-Wno-four-char-constants",
+					"-Wno-unknown-pragmas",
+				);
+			};
+			name = Development;
+		};
+		600B9F930872BA250024A432 /* Deployment */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEPLOYMENT_LOCATION = YES;
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DSTROOT = /;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_MODEL_TUNING = G4;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/AppKit.framework/Headers/AppKit.h";
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_MODE_FLAG = "a+rwX";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				MACH_O_TYPE = mh_dylib;
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+					"-framework",
+					AppKit,
+				);
+				OTHER_REZFLAGS = "";
+				PREBINDING = NO;
+				PRIVATE_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/PrivateHeaders";
+				PRODUCT_NAME = PreferencesKit;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = (
+					"-Wmost",
+					"-Wno-four-char-constants",
+					"-Wno-unknown-pragmas",
+				);
+			};
+			name = Deployment;
+		};
+		600B9F940872BA250024A432 /* Default */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_MODEL_TUNING = G4;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/AppKit.framework/Headers/AppKit.h";
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_MODE_FLAG = "a+rwX";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				MACH_O_TYPE = mh_dylib;
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+					"-framework",
+					AppKit,
+				);
+				OTHER_REZFLAGS = "";
+				PREBINDING = NO;
+				PRIVATE_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/PrivateHeaders";
+				PRODUCT_NAME = PreferencesKit;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = (
+					"-Wmost",
+					"-Wno-four-char-constants",
+					"-Wno-unknown-pragmas",
+				);
+				ZERO_LINK = YES;
+			};
+			name = Default;
+		};
+		604D6EE0089D7D23002CA3F7 /* Development Installed */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Foundation.framework/Headers/Foundation.h";
+				GCC_PREPROCESSOR_DEFINITIONS = HAVE_UKTEST;
+				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = NO;
+				INFOPLIST_FILE = "";
+				INSTALL_PATH = "$(USER_LIBRARY_DIR)/Bundles";
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+				);
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = LuceneKitTest;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = "-Wmost";
+			};
+			name = "Development Installed";
+		};
+		604D6EE1089D7D23002CA3F7 /* Development Installed */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_MODEL_TUNING = G4;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/AppKit.framework/Headers/AppKit.h";
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_MODE_FLAG = "a+rwX";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				MACH_O_TYPE = mh_dylib;
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+					"-framework",
+					AppKit,
+				);
+				OTHER_REZFLAGS = "";
+				PREBINDING = NO;
+				PRIVATE_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/PrivateHeaders";
+				PRODUCT_NAME = PreferencesKit;
+				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = NO;
+				WARNING_CFLAGS = (
+					"-Wmost",
+					"-Wno-four-char-constants",
+					"-Wno-unknown-pragmas",
+				);
+			};
+			name = "Development Installed";
+		};
+		604D6EE2089D7D23002CA3F7 /* Development Installed */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_LOCATION = YES;
+				DSTROOT = /;
+				GCC_MODEL_TUNING = G4;
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				PREBINDING = YES;
+				PRIVATE_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/PrivateHeaders";
+				PRODUCT_NAME = PreferencesKit;
+				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers";
+				ZERO_LINK = YES;
+			};
+			name = "Development Installed";
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		600B9B95087213F90024A432 /* Build configuration list for PBXProject "PreferencesKit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				600B9B96087213F90024A432 /* Development */,
+				604D6EE2089D7D23002CA3F7 /* Development Installed */,
+				600B9B97087213F90024A432 /* Deployment */,
+				600B9B98087213F90024A432 /* Default */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Default;
+		};
+		600B9C010872293F0024A432 /* Build configuration list for PBXNativeTarget "PreferencesKitTest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				600B9C020872293F0024A432 /* Development */,
+				604D6EE0089D7D23002CA3F7 /* Development Installed */,
+				600B9C030872293F0024A432 /* Deployment */,
+				600B9C040872293F0024A432 /* Default */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Default;
+		};
+		600B9F910872BA250024A432 /* Build configuration list for PBXNativeTarget "PaneKit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				600B9F920872BA250024A432 /* Development */,
+				604D6EE1089D7D23002CA3F7 /* Development Installed */,
+				600B9F930872BA250024A432 /* Deployment */,
+				600B9F940872BA250024A432 /* Default */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Default;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 29B97313FDCFA39411CA2CEA /* Project object */;
+}

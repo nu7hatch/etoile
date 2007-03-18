@@ -1,0 +1,95 @@
+2007-02-28 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* Implement replace all in selection.
+	* Use Find panel title to show search result failed or successed.
+	* Use NSFindPboard to shared string in find text field.
+
+2007-02-19 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+        * Format README in reStructuedText
+
+2007-02-17 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Use OgreTextFinder to handle replaceAndFind: and replaceAll:.
+
+2007-02-16 Guenther Noack <guenther@unix-ag.uni-kl.de>
+
+	* Polished find panel: Improved layout, "Replace & Find" button,
+	  "Replace All" button, autofocusing the "Find" field, key view
+	  loop, proper window title.
+
+2006-11-22 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Make default find panel looks better.
+    * Fix loading nib with nil name.
+
+2006-10-20 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Put a note that it does not work with OniGuruma 5 yet.
+      If OgreKit does not update for OniGuruma,
+      we have to do it ourselves.
+
+2006-09-27 Quentin Mathe <qmathe@club-internet.fr>
+
+    * GNUmakefile: Updated to include etoile.make. This allows applications
+    like Typewriter to find OgreKit dependency in Build directory (reported
+    by Jesse Ross).
+    * GNUmakefile.headers_build: Fixed typo.
+
+2006-09-21 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Compile on mac (GNUstep).
+
+2006-09-16 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Update to OgreKit 2.1.2 and start to support GUI.
+    * Does not break LuceneKit SVN.
+    * Add options for regex and cse sensitive.
+    * Add replace and fix a nasty bug.
+
+2006-02-28 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Use OniGuruma 4.0.1 (3.x still work, but 4.x is better).
+
+2006-02-16 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+    * Update to OgreKit 2.1.1.
+    * As OgreKit (GNUstep) 1.1.
+
+2006-02-16 Quentin Mathe <qmathe@club-internet.fr>
+
+    * COPYING:
+    * TODO: 
+    Formatted to look nice :-)
+
+2006-02-07 Quentin Mathe <qmathe@club-internet.fr>
+
+    * INSTALL: Fixed bug reports contact.
+
+2006-01-23 Quentin Mathe <qmathe@club-internet.fr>
+
+    * GNUmakefile: Link AppKit (that should fix undefined reference errors 
+    reported with NSFont and NSFontManager in LuceneKitExample).
+
+2005-08-25 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* GNUmakefile:
+	Work on linux.
+
+2005-08-05 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* Headers/OgreKit.h:
+	Remove unnecessary include.
+
+2005-07-31 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* Source/TestOGRegularExpression.m:
+	Add more tests.
+
+2005-07-30 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* Build on Debian/PowerPC.
+
+2005-05-26 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+	
+	* Initial Import.

@@ -1,0 +1,123 @@
+2007-02-19  Yen-Ju Chen <yjchenx at gmail>
+
+    * Format README in reStructuredText.
+
+2005-11-30  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * GNUmakefile.headers: 
+    * GNUmakefile.headers_build:
+    Removed.
+    * GNUmakefile:
+    * Source/GNUmakefile:
+    Streamlined GNUmakefiles to be simpler and match usual framework build 
+    support. As a side effect, the repository compilation is fixed (at least
+    at BookmarkKit level). Also a bug fix for #7889.
+
+2005-11-16  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * GNUmakefile: Added etoile.make include in this makefile (this allows 
+    proper BookmarKit export in Build directory, then should help Grr 
+    compilation).
+
+2006-11-11  Yen-Ju Chen <yjchen at gmail>
+
+    * Compile on Cocoa.
+
+2006-11-10  Yen-Ju Chen <yjchen at gmail>
+
+    * Make sure object is properly retained and released.
+
+2006-11-03  Yen-Ju Chen <yjchen at gmail>
+
+    * Add -setName: and -name to access kBKGroupNameProperty.
+
+2006-10-27  Yen-Ju Chen <yjchen at gmail>
+
+    * Make unit test work on GNUstep.
+
+2006-10-25  Yen-Ju Chen <yjchen at gmail>
+
+    * Use NSNumber for number value.
+
+2006-10-24  Yen-Ju Chen <yjchen at gmail>
+
+    * Memory fix.
+
+2006-10-23  Yen-Ju Chen <yjchen at gmail>
+
+    * Add BKBookmarkView.
+
+2006-10-18  Yen-Ju Chen <yjchen at gmail>
+
+    * Implement last visited date.
+    * Add recent application bookmark store.
+
+2006-10-16  Yen-Ju Chen <yjchen at gmail>
+
+    * Support ordered top-level records.
+
+2006-10-15  Yen-Ju Chen <yjchen at gmail>
+
+    * Add kBKGroupNameProperty.
+    * Add -setURL: (BKBookmark).
+
+2006-10-14  Yen-Ju Chen <yjchen at gmail>
+
+    * Add title for bookmark.
+    * Compile on mac.
+
+2006-10-13  Yen-Ju Chen <yjchen at gmail>
+
+    * Fix top level;
+
+2006-10-12  Yen-Ju Chen <yjchen at gmail>
+
+    * Fix missing header.
+    * Make sure a record can have only one parent.
+    * Add save test (disable by default).
+
+2006-10-10  Yen-Ju Chen <yjchen at gmail>
+
+    * Basic implementation based on CollectionKit.
+
+2005-05-05  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * Source/GNUmakefile: Removed unneeded GNUSTEP_MAKEFILES definition which
+    seems to break compilation with recent GNUstep version.
+    
+2005-05-04  Quentin Mathe <qmathe@club-internet.fr>
+
+    * Source/BKBookmark.m: Fixed case mismatch which prevented compilation on 
+    case sensitive system (patch provided by Rob Burns).
+
+2005-03-10  Quentin Mathe <qmathe@club-internet.fr>
+
+    * INSTALL: Updated to talk about BookmarkKit and not Gorm
+    * Headers/BKBookmark.h:
+    * Headers/BKBookmarkQuery.h:
+    * Headers/BKBookmarkSearchResult.h:
+    * Headers/BKBookmarkStore.h:
+    * Source/BKBookmark.m:
+    * Source/BKBookmarkQuery.m:
+    * Source/BKBookmarkSearchResult.m:
+    * Source/BKBookmarkStore.m:
+    Updated in order BookmarkKit compiles (TrackerKit will be now optional) but
+    still no implementation.
+    * Source/GNUmakefile: Minor modifications.
+
+2004-08-14  Quentin Mathe <qmathe@club-internet.fr>
+
+    * ChangeLog:
+    * README:
+    * INSTALL:
+    * GNUmakefile:
+    * Headers/BKBookmark.h:
+    * Headers/BKBookmarkQuery.h:
+    * Headers/BKBookmarkSearchResult.h:
+    * Headers/BKBookmarkStore.h:
+    * Source/BKBookmark.m:
+    * Source/BKBookmarkQuery.m:
+    * Source/BKBookmarkSearchResult.m:
+    * Source/BKBookmarkStore.m:
+    * Source/GNUmakefile:
+    Initial import.
