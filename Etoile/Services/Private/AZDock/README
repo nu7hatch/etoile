@@ -1,0 +1,35 @@
+======
+AZDock
+======
+
+:Author: Yen-Ju Chen <yjchenx at gmail>
+:License: BSD license
+
+AZDock is a dock for Etoile
+It depends on XWindowServerKit 
+and requires Azalea for tracking xwindow windows.
+
+User Defaults
+-------------
+Key: DockPosition
+Value: 0 (Left side), 1 (Right side), 2 (Bottom side)
+
+NOTE
+----
+If you have GWorkspace installed, GNUstep will try to use it automatically.
+Therefore, whenever you start AZDock, GWorkspace will also start.
+If you don't want this to happen, use
+`defaults write NSGlobalDomain GSWorkspaceApplication NotExist.app` block it.
+
+TODO
+----
+* Drag file on icon and call -application:openFile: ?
+* Open new window if there is no one on current desktop.
+  (Or should we switch back to the existing one ? )
+* List all windows and documents on contextual menu.
+* Use freedesktop spec to get icon of xwindow applications
+  instead of caching our own.
+* Drag-and-drop to organize icon
+* Support docking regular file ? Or leave it to shelf ?.
+* Figure out how to change icon according to app icon from GNUstep application.
+  See AZGNUstepApp -acceptXWindow: for all options.
