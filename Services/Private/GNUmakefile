@@ -40,7 +40,7 @@ ifeq ($(azalea), yes)
 endif
 
 ifeq ($(background), yes)
-    #SUBPROJECTS += AZBackground
+    SUBPROJECTS += AZBackground
 endif
 
 ifeq ($(system),yes)
