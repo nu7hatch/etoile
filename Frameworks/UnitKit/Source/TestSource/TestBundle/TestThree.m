@@ -27,6 +27,16 @@
 
 @implementation TestThree
 
++ (void) testClass
+{
+    UKFail();
+}
+
++ (void) testClass1
+{
+    UKPass();
+}
+
 - (void) testOne
 {
     UKPass();
