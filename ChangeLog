@@ -1,3 +1,10 @@
+2007-03-22  Quentin Mathe <qmathe@club-internet.fr>
+
+	* setup.sh:
+	* setdown.sh:
+	Modified to set GWorkspace related defaults as suggested in bug reports
+	#8618 and #8668
+
 2007-03-18  Yen-Ju Chen <yjchenx gmail>
 
 	* Create stable branch for relatively stable components.
