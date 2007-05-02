@@ -138,6 +138,7 @@ unsigned long XWindowState(Window win)
 {
   Display *dpy = (Display*)[GSCurrentServer() serverDevice];
 
+  unsigned long return_value = -1;
   unsigned long *data = NULL;
   unsigned long count;
   Atom prop = XInternAtom(dpy, "WM_STATE", False);
@@ -150,13 +151,15 @@ unsigned long XWindowState(Window win)
                                   &after_ret, (unsigned char **)&data);
   if ((result != Success)) {
     NSLog(@"Error: cannot get client state");
-    if (data != NULL) {
-      XFree(data);
-    }
-    return -1;
   }
-  // Free data ?
-  return data[0];
+  else
+  {
+    return_value = data[0];
+  }
+  if (data != NULL) {
+    XFree(data);
+  }
+  return return_value; 
 }
 
 Atom *XWindowNetStates(Window win, unsigned long *count)
@@ -203,7 +206,8 @@ NSString* XWindowCommandPath(Window win)
   char **argv_return;
   
   int result = XGetCommand(dpy, win, &argv_return, &argc_return);
-  if ((result == 0) || (argc_return == 0)) {
+  if ((result == 0) || (argc_return == 0)) 
+  {
     //NSLog(@"No command available");
     return nil;
   }
@@ -238,6 +242,7 @@ void XWindowCloseWindow(Window win, BOOL forcefully)
 
   if (forcefully) {
     XKillClient(dpy, win);
+    return;
   } 
 
   Atom *data = NULL;
@@ -257,6 +262,7 @@ void XWindowCloseWindow(Window win, BOOL forcefully)
       XFree(data);
     }
     XKillClient(dpy, win);
+    return;
   } else {
     int i;
     for (i = 0; i < count; i++) {
@@ -288,29 +294,105 @@ BOOL XGNUstepWindowLevel(Window win, int *level)
 {
   Display *dpy = (Display*)[GSCurrentServer() serverDevice];
 
+  BOOL result_value = NO;
   unsigned long *data = NULL;
   Atom prop = XInternAtom(dpy, _GNUSTEP_WM_ATTR, False);
   Atom type_ret;
   int format_ret;
-  unsigned long after_ret, count;;
+  unsigned long after_ret, count;
   int result = XGetWindowProperty(dpy, win, prop,
                                   0, 0x7FFFFFFF, False, prop,
                                   &type_ret, &format_ret, &count,
                                   &after_ret, (unsigned char **)&data);
-  if ((result == Success)) {
-    if (data[0] & GSWindowLevelAttr) {
+  if ((result == Success)) 
+  {
+    if (data[0] & GSWindowLevelAttr) 
+    {
       *level = data[2];
-      if (data != NULL) {
-        XFree(data);
-      }
-      return YES;
+      result_value = YES;
     }
   }
-  if (data != NULL) {
+  if (data != NULL) 
+  {
     XFree(data);
   }
-  return NO;
+  return result_value;
 }
+
+void XWindowSetActiveWindow(Window win, Window old)
+{
+  Display *dpy = (Display*)[GSCurrentServer() serverDevice];
+  Window root_win = RootWindow(dpy, [[NSScreen mainScreen] screenNumber]);
+  Atom X_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+
+  XClientMessageEvent *xev = calloc(1, sizeof(XClientMessageEvent));
+  xev->type = ClientMessage;
+  xev->display = dpy;
+  xev->window = win;
+  xev->message_type = X_NET_ACTIVE_WINDOW;
+  xev->format = 32;
+  xev->data.l[0] = 2;
+  xev->data.l[1] = CurrentTime; /* Not sure about this */
+  xev->data.l[2] = (old == None) ? 0 : old;
+  xev->data.l[3] = 0;
+  XSendEvent(dpy, root_win, False,
+             SubstructureRedirectMask, (XEvent *)xev);
+  XFree(xev);
+}
+
+unsigned int XWindowDesktopOfWindow(Window win)
+{
+  Display *dpy = (Display*)[GSCurrentServer() serverDevice];
+
+  unsigned long *data = NULL;
+  Atom prop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+  Atom type_ret;
+  int format_ret;
+  unsigned long after_ret, count;
+  int result = XGetWindowProperty(dpy, win, prop,
+                                  0, 0x7FFFFFFF, False, XA_CARDINAL,
+                                  &type_ret, &format_ret, &count,
+                                  &after_ret, (unsigned char **)&data);
+  if ((result != Success)) {
+    NSLog(@"Error: cannot get _NET_WM_DESKTOP of client");
+    return -1;
+  }
+  int desktop = (int)*data;
+  XFree(data);
+  return desktop;
+}
+
+Window XWindowActiveWindow()
+{
+  Display *dpy = (Display*)[GSCurrentServer() serverDevice];
+  Window root_win = RootWindow(dpy, [[NSScreen mainScreen] screenNumber]);
+  Atom X_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+
+  Window window = None;
+  unsigned long num;
+  unsigned long *data = NULL;
+  Atom type_ret;
+  int format_ret;
+  unsigned long after_ret;
+  int result = XGetWindowProperty(dpy, root_win, X_NET_ACTIVE_WINDOW,
+                                  0, 0x7FFFFFFF, False, XA_WINDOW,
+                                  &type_ret, &format_ret, &num,
+                                  &after_ret, (unsigned char **)&data);
+  if ((result != Success)) 
+  {
+    NSLog(@"Error: cannot get active window.");
+  }
+  else
+  {
+    window = data[0];
+  }
+  if (data != NULL)
+  {
+    XFree(data);
+  }
+  return window;
+}
+
 
 /* Freedesktop.org stuff */
 NSString *XDGConfigHomePath()

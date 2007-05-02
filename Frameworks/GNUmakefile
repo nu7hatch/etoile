@@ -26,7 +26,8 @@ ifeq ($(desktop-base), yes)
     
     export collectionkit ?= yes
     export bookmarkkit ?= yes
-    export iconkit ?= no
+    export iconkit ?= yes
+    export inspectorkit ?= yes
     export panekit ?= yes
     export addresseskit ?= yes
 
@@ -40,10 +41,11 @@ ifeq ($(etoile-extensions), yes)
     export ogrekit ?= yes
     export lucenekit ?= no 
     export servicesbarkit ?= no
+    export opmlkit ?= yes
     export rsskit ?= yes
     export xwindowserverkit ?= yes
     export popplerkit ?= yes
-    export systemconfig ?= no
+    export systemconfig ?= yes
     
 endif
 
@@ -115,6 +117,10 @@ ifeq ($(rsskit), yes)
    SUBPROJECTS += RSSKit
 endif
 
+ifeq ($(opmlkit), yes)
+   SUBPROJECTS += OPMLKit
+endif
+
 ifeq ($(xwindowserverkit), yes)
    SUBPROJECTS += XWindowServerKit
 endif
@@ -136,7 +142,11 @@ ifeq ($(bookmarkkit), yes)
 endif
 
 ifeq ($(iconkit), yes)
-   #SUBPROJECTS += IconKit
+   SUBPROJECTS += IconKit
+endif
+
+ifeq ($(inspectorkit), yes)
+   SUBPROJECTS += InspectorKit
 endif
 
 ifeq ($(panekit), yes)
@@ -148,7 +158,7 @@ ifeq ($(addresseskit), yes)
 endif
 
 ifeq ($(systemconfig), yes)
-   #SUBPROJECTS += SystemConfig
+   SUBPROJECTS += SystemConfig
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
