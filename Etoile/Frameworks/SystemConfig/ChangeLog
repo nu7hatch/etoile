@@ -1,0 +1,55 @@
+2007-04-14  Yen-Ju Chen <yjchenx at gmail>
+
+	* Initial sound support.
+	* Keep volume between 0 and 100.
+
+2007-02-18  Yen-Ju Chen <yjchenx at gmail>
+
+	* Format README in reStructuredText
+
+2007-02-16  Guenther Noack <guenther@unix-ag.uni-kl.de>
+
+	* Source/X11Mouse.m:
+	Fixed error checking. (Does not apply to these functions.)
+
+2007-02-12  Guenther Noack <guenther@unix-ag.uni-kl.de>
+
+	* Headers/X11Mouse.h:
+	* Source/X11Mouse.m:
+	X11 mouse configuration code (untested)
+	
+	* Headers/SCConfig.h:
+	* Headers/SCConfig+Private.h:
+	* Source/SCConfig.m:
+	Added helper method for implementing classes
+	
+	* Headers/SCMonitor.h:
+	* Headers/SCMouse.h:
+	* Source/SCMonitor.m:
+	* Source/SCMouse.m:
+	Documented methods and implemented default methods
+
+2006-11-10  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/SCConfig.h:
+	* Source/SCConfig.m:
+	Modified to have a delegate object for error reporting.
+
+2006-11-08  Quentin Mathe <qmathe@club-internet.fr>
+
+	* COPYING:
+	* INSTALL:
+	* README:
+	* GNUmakefile:
+	* Headers/SCConfig.h:
+	* Headers/SCKeyboard.h:
+	* Headers/SCMonitor.h:
+	* Headers/SCMouse.h:
+	* Headers/SCSound.h:
+	* Source/SCConfig.m:
+	* Source/SCKeyboard.m:
+	* Source/SCMonitor.m:
+	* Source/SCMouse.m:
+	* Source/SCSound.m:
+	* Source/GNUmakefile:
+	Initial import (API draft without implementation code).
