@@ -40,7 +40,7 @@
 - (void) drawTitleBox: (NSRect) rect on: (id) box;
 - (void) setGroupBoxImages;
 - (float) boxBorderHeight;
-- (void) drawBox: (NSRect) rect on: (id) box;
+- (void) drawBox: (NSRect) rect on: (NSView *) box;
 - (void) drawWindowBackground: (NSRect) rect on: (id) window;
 - (void) drawPopupButton: (NSRect) border inView: (NSView*) view;
 - (void) drawHorizontalScrollerKnob: (NSRect) knob on: (NSView*) view;
@@ -52,7 +52,7 @@
 - (void) drawTopTabFill: (NSRect) rect selected: (BOOL) selected on: (NSView*) view;
 - (void) drawTabFrame: (NSRect) rect on: (NSView*) view;
 - (void) drawScrollViewFrame: (NSRect) rect on: (NSView*) view;
-- (void) drawFocusFrame: (NSRect) cellFrame;
+//- (void) drawFocusFrame: (NSRect) cellFrame;
 @end
 
 #endif // __GSDRAWFUNCTIONS_H__
