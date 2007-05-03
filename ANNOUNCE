@@ -1,16 +1,14 @@
-===================
-Étoilé 0.1 Released
-===================
+=====================
+Étoilé 0.1.9 Released
+=====================
 
-February 16, 2006 (From Internet). The Étoilé project today released the first 
-preview release of Étoilé User Environment, the next generation Desktop 
-Environment (based on GNUstep) for Linux and other Unix operating systems. 
-Étoilé 0.1 introduces Étoilé environment to public as a developer platform. This 
-release is mostly targeted at GNUstep/Cocoa developers and introduces several 
-frameworks that settle foundations for the future developments of the project.
+May 02, 2007 (From Internet). The Étoilé project today released the first 
+preview release of Étoilé User Environment 0.2, the next generation Desktop 
+Environment based on GNUstep for Linux and other Unix operating systems. 
+Étoilé 0.1.9 introduces Étoilé environment to public as a developer platform. 
+This release is mostly targeted at GNUstep/Cocoa developers.
 
-
-Key Features of Étoilé 0.1 for developers
+Key Features of Étoilé 0.1.9 for developers
 -----------------------------------------
 
 	* LuceneKit 0.1
@@ -50,8 +48,8 @@ More detailed Release Notes may be found here :
 Availability
 ------------
 
-Étoilé 0.1 is currently available in code source form only and may be downloaded 
-at <http://download.gna.org/etoile/> 
+Étoilé 0.1.9 is currently available in code source form only 
+and may be downloaded at <http://download.gna.org/etoile/> 
 Instructions to compile and install it are located at 
 <http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Install>
 For developer related documentation, visit 
@@ -76,6 +74,7 @@ More Information
 ----------------
 
 Visit our website: <http://www.etoile-project.org/>
+and blog: <http://www.etoile-project.org/etoile/blog/>
 Mail contact: qmathe@gna.org
 
 
@@ -86,4 +85,3 @@ References
     Cocoa: <http://developer.apple.com/cocoa/>
     Lucene: <http://lucene.apache.org/java/>
     OgreKit: <http://www8.ocn.ne.jp/~sonoisa/OgreKit/>
-    UnitKit: <http://www.unitkit.org/>
