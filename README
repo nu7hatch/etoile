@@ -35,9 +35,7 @@ Here are modules with supported Cocoa compatibility:
 
     * IconKit
     
-    * LuceneKit
-    
-    * PreferencesKit
+    * PaneKit 
 
 
 
@@ -73,25 +71,19 @@ related dependencies, you should read about GNUstep install on
     
     * gnustep-back
     
-    For IconKit (built by default)
+    For IconKit 
     
     * libpng
     
-    For LuceneKit (built by default)
+    For OgreKit 
+    
+    * OniGuruma <http://www.geocities.jp/kosako3/oniguruma/>
 
-    * zlib: compression/decompression
-    
-    For OgreKit (built by default)
-    
-    * OniGuruma
-    
-    For SQLiteClient (not built by default)
-    
-    * sqlite3
-    
-    * SQLClient (on GNUstep)
+    For System
 
-
+    * DBus <http://www.freedesktop.org/wiki/Software/dbus>
+    * HAL <http://www.freedesktop.org/wiki/Software_2fhal>
+    
 Contribute 
 ----------
 
