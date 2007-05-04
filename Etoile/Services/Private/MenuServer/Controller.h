@@ -24,24 +24,24 @@
 #import <Foundation/NSObject.h>
 #import <Foundation/NSGeometry.h>
 
-@class NSNotification, MenuBarWindow;
+@class NSNotification, MenuBarWindow, MenuBarView;
 
 extern MenuBarWindow * ServerMenuBarWindow;
 
 @interface Controller : NSObject
+{
+  MenuBarView *menuBarView;
 
-+ (NSRect) menuBarWindowFrame;
+  /* keep menu bar only big enough to fit etoile log and all menulets */
+  BOOL isShortFormat;
+}
+
+//+ (NSRect) menuBarWindowFrame;
 + (MenuBarWindow *) sharedMenuBarWindow;
-
-- (void) applicationDidFinishLaunching: (NSNotification *) notif;
-
-- (void) windowDidMove: (NSNotification *) notif;
 
 - (void) logOut: sender;
 - (void) sleep: sender;
 - (void) reboot: sender;
 - (void) shutDown: sender;
-
-- (id) workspaceApp;
 
 @end

@@ -20,7 +20,6 @@
    See the COPYING file for a copy of the GNU General Public License.
 */
 
-#import "AZDock.h"
 #import "config.h"
 #import "AZKeyboardHandler.h"
 #import "AZMouseHandler.h"
@@ -30,9 +29,6 @@
 #import "openbox.h"
 
 BOOL config_focus_new;
-BOOL config_focus_follow;
-unsigned int    config_focus_delay;
-BOOL config_focus_raise;
 BOOL config_focus_last;
 
 ObPlacePolicy config_place_policy;
@@ -45,25 +41,12 @@ NSString *config_title_layout;
 
 int    config_desktops_num;
 NSArray *config_desktops_names;
-int    config_screen_firstdesk;
+unsigned int    config_screen_firstdesk;
 
 BOOL config_resize_redraw;
 BOOL config_resize_four_corners;
 int     config_resize_popup_show;
 int     config_resize_popup_pos;
-
-ObStackingLayer config_dock_layer;
-BOOL        config_dock_floating;
-BOOL        config_dock_nostrut;
-ObDirection     config_dock_pos;
-int            config_dock_x;
-int            config_dock_y;
-ObOrientation   config_dock_orient;
-BOOL        config_dock_hide;
-unsigned int           config_dock_hide_delay;
-unsigned int           config_dock_show_delay;
-unsigned int           config_dock_app_move_button;
-unsigned int           config_dock_app_move_modifiers;
 
 unsigned int config_keyboard_reset_keycode;
 unsigned int config_keyboard_reset_state;
@@ -72,7 +55,6 @@ int config_mouse_threshold;
 int config_mouse_dclicktime;
 
 BOOL config_menu_warppointer;
-BOOL config_menu_xorstyle;
 unsigned int    config_menu_hide_delay;
 BOOL config_menu_client_list_icons;
 
@@ -221,12 +203,6 @@ static void parse_focus(AZParser *parser, xmlDocPtr doc, xmlNodePtr node,
     
     if ((n = parse_find_node("focusNew", node)))
         config_focus_new = parse_bool(doc, n);
-    if ((n = parse_find_node("followMouse", node)))
-        config_focus_follow = parse_bool(doc, n);
-    if ((n = parse_find_node("focusDelay", node)))
-        config_focus_delay = parse_int(doc, n) * 1000;
-    if ((n = parse_find_node("raiseOnFocus", node)))
-        config_focus_raise = parse_bool(doc, n);
     if ((n = parse_find_node("focusLast", node)))
         config_focus_last = parse_bool(doc, n);
 }
@@ -280,7 +256,7 @@ static void parse_desktops(AZParser *parser, xmlDocPtr doc, xmlNodePtr node,
     if ((n = parse_find_node("firstdesk", node))) {
         int d = parse_int(doc, n);
         if (d > 0)
-            config_screen_firstdesk = d;
+            config_screen_firstdesk = (unsigned int)d;
     }
     if ((n = parse_find_node("names", node))) {
         xmlNodePtr nname;
@@ -326,82 +302,6 @@ static void parse_resize(AZParser *parser, xmlDocPtr doc, xmlNodePtr node,
     }
 }
 
-static void parse_dock(AZParser *parser, xmlDocPtr doc, xmlNodePtr node,
-                       void * d)
-{
-    xmlNodePtr n;
-
-    node = node->children;
-
-    if ((n = parse_find_node("position", node))) {
-        if (parse_contains("TopLeft", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_NORTHWEST;
-        else if (parse_contains("Top", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_NORTH;
-        else if (parse_contains("TopRight", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_NORTHEAST;
-        else if (parse_contains("Right", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_EAST;
-        else if (parse_contains("BottomRight", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_SOUTHEAST;
-        else if (parse_contains("Bottom", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_SOUTH;
-        else if (parse_contains("BottomLeft", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_SOUTHWEST;
-        else if (parse_contains("Left", doc, n))
-            config_dock_floating = NO,
-            config_dock_pos = OB_DIRECTION_WEST;
-        else if (parse_contains("Floating", doc, n))
-            config_dock_floating = YES;
-    }
-    if (config_dock_floating) {
-        if ((n = parse_find_node("floatingX", node)))
-            config_dock_x = parse_int(doc, n);
-        if ((n = parse_find_node("floatingY", node)))
-            config_dock_y = parse_int(doc, n);
-    } else {
-        if ((n = parse_find_node("noStrut", node)))
-            config_dock_nostrut = parse_bool(doc, n);
-    }
-    if ((n = parse_find_node("stacking", node))) {
-        if (parse_contains("top", doc, n))
-            config_dock_layer = OB_STACKING_LAYER_ABOVE;
-        else if (parse_contains("normal", doc, n))
-            config_dock_layer = OB_STACKING_LAYER_NORMAL;
-        else if (parse_contains("bottom", doc, n))
-            config_dock_layer = OB_STACKING_LAYER_BELOW;
-    }
-    if ((n = parse_find_node("direction", node))) {
-        if (parse_contains("horizontal", doc, n))
-            config_dock_orient = OB_ORIENTATION_HORZ;
-        else if (parse_contains("vertical", doc, n))
-            config_dock_orient = OB_ORIENTATION_VERT;
-    }
-    if ((n = parse_find_node("autoHide", node)))
-        config_dock_hide = parse_bool(doc, n);
-    if ((n = parse_find_node("hideDelay", node)))
-        config_dock_hide_delay = parse_int(doc, n) * 1000;
-    if ((n = parse_find_node("showDelay", node)))
-        config_dock_show_delay = parse_int(doc, n) * 1000;
-    if ((n = parse_find_node("moveButton", node))) {
-        NSString *str = parse_string(doc, n);
-        unsigned int b, s;
-        if (translate_button(str, &s, &b)) {
-            config_dock_app_move_button = b;
-            config_dock_app_move_modifiers = s;
-        } else {
-            NSLog(@"Warning: invalid button '%@'", str);
-        }
-    }
-}
-
 static void parse_menu(AZParser *parser, xmlDocPtr doc, xmlNodePtr node,
                        void * d)
 {
@@ -418,8 +318,6 @@ static void parse_menu(AZParser *parser, xmlDocPtr doc, xmlNodePtr node,
         }
         if ((n = parse_find_node("warpPointer", node)))
             config_menu_warppointer = parse_bool(doc, n);
-        if ((n = parse_find_node("xorStyle", node)))
-            config_menu_xorstyle = parse_bool(doc, n);
         if ((n = parse_find_node("hideDelay", node)))
             config_menu_hide_delay = parse_int(doc, n);
         if ((n = parse_find_node("desktopMenuIcons", node)))
@@ -537,7 +435,7 @@ static void bind_default_mouse()
             uact = OB_USER_ACTION_MOUSE_DOUBLE_CLICK; break;
         case OB_MOUSE_ACTION_MOTION:
             uact = OB_USER_ACTION_MOUSE_MOTION; break;
-        case OB_NUM_MOUSE_ACTIONS:
+        default:
             NSLog(@"Internal Error: should reach here");
         }
 	[[AZMouseHandler defaultHandler] bind: it->button
@@ -549,9 +447,6 @@ static void bind_default_mouse()
 void config_startup(AZParser *parser)
 {
     config_focus_new = YES;
-    config_focus_follow = NO;
-    config_focus_delay = 0;
-    config_focus_raise = NO;
     config_focus_last = NO;
 
     [parser registerTag: @"focus" callback: parse_focus data: NULL];
@@ -581,21 +476,6 @@ void config_startup(AZParser *parser)
 
     [parser registerTag: @"resize" callback: parse_resize data: NULL];
 
-    config_dock_layer = OB_STACKING_LAYER_ABOVE;
-    config_dock_pos = OB_DIRECTION_NORTHEAST;
-    config_dock_floating = NO;
-    config_dock_nostrut = NO;
-    config_dock_x = 0;
-    config_dock_y = 0;
-    config_dock_orient = OB_ORIENTATION_VERT;
-    config_dock_hide = NO;
-    config_dock_hide_delay = 300;
-    config_dock_show_delay = 300;
-    config_dock_app_move_button = 2; /* middle */
-    config_dock_app_move_modifiers = 0;
-
-    [parser registerTag: @"dock" callback: parse_dock data: NULL];
-
     translate_key(@"C-g", &config_keyboard_reset_state,
                   &config_keyboard_reset_keycode);
 
@@ -617,7 +497,6 @@ void config_startup(AZParser *parser)
     [parser registerTag: @"resistance" callback: parse_resistance data: NULL];
 
     config_menu_warppointer = YES;
-    config_menu_xorstyle = YES;
     config_menu_hide_delay = 250;
     config_menu_client_list_icons = YES;
     config_menu_files = nil;

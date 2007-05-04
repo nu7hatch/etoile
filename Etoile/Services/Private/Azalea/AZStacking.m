@@ -21,7 +21,7 @@
 
 #import "AZStacking.h"
 #import "AZScreen.h"
-#import "AZDock.h"
+#import "AZFocusManager.h"
 #import "AZGroup.h"
 #import "AZClient.h"
 #import "openbox.h"
@@ -33,8 +33,7 @@ static AZStacking *sharedInstance;
 - (void) doRestack: (NSArray *) wins before: (id <AZWindow>) before;
 - (void) doRaise: (NSArray *) wins;
 - (void) doLower: (NSArray *) wins;
-- (NSArray *)pickWindowsFrom: (AZClient *) top to: (AZClient *) selected raise: (BOOL) raise;
-- (NSArray *)pickGroupWindowsFrom: (AZClient *) top to: (AZClient *) selected raise: (BOOL) raise normal: (BOOL) normal;
+- (void) restackWindows: (AZClient *) selected raise: (BOOL) raise;
 @end
 
 @implementation AZStacking
@@ -68,43 +67,32 @@ static AZStacking *sharedInstance;
     free(windows);
 }
 
-- (void) raiseWindow: (id <AZWindow>) window group: (BOOL) group
+- (void) raiseWindow: (id <AZWindow>) window 
 {
-    NSMutableArray *wins = [[NSMutableArray alloc] init];
-
     if (WINDOW_IS_CLIENT(window)) {
-        AZClient *c;
-        AZClient *selected;
-        selected = (AZClient *)window;
-	c = [selected searchTopTransient];
-	[wins addObjectsFromArray: [self pickWindowsFrom: c to: selected raise: YES]];
-	[wins addObjectsFromArray: [self pickGroupWindowsFrom: c to: selected raise: YES normal: group]];
+        AZClient *selected = (AZClient *)window;
+	[self restackWindows: selected raise: YES];
     } else {
+        NSMutableArray *wins = [[NSMutableArray alloc] init];
 	[wins addObject: window];
 	[self removeWindow: window];
+	[self doRaise: wins];
+	DESTROY(wins);
     }
-    [self doRaise: wins];
-    DESTROY(wins);
 }
 
-- (void) lowerWindow: (id <AZWindow>) window group: (BOOL) group
-{
-    NSMutableArray *wins = [[NSMutableArray alloc] init];
-
+- (void) lowerWindow: (id <AZWindow>) window
+{		
     if (WINDOW_IS_CLIENT(window)) {
-        AZClient *c;
-        AZClient *selected;
-        selected = (AZClient*)window;
-	c = [selected searchTopTransient];
-	NSArray *w = [self pickWindowsFrom: c to: selected raise: NO];
-	[wins addObjectsFromArray: [self pickGroupWindowsFrom: c to: selected raise: NO normal: group]];
-	[wins addObjectsFromArray: w];
+        AZClient *selected = (AZClient*)window;
+	[self restackWindows: selected raise: NO];
     } else {
+        NSMutableArray *wins = [[NSMutableArray alloc] init];
 	[wins addObject: window];
 	[self removeWindow: window];
+        [self doLower: wins];
+        DESTROY(wins);
     }
-    [self doLower: wins];
-    DESTROY(wins);
 }
 
 - (void) moveWindow: (id <AZWindow>) window belowWindow: (id <AZWindow>) below
@@ -133,7 +121,106 @@ static AZStacking *sharedInstance;
     NSAssert([screen supportXWindow] != None, @"SupportXWindow cannot be None"); /* make sure I dont break this in the future */
 
     [stacking_list addObject: win];
-    [self raiseWindow: win group: NO];
+    [self raiseWindow: win];
+}
+
+- (void) addWindowNonIntrusively: (id <AZWindow>) win
+{
+    AZClient *client = nil;
+    AZClient *parent = nil;
+
+    if (!WINDOW_IS_CLIENT(win)) {
+        [self addWindow: win]; /* no special rules for others */
+        return;
+    }
+
+    client = (AZClient *)win;
+
+    /* insert above its highest parent */
+    if ([client transient_for]) 
+    {
+        if ([client transient_for] != OB_TRAN_GROUP) 
+        {
+            parent = [client transient_for];
+        }
+	else 
+        {
+	    int sit, it;
+
+            if ([client group])
+	    {
+		NSArray *members = [[client group] members];
+		for (it = 0; !parent && (it < [stacking_list count]); it++)
+		{
+		    AZClient *data = [self windowAtIndex: it];
+		    if ([members containsObject: data])
+		    {
+			for (sit = 0; !parent && (sit < [members count]); sit++)
+			{
+			    AZClient *c = [members objectAtIndex: sit];
+			    /* checking transient_for prevents infinate loops */
+                    	    if (c == data && ![c transient_for])
+                              parent = data;
+			}
+		    }
+		}
+	    }
+	}
+    }
+
+    AZClient *it_below = nil;
+    int index = [stacking_list indexOfObject: parent];
+    if (index == NSNotFound)
+    {
+        /* no parent to put above, try find the focused client to go
+           under */
+	AZClient *fc = [[AZFocusManager defaultManager] focus_client];
+        if (fc && [fc windowLayer] == [client windowLayer]) 
+	{
+	    index = [stacking_list indexOfObject: fc];
+	    if ((index != NSNotFound) && (index < [stacking_list count]-2))
+	    {
+	        it_below = [self windowAtIndex: index+1];
+	    }
+        }
+    }
+    else
+    {
+	it_below = parent;
+    }
+
+    if (it_below == nil)
+    {
+        /* there is no window to put this directly above, so put it at the
+           bottom */
+        [stacking_list insertObject: win atIndex: 0];
+	[self lowerWindow: win];
+    } else {
+        /* make sure it's not in the wrong layer though ! */
+	index = [stacking_list indexOfObject: it_below];
+	if (index == NSNotFound)
+	    NSLog(@"Internal Error: inconsistent it_below position");
+	for (; index < [stacking_list count]; index++)
+ 	{
+            /* stop when the window is not in a higher layer than the window
+               it is going above (it_below) */
+	    AZClient *data = [self windowAtIndex: index];
+            if ([client windowLayer] >= [data windowLayer])
+                break;
+        }
+	for (; index > 0; index--)
+	{
+            /* stop when the window is not in a lower layer than the
+               window it is going under (it_above) */
+  	    AZClient *it_above = [stacking_list objectAtIndex: (index-1)];
+	    if ([client windowLayer] <= [it_above windowLayer])
+	      break;
+        }
+
+	NSArray *wins = [[NSArray alloc] initWithObjects: win, nil];
+	[self doRestack: wins before: [self windowAtIndex: index]];
+	DESTROY(wins);
+    }
 }
 
 - (void) removeWindow: (id <AZWindow>) win
@@ -183,18 +270,6 @@ static AZStacking *sharedInstance;
     Window *win;
     int i, j, jcount = [wins count];
 
-#ifdef DEBUG_AZALEA
-    GList *next;
-    /* pls only restack stuff in the same layer at a time */
-    for (it = wins; it; it = next) {
-        next = g_list_next(it);
-        if (!next) break;
-	g_assert ([((id <AZWindow>)(it->data)) windowLayer] == [((id <AZWindow>)(next->data)) windowLayer]);
-    }
-    if (before)
-	g_assert ([((id <AZWindow>)(it->data)) windowLayer] == [((id <AZWindow>)(before->data)) windowLayer]);
-#endif
-
     win = calloc(sizeof(Window), [wins count] + 1);
 
     if (before == ([self count] ? [self windowAtIndex: 0] : nil)) {
@@ -203,7 +278,7 @@ static AZStacking *sharedInstance;
         win[0] = [[stacking_list lastObject] windowTop];
     } else {
 	int index = [stacking_list indexOfObject: before];
-	if (index < 1) {
+	if (index == NSNotFound) {
 	  NSLog(@"Internal Error: cannot find window in doRestack:before:");
 	} else {
 	  win[0] = [(id <AZWindow>)[self windowAtIndex: index-1] windowTop];
@@ -227,15 +302,6 @@ static AZStacking *sharedInstance;
 	  } 
 	}
     }
-
-#ifdef DEBUG_AZALEA
-    /* some debug checking of the stacking list's order */
-    for (it = stacking_list; ; it = next) {
-        next = g_list_next(it);
-        if (!next) break;
-        g_assert([(id <AZWindow>)(it->data) windowLayer] >= [(id <AZWindow>)(next->data) windowLayer]);
-    }
-#endif
 
     XRestackWindows(ob_display, win, i);
     free(win);
@@ -351,143 +417,236 @@ static AZStacking *sharedInstance;
     }
 }
 
-- (NSArray *)pickWindowsFrom: (AZClient *) top to: (AZClient *) selected 
-		     raise: (BOOL) raise
+- (void)restackWindows: (AZClient *) selected raise: (BOOL) raise
 {
-    NSMutableArray *ret = AUTORELEASE([[NSMutableArray alloc] init]);
-    id <AZWindow> data = nil;
-    int i, n;
-    NSMutableArray *modals = [[NSMutableArray alloc] init];
-    NSMutableArray *trans = [[NSMutableArray alloc] init];
-    NSMutableArray *modal_sel = [[NSMutableArray alloc] init]; /* the selected guys if modal */
-    NSMutableArray *tran_sel = [[NSMutableArray alloc] init]; /* the selected guys if not */
+    if (!raise && [selected transient_for])
+    {
+        /* if it's a transient lowering, lower its parents so that we can lower
+           this window, or it won't move */
+        NSMutableArray *top = [[NSMutableArray alloc] initWithArray: [selected searchAllTopParents]];
+        NSMutableArray *top_reorder = [[NSMutableArray alloc] init];
+
+        /* that is, if it has any parents */
+        if (!(top && [top count] == 1 && [top objectAtIndex: 0] == selected)) 
+        {
+          /* go thru stacking list backwards so we can use g_slist_prepend */
+	  int i = [stacking_list count]-1;
+          for (; (i > -1) && ([top count] > 0); i--)
+	  {
+	    id <AZWindow> it = [self windowAtIndex: i];
+	    if ([top containsObject: it])
+	    {
+	      if ([top_reorder count] > 0)
+ 	        [top_reorder insertObject: it atIndex: 0];
+	      else 
+ 	        [top_reorder addObject: it];
+	      [top removeObject: it];
+	    }
+	  }
+
+	  if ([top count] > 0)
+	    NSLog(@"Internal Error: top parents are left");
+
+          /* call restack for each of these to lower them */
+	  for (i = 0; i < [top_reorder count]; i++)
+	  {
+	    [self restackWindows: [top_reorder objectAtIndex: i]
+	                   raise: raise];
+	  }
+	  DESTROY(top_reorder);
+	  DESTROY(top);
+	  return;
+       }
+    }
 
     /* remove first so we can't run into ourself */
-    int index = [stacking_list indexOfObject: top];
+    int index = [stacking_list indexOfObject: selected];
     if (index != NSNotFound)
-      [self removeWindow: top];
+      [self removeWindow: selected];
     else
-      return ret; /* Empty */
+      NSLog(@"Internal Error: Cannot find itself");
 
-    i = 0;
-    n = [[top transients] count];
-
-    int prev_index;
-    int j;
-    for (j = 0; ((i < n) && (j < [self count]));/*j++ in the end */ ) {
-	data = [self windowAtIndex: j];
-	prev_index = j - 1;
-
-	int index = NSNotFound;
+    /* go from the bottom of the stacking list up */
+    NSMutableArray *wins = AUTORELEASE([[NSMutableArray alloc] init]);
+    NSMutableArray *modals = AUTORELEASE([[NSMutableArray alloc] init]);
+    NSMutableArray *trans = AUTORELEASE([[NSMutableArray alloc] init]);
+    NSMutableArray *group_modals = AUTORELEASE([[NSMutableArray alloc] init]);
+    NSMutableArray *group_trans = AUTORELEASE([[NSMutableArray alloc] init]);
+    id <AZWindow> data = nil;
+    int i = [stacking_list count]-1;
+    for (; i > -1; i--)
+    {
+	data = [self windowAtIndex: i];
 
 	if (WINDOW_IS_CLIENT(data))
-	  index = [[top transients] indexOfObject: (AZClient*)data];
-
-	if (index != NSNotFound) {
-            AZClient *c = [[top transients] objectAtIndex: index];
-            BOOL sel_child;
-
-            ++i;
-
-            if (c == selected)
-                sel_child = YES;
-            else
-		sel_child = ([c searchTransient: selected] != nil);
-
-            if (![c modal]) {
-                if (!sel_child) {
-		    [trans addObjectsFromArray: [self pickWindowsFrom: c to: selected raise: raise]];
-                } else {
-		    [tran_sel addObjectsFromArray: [self pickWindowsFrom: c to: selected raise: raise]];
-                }
-            } else {
-                if (!sel_child) {
-		    [modals addObjectsFromArray: [self pickWindowsFrom: c to: selected raise: raise]];
-                } else {
-		    [modal_sel addObjectsFromArray: [self pickWindowsFrom: c to: selected raise: raise]];
-                }
-            }
-            /* if we dont have a prev then start back at the beginning,
-               otherwise skip back to the prev's next */
-	    if (prev_index < 0) {
-              j = 0;
-	      continue;
+	{
+	  AZClient *ch = (AZClient *) data;
+          /* only move windows in the same stacking layer */
+          if (([ch windowLayer] == [selected windowLayer]) &&
+	      [selected searchTransient: ch])
+	  {
+	    if ([selected hasDirectChild: ch])
+	    {
+	       if ([ch modal])
+	       {
+		 if ([modals count] > 0)
+		    [modals insertObject: ch atIndex: 0];
+	    	 else
+		    [modals addObject: ch];
+	       }
+	       else
+	       {
+		 if ([trans count] > 0)
+		    [trans insertObject: ch atIndex: 0];
+	    	 else
+		    [trans addObject: ch];
+	       }
 	    }
-        }
-	j++;
+	    else
+	    {
+	       if ([ch modal])
+	       {
+		 if ([group_modals count] > 0)
+		    [group_modals insertObject: ch atIndex: 0];
+	    	 else
+		    [group_modals addObject: ch];
+	       }
+	       else
+	       {
+		 if ([group_trans count] > 0)
+		    [group_trans insertObject: ch atIndex: 0];
+	    	 else
+		    [group_trans addObject: ch];
+	       }
+	    }
+	    /* We can safely delete it because the loop is backward */
+	    [self removeWindow: ch];
+	  }
+	}
     }
 
-    [ret addObjectsFromArray: (raise ? modal_sel : modals)];
-    [ret addObjectsFromArray: (raise ? modals : modal_sel)];
+    /* put transients of the selected window right above it */
+    [wins addObjectsFromArray: modals];
+    [wins addObjectsFromArray: trans];
+    [wins addObject: selected];
 
-    [ret addObjectsFromArray: (raise ? tran_sel : trans)];
-    [ret addObjectsFromArray: (raise ? trans : tran_sel)];
-
-
-    /* add itself */
-    [ret addObject: top];
-    DESTROY(modals);
-    DESTROY(modal_sel);
-    DESTROY(trans);
-    DESTROY(tran_sel);
-
-    return ret;
-}
-
-- (NSArray *)pickGroupWindowsFrom: (AZClient *) top to: (AZClient *) selected
-                     raise: (BOOL) raise normal: (BOOL) normal
-{
-    NSMutableArray *ret = AUTORELEASE([[NSMutableArray alloc] init]);
-    id <AZWindow> data = nil;
-    int i, n;
-
-    /* add group members in their stacking order */
-    if ((top) && (top != OB_TRAN_GROUP) && ([top group])) {
-        i = 0;
-	n = [[[top group] members] count]-1;
-	int prev_index;
-	int j;
-	for (j = 0; ((i < n) && (j < [self count])); /* j++ later */) {
-	    data = [self windowAtIndex: j];
-	    prev_index = j - 1;
-
-	    /* Not in openbox. Maybe have side-effect. */
-	    if (!WINDOW_IS_CLIENT(data)) {
-              j++;
-	      continue;
-            }
-
-	    int sit = [[top group] indexOfMember: (AZClient*)data];
-	    if (sit != NSNotFound) {
-                AZClient *c = nil;
-                ObClientType t;
-
-                ++i;
-                c = (AZClient *)data;
-                t = [c type];
-
-                if (([c desktop] == [selected desktop] ||
-                     [c desktop] == DESKTOP_ALL) &&
-                    (t == OB_CLIENT_TYPE_TOOLBAR ||
-                     t == OB_CLIENT_TYPE_MENU ||
-                     t == OB_CLIENT_TYPE_UTILITY ||
-                     (normal && t == OB_CLIENT_TYPE_NORMAL)))
-                {
-		    AZClient *data = [[top group] memberAtIndex: sit];
-                    [ret addObjectsFromArray:
-                        [self pickWindowsFrom: data to: selected raise: raise]];
-                    /* if we dont have a prev then start back at the beginning,
-                       otherwise skip back to the prev's next */
-		    if (prev_index < 0) {
-		      j = 0;
-		      continue;
-		    }
-                }
-            }
-	    j++;
+    /* if selected window is transient for group then raise it above others */
+    if ([selected transient_for] == OB_TRAN_GROUP) {
+        /* if it's modal, raise it above those also */
+        if ([selected modal]) {
+	    [wins addObjectsFromArray: group_modals];
+	    group_modals = nil; /* It is autoreleased */
         }
+	[wins addObjectsFromArray: group_trans];
+	group_trans = nil; /* It is autoreleased */
     }
-    return ret;
+
+    /* find where to put the selected window, start from bottom of list,
+       this is the window below everything we are re-adding to the list */
+    int last = NSNotFound;
+    int below = NSNotFound;
+    i = [stacking_list count]-1;
+    for (; i > -1; i--)
+    {
+	data = [self windowAtIndex: i];
+	if ([data windowLayer] < [selected windowLayer])
+	{
+	  last = i;
+	  continue;
+	}
+        /* if lowering, stop at the beginning of the layer */
+        if (!raise)
+            break;
+        /* if raising, stop at the end of the layer */
+        if ([data windowLayer] > [selected windowLayer])
+            break;
+	last = i;
+    }
+
+    /* save this position in the stacking list */
+    below = last;
+    id <AZWindow> belowWindow = nil;
+    if (below != NSNotFound)
+      belowWindow = [self windowAtIndex: below];
+
+    /* find where to put the group transients, start from the top of list */
+    for (i = 0; i < [stacking_list count]; i++)
+    {
+	data = [self windowAtIndex: i];
+        /* skip past higher layers */
+        if ([data windowLayer] > [selected windowLayer])
+            continue;
+        /* if we reach the end of the layer (how?) then don't go further */
+        if ([data windowLayer] < [selected windowLayer])
+            break;
+        /* stop when we reach the first window in the group */
+        if (WINDOW_IS_CLIENT(data)) 
+	{
+            AZClient *c = (AZClient *)data;
+            if ([c group] == [selected group])
+                break;
+        }
+        /* if we don't hit any other group members, stop here because this
+           is where we are putting the selected window (and its children) */
+        if (i == below)
+            break;
+    }
+
+    /* save this position, this is the top of the group of windows between the
+       group transient ones we're restacking and the others up above that we're
+       restacking
+
+       we actually want to save 1 position _above_ that, for for loops to work
+       nicely, so move back one position in the list while saving it
+    */
+    int above = NSNotFound;
+    if (i < [stacking_list count])
+    {
+      if (i > 1)
+        above = i-1;
+    }
+    else
+    {
+      if ([stacking_list count] > 0)
+        above = [stacking_list count]-1;
+    }
+
+    /* put the windows inside the gap to the other windows we're stacking
+       into the restacking list, go from the bottom up so that we can use
+       g_list_prepend */
+    index = NSNotFound;
+    if (below != NSNotFound)
+    {
+      if (below > 1)
+        index = below-1;
+    }
+    else
+    {
+      if ([stacking_list count] > 0)
+        index = [stacking_list count]-1;
+    }
+
+    if (index == NSNotFound)
+      NSLog(@"Internal Error: index %d out of range of stacking_list", index);
+
+    for (; (index != above) && (index > -1); index--)
+    {
+      id <AZWindow> data = [self windowAtIndex: index];
+      if ([wins count] > 0)
+        [wins insertObject: data atIndex: 0];
+      else
+        [wins addObject: data];
+      [self removeWindow: data]; /* We do this backward */
+    }
+
+    NSMutableArray *a = AUTORELEASE([[NSMutableArray alloc] init]);
+    /* group modals go on the very top */
+    [a addObjectsFromArray: group_modals];
+    /* group transients go above the rest of the stuff acquired to now */
+    [a addObjectsFromArray: group_trans];
+    [a addObjectsFromArray: wins];
+
+    [self doRestack: wins before: belowWindow];
 }
 
 @end

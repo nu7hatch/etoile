@@ -26,7 +26,6 @@
 #import "AZStartupHandler.h"
 #import "AZEventHandler.h"
 #import "AZDebug.h"
-#import "AZDock.h"
 #import "AZGroup.h"
 #import "AZClientManager.h"
 #import "AZMoveResizeHandler.h"
@@ -71,6 +70,9 @@
 #include <errno.h>
 
 #include <X11/cursorfont.h>
+#if USE_XCURSOR
+#include <X11/Xcursor/Xcursor.h>
+#endif
 
 #define ALTERNATIVE_RUN_LOOP 0
 
@@ -80,19 +82,22 @@ AZInstance *ob_rr_inst;
 RrTheme    *ob_rr_theme;
 Display    *ob_display;
 int        ob_screen;
-BOOL    ob_replace_wm;
+BOOL    ob_replace_wm = NO;
 
-static ObState   state;
-static BOOL  xsync;
-static BOOL  reconfigure;
-static BOOL  restart;
+static ObState state;
+static BOOL  xsync = NO;
+static BOOL  reconfigure = NO;
+static BOOL  restart = NO;
 static NSString *restart_path = nil;
 static Cursor    cursors[OB_NUM_CURSORS];
 static KeyCode   keys[OB_NUM_KEYS];
 static int      exitcode = 0;
+static unsigned int remote_control = 0;
+static BOOL being_replaced = NO;
 
 static void signal_handler(int signal, void *data);
 static void parse_args(int argc, char **argv);
+static Cursor load_cursor(const char *name, unsigned int fontval);
 
 int main(int argc, char **argv)
 {
@@ -104,18 +109,31 @@ int main(int argc, char **argv)
 
     state = OB_STATE_STARTING;
 
-    parse_paths_startup();
-
-    session_startup(&argc, &argv);
-
     /* parse out command line args */
     parse_args(argc, argv);
+
+    if (!remote_control) {
+        parse_paths_startup();
+
+        session_startup(argc, argv);
+    }
 
     ob_display = XOpenDisplay(NULL);
     if (ob_display == NULL)
         ob_exit_with_error("Failed to open the display.");
     if (fcntl(ConnectionNumber(ob_display), F_SETFD, 1) == -1)
         ob_exit_with_error("Failed to set display as close-on-exec.");
+
+    if (remote_control) {
+        prop_startup(); /* get atoms values for the display */
+        /* Send client message telling the OB process to:
+         * remote_control = 1 -> reconfigure 
+         * remote_control = 2 -> restart */
+        PROP_MSG(RootWindow(ob_display, ob_screen),
+                 ob_control, remote_control, 0, 0, 0);
+        XCloseDisplay(ob_display);
+	exit(EXIT_SUCCESS);
+    }
 
     /* Initiate NSApp */
 #if ALTERNATIVE_RUN_LOOP
@@ -130,7 +148,6 @@ int main(int argc, char **argv)
     AZGroupManager *groupManager = [AZGroupManager defaultManager];
     AZClientManager *clientManager = [AZClientManager defaultManager];
     AZMoveResizeHandler *mrHandler = [AZMoveResizeHandler defaultHandler];
-    AZDock *defaultDock = [AZDock defaultDock];
     AZFocusManager *focusManager = [AZFocusManager defaultManager];
     AZKeyboardHandler *keyboardHandler = [AZKeyboardHandler defaultHandler];
     AZMenuManager *menuManager = [AZMenuManager defaultManager];
@@ -171,28 +188,21 @@ int main(int argc, char **argv)
 
     /* create available cursors */
     cursors[OB_CURSOR_NONE] = None;
-    cursors[OB_CURSOR_POINTER] =
-        XCreateFontCursor(ob_display, XC_left_ptr);
-    cursors[OB_CURSOR_BUSY] =
-        XCreateFontCursor(ob_display, XC_watch);
-    cursors[OB_CURSOR_MOVE] =
-        XCreateFontCursor(ob_display, XC_fleur);
-    cursors[OB_CURSOR_NORTH] =
-        XCreateFontCursor(ob_display, XC_top_side);
-    cursors[OB_CURSOR_NORTHEAST] =
-        XCreateFontCursor(ob_display, XC_top_right_corner);
-    cursors[OB_CURSOR_EAST] =
-        XCreateFontCursor(ob_display, XC_right_side);
-    cursors[OB_CURSOR_SOUTHEAST] =
-        XCreateFontCursor(ob_display, XC_bottom_right_corner);
-    cursors[OB_CURSOR_SOUTH] =
-        XCreateFontCursor(ob_display, XC_bottom_side);
-    cursors[OB_CURSOR_SOUTHWEST] =
-        XCreateFontCursor(ob_display, XC_bottom_left_corner);
-    cursors[OB_CURSOR_WEST] =
-        XCreateFontCursor(ob_display, XC_left_side);
-    cursors[OB_CURSOR_NORTHWEST] =
-        XCreateFontCursor(ob_display, XC_top_left_corner);
+    cursors[OB_CURSOR_POINTER] = load_cursor("left_ptr", XC_left_ptr);
+    cursors[OB_CURSOR_BUSY] = load_cursor("left_ptr_watch", XC_watch);
+    cursors[OB_CURSOR_MOVE] = load_cursor("fleur", XC_fleur);
+    cursors[OB_CURSOR_NORTH] = load_cursor("top_side", XC_top_side);
+    cursors[OB_CURSOR_NORTHEAST] = load_cursor("top_right_corner",
+                                               XC_top_right_corner);
+    cursors[OB_CURSOR_EAST] = load_cursor("right_side", XC_right_side);
+    cursors[OB_CURSOR_SOUTHEAST] = load_cursor("bottom_right_corner",
+                                               XC_bottom_right_corner);
+    cursors[OB_CURSOR_SOUTH] = load_cursor("bottom_side", XC_bottom_side);
+    cursors[OB_CURSOR_SOUTHWEST] = load_cursor("bottom_left_corner",
+                                               XC_bottom_left_corner);
+    cursors[OB_CURSOR_WEST] = load_cursor("left_side", XC_left_side);
+    cursors[OB_CURSOR_NORTHWEST] = load_cursor("top_left_corner",
+                                               XC_top_left_corner);
 
     /* create available keycodes */
     keys[OB_KEY_RETURN] =
@@ -261,7 +271,6 @@ int main(int argc, char **argv)
             grab_startup(reconfigure);
 	    [groupManager startup: reconfigure];
 	    [clientManager startup: reconfigure];
-	    [defaultDock startup: reconfigure];
 	    [mrHandler startup: reconfigure];
 	    [keyboardHandler startup: reconfigure];
 	    [mouseHandler startup: reconfigure];
@@ -270,13 +279,16 @@ int main(int argc, char **argv)
             if (!reconfigure) {
                 /* get all the existing windows */
 		[clientManager manageAll];
-		[focusManager fallback: OB_FOCUS_FALLBACK_NOFOCUS];
+		[focusManager fallback: YES];
             } else {
                 /* redecorate all existing windows */
 		int j, jcount = [clientManager count];
 
 		for (j = 0; j < jcount; j++) {
                     AZClient *c = [clientManager clientAtIndex: j];
+                    /* the new config can change the window's decorations */
+                    [c setupDecorAndFunctions];
+                    /* redraw the frames */
 		    [[c frame] adjustAreaWithMoved: YES resized: YES fake: NO];
                 }
             }
@@ -327,7 +339,6 @@ int main(int argc, char **argv)
             state = OB_STATE_EXITING;
 
             if (!reconfigure) {
-		[defaultDock removeAll];
 		[clientManager unmanageAll];
             }
 
@@ -335,7 +346,6 @@ int main(int argc, char **argv)
 	    [mouseHandler shutdown: reconfigure];
 	    [keyboardHandler shutdown: reconfigure];
 	    [mrHandler shutdown: reconfigure];
-	    [defaultDock shutdown: reconfigure];
 	    [clientManager shutdown: reconfigure];
 	    [groupManager shutdown: reconfigure];
             grab_shutdown(reconfigure);
@@ -353,7 +363,7 @@ int main(int argc, char **argv)
     RrThemeFree(ob_rr_theme);
     DESTROY(ob_rr_inst);
 
-    session_shutdown();
+    session_shutdown(being_replaced);
 
     XCloseDisplay(ob_display);
 
@@ -419,9 +429,9 @@ static void signal_handler(int signal, void *data)
 static void print_version()
 {
     printf("Openbox %s\n", PACKAGE_VERSION);
-    printf("Copyright (c) 2006 Yen-ju Chen\n");
-    printf("Copyright (c) 2004 Mikael Magnusson\n");
-    printf("Copyright (c) 2003 Ben Jansens\n\n");
+    printf("Copyright (c) 2007 Yen-ju Chen\n");
+    printf("Copyright (c) 2007 Dana Jansens\n\n");
+    printf("Copyright (c) 2007 Mikael Magnusson\n");
     printf("This program comes with ABSOLUTELY NO WARRANTY.\n");
     printf("This is free software, and you are welcome to redistribute it\n");
     printf("under certain conditions. See the file COPYING for details.\n\n");
@@ -431,6 +441,9 @@ static void print_help()
 {
     printf("Syntax: openbox [options]\n\n");
     printf("Options:\n\n");
+    printf("  --reconfigure       Tell the currently running instance of "
+           "Openbox to\n"
+           "                      reconfigure (and then exit immediately)\n");
 #ifdef USE_SM
     printf("  --sm-disable        Disable connection to session manager\n");
     printf("  --sm-client-id ID   Specify session management ID\n");
@@ -465,18 +478,30 @@ static void parse_args(int argc, char **argv)
             xsync = YES;
         } else if (!strcmp(argv[i], "--debug")) {
             AZDebugShowOutput(YES);
-        } else {
-            printf("Invalid option: '%s'\n\n", argv[i]);
-            print_help();
-            exit(1);
+        } else if (!strcmp(argv[i], "--reconfigure")) {
+            remote_control = 1;
+        } else if (!strcmp(argv[i], "--restart")) {
+            remote_control = 2;
         }
     }
 }
 
-void ob_exit_with_error(char *msg)
+static Cursor load_cursor(const char *name, unsigned int fontval)
+{
+    Cursor c = None;
+
+#if USE_XCURSOR
+    c = XcursorLibraryLoadCursor(ob_display, name);
+#endif
+    if (c == None)
+        c = XCreateFontCursor(ob_display, fontval);
+    return c;
+}
+
+void ob_exit_with_error(const char *msg)
 {
     NSLog(@"Critical: %s", msg);
-    session_shutdown();
+    session_shutdown(YES);
     exit(EXIT_FAILURE);
 }
 
@@ -505,6 +530,13 @@ void ob_reconfigure()
 void ob_exit(int code)
 {
     exitcode = code;
+    [mainLoop exit];
+}
+
+void ob_exit_replace()
+{
+    exitcode = 0;
+    being_replaced = YES;
     [mainLoop exit];
 }
 

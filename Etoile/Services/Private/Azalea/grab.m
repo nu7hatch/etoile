@@ -35,6 +35,26 @@
 static unsigned int mask_list[MASK_LIST_SIZE];
 static unsigned int kgrabs = 0;
 static unsigned int pgrabs = 0;
+/*! The time at which the last grab was made */
+static Time  grab_time = CurrentTime;
+
+static Time ungrab_time()
+{
+    Time t = event_curtime;
+    if (!(t == CurrentTime || event_time_after(t, grab_time)))
+    {
+        /* When the time moves backward on the server, then we can't use
+           the grab time because that will be in the future. So instead we
+           have to use CurrentTime.
+
+           "XUngrabPointer does not release the pointer if the specified time
+           is earlier than the last-pointer-grab time or is later than the
+           current X server time."
+        */
+        t = CurrentTime; /*grab_time;*/
+    }
+    return t;
+}
 
 BOOL grab_on_keyboard()
 {
@@ -54,14 +74,18 @@ BOOL grab_keyboard(BOOL grab)
         if (kgrabs++ == 0) {
             ret = XGrabKeyboard(ob_display, RootWindow(ob_display, ob_screen),
                                 NO, GrabModeAsync, GrabModeAsync,
-                                [[AZEventHandler defaultHandler] eventLastTime]/*event_lasttime*/) == Success;
+                                event_curtime) == Success;
             if (!ret)
                 --kgrabs;
+            else
+                grab_time = event_curtime;
         } else
             ret = YES;
     } else if (kgrabs > 0) {
         if (--kgrabs == 0)
-            XUngrabKeyboard(ob_display, [[AZEventHandler defaultHandler] eventLastTime]/*event_lasttime*/);
+	{
+            XUngrabKeyboard(ob_display,  ungrab_time());
+	}
         ret = YES;
     }
 
@@ -78,37 +102,16 @@ BOOL grab_pointer(BOOL grab, ObCursor cur)
 			       [[AZScreen defaultScreen] supportXWindow],
                                False, GRAB_PTR_MASK, GrabModeAsync,
                                GrabModeAsync, None,
-                               ob_cursor(cur), [[AZEventHandler defaultHandler] eventLastTime]) == Success;
+                               ob_cursor(cur), event_curtime) == Success;
             if (!ret)
                 --pgrabs;
+            else
+                grab_time = event_curtime;
         } else
             ret = YES;
     } else if (pgrabs > 0) {
         if (--pgrabs == 0) {
-            XUngrabPointer(ob_display, [[AZEventHandler defaultHandler] eventLastTime]);
-        }
-        ret = YES;
-    }
-    return ret;
-}
-
-BOOL grab_pointer_window(BOOL grab, ObCursor cur, Window win)
-{
-    BOOL ret = NO;
-
-    if (grab) {
-        if (pgrabs++ == 0) {
-            ret = XGrabPointer(ob_display, win, False, GRAB_PTR_MASK,
-                               GrabModeAsync, GrabModeAsync, None,
-                               ob_cursor(cur),
-                               [[AZEventHandler defaultHandler] eventLastTime]) == Success;
-            if (!ret)
-                --pgrabs;
-        } else
-            ret = YES;
-    } else if (pgrabs > 0) {
-        if (--pgrabs == 0) {
-            XUngrabPointer(ob_display, [[AZEventHandler defaultHandler] eventLastTime]);
+            XUngrabPointer(ob_display, ungrab_time());
         }
         ret = YES;
     }
@@ -159,7 +162,6 @@ void grab_shutdown(BOOL reconfig)
 
     while (grab_keyboard(NO));
     while (grab_pointer(NO, OB_CURSOR_NONE));
-    while (grab_pointer_window(NO, OB_CURSOR_NONE, None));
     while (grab_server(NO));
 }
 

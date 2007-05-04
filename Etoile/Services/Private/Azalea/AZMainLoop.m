@@ -21,9 +21,9 @@
 */
 
 #import "AZMainLoop.h"
-#import "AZDock.h"
 #import "AZClient.h"
 #import "AZClientManager.h"
+#import "AZEventHandler.h"
 #import <X11/Xlib.h>
 #import <signal.h>
 #import "action.h"
@@ -534,7 +534,9 @@ static AZMainLoop *sharedInstance;
             } while (!act && [actionQueue count]);
 
             if  (act) {
+		event_curtime = [act data].any.time;
                 [act func]([act data_pointer]);
+		event_curtime = CurrentTime;
 		[actionQueue removeObjectAtIndex: 0];
             }
         } else {
@@ -788,7 +790,7 @@ static AZMainLoop *sharedInstance;
             /* XXX special case for signals that default to core dump.
                but throw some helpful output here... */
 
-            fprintf(stderr, "Fuck yah. Core dump. (Signal=%d)\n", sig);
+            fprintf(stderr, "Core dump. (Openbox received signal %d)\n", sig);
 
             /* die with a core dump */
             abort();

@@ -34,10 +34,16 @@
 #import "action.h"
 #import "session.h"
 #import "extensions.h"
+#import "AZDebug.h"
+
+#ifdef HAVE_UNISTD_H // For locahost name
+#  include <unistd.h>
+#endif
+
+
 
 @interface AZClient (AZPrivate)
 - (AZClientIcon *) iconRecursiveWithWidth: (int) w height: (int) h;
-- (void) urgentNotify;
 - (ObStackingLayer) calcStackingLayer;;
 - (void) calcLayerRecursiveWithOriginal: (AZClient *)orig
 	stackingLayer: (ObStackingLayer) l raised: (BOOL) raised;
@@ -48,10 +54,11 @@
 - (void) getArea;
 - (void) getDesktop;
 - (void) getState;
+- (void) getLayer;
 - (void) getShaped;
 - (void) getMwmHints;
 - (void) getGravity;
-
+- (void) getClientMachine;
 @end
 
 @implementation AZClient
@@ -101,74 +108,21 @@
 	            user: user final: final forceReply: NO];
 }
 
-- (void) configureToCorner: (ObCorner) anchor x: (int) x y: (int) y
-                     width: (int) w height: (int) h
-                      user: (BOOL) user final: (BOOL) final
-                forceReply: (BOOL) force_reply;
+- (void) tryConfigureToCorner: (ObCorner) anchor
+                     x: (int *) x y: (int *) y 
+                     width: (int *) w height: (int *) h 
+                     logicalW: (int *) logicalw logicalH: (int *) logicalh
+                     user: (BOOL) user
 {
-    int oldw, oldh;
-    BOOL send_resize_client;
-    BOOL moved = NO, resized = NO;
-    unsigned int fdecor = [frame decorations];
-    BOOL fhorz = [frame max_horz];
+    Rect desired_area = {*x, *y, *w, *h};
 
     /* make the frame recalculate its dimentions n shit without changing
        anything visible for real, this way the constraints below can work with
        the updated frame dimensions. */
     [frame adjustAreaWithMoved: YES resized: YES fake: YES];
 
-    /* gets the frame's position */
-    [frame clientGravityAtX: &x y: &y];
-
-    /* these positions are frame positions, not client positions */
-
-    /* set the size and position if fullscreen */
-    if (fullscreen) {
-        Rect *a;
-        unsigned int i;
-
-        i = [self monitor];
-	a = [[AZScreen defaultScreen] physicalAreaOfMonitor: i];
-
-        x = a->x;
-        y = a->y;
-        w = a->width;
-        h = a->height;
-
-        user = NO; /* ignore that increment etc shit when in fullscreen */
-    } else {
-        Rect *a;
-
-	a = [[AZScreen defaultScreen] areaOfDesktop: desktop
-		                      monitor: [self monitor]];
-
-        /* set the size and position if maximized */
-        if (max_horz) {
-            x = a->x;
-            w = a->width - [frame size].left - [frame size].right;
-        }
-        if (max_vert) {
-            y = a->y;
-            h = a->height - [frame size].top - [frame size].bottom;
-        }
-    }
-
-    /* gets the client's position */
-    [frame frameGravityAtX: &x y: &y];
-
-    /* these override the above states! if you cant move you can't move! */
-    if (user) {
-        if (!(functions & OB_CLIENT_FUNC_MOVE)) {
-            x = area.x;
-            y = area.y;
-        }
-        if (!(functions & OB_CLIENT_FUNC_RESIZE)) {
-            w = area.width;
-            h = area.height;
-        }
-    }
-
-    if (!(w == area.width && h == area.height)) {
+    /* work within the prefered sizes given by the window */
+    if (!(*w == area.width && *h == area.height)) {
         int basew, baseh, minw, minh;
 
         /* base size is substituted with min size if not specified */
@@ -192,83 +146,161 @@
            sizes */
 
         /* smaller than min size or bigger than max size? */
-        if (w > max_size.width) w = max_size.width;
-        if (w < minw) w = minw;
-        if (h > max_size.height) h = max_size.height;
-        if (h < minh) h = minh;
+        if (*w > max_size.width) *w = max_size.width;
+        if (*w < minw) *w = minw;
+        if (*h > max_size.height) *h = max_size.height;
+        if (*h < minh) *h = minh;
 
-        w -= basew;
-        h -= baseh;
+        *w -= basew;
+        *h -= baseh;
 
         /* keep to the increments */
-        w /= size_inc.width;
-        h /= size_inc.height;
+        *w /= size_inc.width;
+        *h /= size_inc.height;
 
         /* you cannot resize to nothing */
-        if (basew + w < 1) w = 1 - basew;
-        if (baseh + h < 1) h = 1 - baseh;
+        if (basew + *w < 1) *w = 1 - basew;
+        if (baseh + *h < 1) *h = 1 - baseh;
   
-        /* store the logical size */
-        SIZE_SET(logical_size,
-                 size_inc.width > 1 ? w : w + basew,
-                 size_inc.height > 1 ? h : h + baseh);
+        /* save the logical size */
+        *logicalw = size_inc.width > 1 ? *w : *w + basew;
+        *logicalh = size_inc.height > 1 ? *h : *h + baseh;
 
-        w *= size_inc.width;
-        h *= size_inc.height;
+        *w *= size_inc.width;
+        *h *= size_inc.height;
 
-        w += basew;
-        h += baseh;
+        *w += basew;
+        *h += baseh;
 
         /* adjust the height to match the width for the aspect ratios.
            for this, min size is not substituted for base size ever. */
-        w -= base_size.width;
-        h -= base_size.height;
+        *w -= base_size.width;
+        *h -= base_size.height;
 
         if (!fullscreen) {
             if (min_ratio)
-                if (h * min_ratio > w) {
-                    h = (int)(w / min_ratio);
+                if (*h * min_ratio > *w) {
+                    *h = (int)(*w / min_ratio);
 
                     /* you cannot resize to nothing */
-                    if (h < 1) {
-                        h = 1;
-                        w = (int)(h * min_ratio);
+                    if (*h < 1) {
+                        *h = 1;
+                        *w = (int)(*h * min_ratio);
                     }
                 }
             if (max_ratio)
-                if (h * max_ratio < w) {
-                    h = (int)(w / max_ratio);
+                if (*h * max_ratio < *w) {
+                    *h = (int)(*w / max_ratio);
 
                     /* you cannot resize to nothing */
-                    if (h < 1) {
-                        h = 1;
-                        w = (int)(h * min_ratio);
+                    if (*h < 1) {
+                        *h = 1;
+                        *w = (int)(*h * min_ratio);
                     }
                 }
         }
 
-        w += base_size.width;
-        h += base_size.height;
+        *w += base_size.width;
+        *h += base_size.height;
     }
 
-    NSAssert(w > 0, @"Width less than 0");
-    NSAssert(h > 0, @"Height less than 0");
+    /* gets the frame's position */
+    [frame clientGravityAtX: x y: y];
+
+    /* these positions are frame positions, not client positions */
+
+    /* set the size and position if fullscreen */
+    AZScreen *screen = [AZScreen defaultScreen];
+    if (fullscreen) {
+        Rect *a;
+        unsigned int i;
+
+	i = [screen findMonitor: &desired_area];
+	a = [screen physicalAreaOfMonitor: i];
+
+        *x = a->x;
+        *y = a->y;
+        *w = a->width;
+        *h = a->height;
+
+        user = NO; /* ignore if the client can't be moved/resized when it
+                      is entering fullscreen */
+    } else if (max_horz || max_vert) {
+        Rect *a;
+        unsigned int i;
+
+	i = [screen findMonitor: &desired_area];
+	a = [screen areaOfDesktop: desktop monitor: i];
+
+        /* set the size and position if maximized */
+        if (max_horz) {
+            *x = a->x;
+            *w = a->width - [frame size].left - [frame size].right;
+        }
+        if (max_vert) {
+            *y = a->y;
+            *h = a->height - [frame size].top - [frame size].bottom;
+        }
+
+        /* maximizing is not allowed if the user can't move+resize the window
+         */
+    }
+
+    /* gets the client's position */
+    [frame frameGravityAtX: x y: y];
+
+    /* these override the above states! if you cant move you can't move! */
+    if (user) {
+        if (!(functions & OB_CLIENT_FUNC_MOVE)) {
+            *x = area.x;
+            *y = area.y;
+        }
+        if (!(functions & OB_CLIENT_FUNC_RESIZE)) {
+            *w = area.width;
+            *h = area.height;
+        }
+    }
+
+    if (*w <= 0) NSLog(@"Internal Error: width less than 0");
+    if (*h <= 0) NSLog(@"Internal Error: height less than 0");
 
     switch (anchor) {
     case OB_CORNER_TOPLEFT:
         break;
     case OB_CORNER_TOPRIGHT:
-        x -= w - area.width;
+        *x -= *w - area.width;
         break;
     case OB_CORNER_BOTTOMLEFT:
-        y -= h - area.height;
+        *y -= *h - area.height;
         break;
     case OB_CORNER_BOTTOMRIGHT:
-        x -= w - area.width;
-        y -= h - area.height;
+        *x -= *w - area.width;
+        *y -= *h - area.height;
         break;
     }
+}
 
+- (void) configureToCorner: (ObCorner) anchor x: (int) x y: (int) y
+                     width: (int) w height: (int) h
+                      user: (BOOL) user final: (BOOL) final
+                forceReply: (BOOL) force_reply;
+{
+    int oldw, oldh, oldrx, oldry;
+    BOOL send_resize_client;
+    BOOL moved = NO, resized = NO, rootmoved = NO;
+    unsigned int fdecor = [frame decorations];
+    BOOL fhorz = [frame max_horz];
+    int logicalw, logicalh;
+
+    /* find the new x, y, width, and height (and logical size) */
+    [self tryConfigureToCorner: anchor x: &x y: &y width: &w height: &h
+                      logicalW: &logicalw logicalH: &logicalh user: user];
+
+    /* set the logical size if things changed */
+    if (!(w == area.width && h == area.height))
+        SIZE_SET(logical_size, logicalw, logicalh);
+
+    /* figure out if we moved or resized or what */
     moved = x != area.x || y != area.y;
     resized = w != area.width || h != area.height;
 
@@ -287,35 +319,47 @@
     if (send_resize_client && user && (w > oldw || h > oldh))
         XResizeWindow(ob_display, window, MAX(w, oldw), MAX(h, oldh));
 
-    /* move/resize the frame to match the request */
-    if (frame) {
-        if (decorations != fdecor || max_horz != fhorz)
-            moved = resized = YES;
+    /* find the frame's dimensions and move/resize it */
+    if (decorations != fdecor || max_horz != fhorz)
+        moved = resized = YES;
 
-        if (moved || resized)
-	    [frame adjustAreaWithMoved: moved resized: resized fake: NO];
+    if (moved || resized)
+	[frame adjustAreaWithMoved: moved resized: resized fake: NO];
 
-        if (!resized && (force_reply || ((!user && moved) || (user && final))))
-        {
-            XEvent event;
-            event.type = ConfigureNotify;
-            event.xconfigure.display = ob_display;
-            event.xconfigure.event = window;
-            event.xconfigure.window = window;
+    /* find the client's position relative to the root window */
+    oldrx = root_pos.x;
+    oldry = root_pos.y;
+    rootmoved = (oldrx != (signed)([frame area].x +
+                                   [frame size].left -
+                                   border_width) ||
+                 oldry != (signed)([frame area].y +
+                                   [frame size].top -
+                                   border_width));
 
-            /* root window real coords */
-            event.xconfigure.x = [frame area].x + 
-		    [frame size].left - border_width;
-            event.xconfigure.y = [frame area].y + 
-		    [frame size].top - border_width;
-            event.xconfigure.width = w;
-            event.xconfigure.height = h;
-            event.xconfigure.border_width = 0;
-            event.xconfigure.above = [frame plate];
-            event.xconfigure.override_redirect = NO;
-            XSendEvent(event.xconfigure.display, event.xconfigure.window,
-                       NO, StructureNotifyMask, &event);
-        }
+    if (force_reply || ((!user || (user && final)) && rootmoved))
+    {
+        XEvent event;
+        POINT_SET(root_pos,
+                  [frame area].x + [frame size].left -
+                  border_width,
+                  [frame area].y + [frame size].top -
+                  border_width);
+
+        event.type = ConfigureNotify;
+        event.xconfigure.display = ob_display;
+        event.xconfigure.event = window;
+        event.xconfigure.window = window;
+
+        /* root window real coords */
+        event.xconfigure.x = root_pos.x;
+        event.xconfigure.y = root_pos.y;
+        event.xconfigure.width = w;
+        event.xconfigure.height = h;
+        event.xconfigure.border_width = 0;
+        event.xconfigure.above = [frame plate];
+        event.xconfigure.override_redirect = False;
+        XSendEvent(event.xconfigure.display, event.xconfigure.window,
+                   False, StructureNotifyMask, &event);
     }
 
     /* if the client is shrinking, then resize the frame before the client */
@@ -358,17 +402,25 @@
 
     /* XXX watch for xinerama dead areas */
     /* This makes sure windows aren't entirely outside of the screen so you
-     * can't see them at all */
+       can't see them at all.
+       It makes sure 10% of the window is on the screen at least. At don't let
+       it move itself off the top of the screen, which would hide the titlebar
+       on you. (The user can still do this if they want too, it's only limiting
+       the application.
+    */
+
     if ([self normal]) {
         a = [screen areaOfDesktop: desktop];
-        if (!strut.right && *x >= a->x + a->width - 1)
-            *x = a->x + a->width - [frame area].width;
-        if (!strut.bottom && *y >= a->y + a->height - 1)
-            *y = a->y + a->height - [frame area].height;
-        if (!strut.left && *x + [frame area].width - 1 < a->x)
-            *x = a->x;
-        if (!strut.top && *y + [frame area].height - 1 < a->y)
-            *y = a->y;
+        if (!strut.right &&
+            *x + [frame area].width/10 >= a->x + a->width - 1)
+            *x = a->x + a->width - [frame area].width/10;
+        if (!strut.bottom &&
+            *y + [frame area].height/10 >= a->y + a->height - 1)
+            *y = a->y + a->height - [frame area].height/10;
+        if (!strut.left && *x + [frame area].width*9/10 - 1 < a->x)
+            *x = a->x - [frame area].width*9/10;
+        if (!strut.top && *y + [frame area].height*9/10 - 1 < a->y)
+            *y = a->y - [frame area].width*9/10;
     }
     /* Azalea: for GNUstep menu, it will reposition itself to be inside the
        screen. If we force it here, it will not display properly. 
@@ -389,8 +441,9 @@
         /* avoid the xinerama monitor divide while we're at it,
          * remember to fix the placement stuff to avoid it also and
          * then remove this XXX */
-	a = [screen physicalAreaOfMonitor: [self monitor]];
-        /* dont let windows map/move into the strut unless they
+	a = [screen areaOfDesktop: [self desktop]
+ 			  monitor: [self monitor]];
+        /* dont let windows map into the strut unless they
            are bigger than the available area */
         if (w <= a->width) {
             if (!strut.left && *x < a->x) *x = a->x;
@@ -408,7 +461,7 @@
     return ox != *x || oy != *y;
 }
 
-- (void) fullscreen: (BOOL) fs saveArea: (BOOL) savearea
+- (void) fullscreen: (BOOL) fs
 {
     int x, y, w, h;
 
@@ -416,14 +469,21 @@
         fullscreen == fs) return;                   /* already done */
 
     fullscreen = fs;
-    [self changeState]; /* change the state hints on the client,
-                                  and adjust out layer/stacking */
+    [self changeState]; /* change the state hints on the client */
+    [self calcLayer];   /* and adjust out layer/stacking */
 
     if (fs) {
-        if (savearea)
-	{
-            pre_fullscreen_area = area;
-	}
+        pre_fullscreen_area = area;
+        /* if the window is maximized, its area isn't all that meaningful.
+           save it's premax area instead. */
+        if (max_horz) {
+            pre_fullscreen_area.x = pre_max_area.x;
+            pre_fullscreen_area.width = pre_max_area.width;
+        }
+        if (max_vert) {
+            pre_fullscreen_area.y = pre_max_area.y;
+            pre_fullscreen_area.height = pre_max_area.height;
+        }
 
         /* these are not actually used cuz client_configure will set them
            as appropriate when the window is fullscreened */
@@ -459,13 +519,11 @@
 
 - (void) iconify: (BOOL) _iconic currentDesktop: (BOOL) curdesk
 {
-    /* move up the transient chain as far as possible first */
-    AZClient *client = [self searchTopTransient];
-
-    [[client searchTopTransient] iconifyRecursive: _iconic currentDesktop: curdesk];
+    AZClient *client = [self searchTopParent];
+    [client iconifyRecursive: _iconic currentDesktop: curdesk];
 }
 
-- (void) maximize: (BOOL) max direction: (int) dir saveArea: (BOOL) savearea
+- (void) maximize: (BOOL) max direction: (int) dir
 {
     int x, y, w, h;
      
@@ -491,17 +549,15 @@
     h = area.height;
 
     if (max) {
-        if (savearea) {
-            if ((dir == 0 || dir == 1) && !max_horz) { /* horz */
-                RECT_SET(pre_max_area,
-                         area.x, pre_max_area.y,
-                         area.width, pre_max_area.height);
-            }
-            if ((dir == 0 || dir == 2) && !max_vert) { /* vert */
-                RECT_SET(pre_max_area,
-                         pre_max_area.x, area.y,
-                         pre_max_area.width, area.height);
-            }
+        if ((dir == 0 || dir == 1) && !max_horz) { /* horz */
+            RECT_SET(pre_max_area,
+                     area.x, pre_max_area.y,
+                     area.width, pre_max_area.height);
+	}
+        if ((dir == 0 || dir == 2) && !max_vert) { /* vert */
+            RECT_SET(pre_max_area,
+                     pre_max_area.x, area.y,
+                     pre_max_area.width, area.height);
         }
     } else {
         Rect *a;
@@ -553,18 +609,9 @@
     if ((!(functions & OB_CLIENT_FUNC_SHADE) && shade) || /* can't shade */
         shaded == shade) return;     /* already done */
 
-    /* when we're iconic, don't change the wmstate */
-    if (!iconic) {
-        long old;
-
-        old = wmstate;
-        wmstate = (shade ? IconicState : NormalState);
-        if (old != wmstate)
-            PROP_MSG(window, kde_wm_change_state, wmstate, 1, 0, 0);
-    }
-
     shaded = shade;
     [self changeState];
+    [self changeWMState];
     /* resize the frame to just the titlebar */
     [frame adjustAreaWithMoved: NO resized: NO fake: NO];
 }
@@ -594,7 +641,7 @@
     ce.xclient.window = window;
     ce.xclient.format = 32;
     ce.xclient.data.l[0] = prop_atoms.wm_delete_window;
-    ce.xclient.data.l[1] = [[AZEventHandler defaultHandler] eventLastTime]/*event_lasttime*/;
+    ce.xclient.data.l[1] = event_curtime;
     ce.xclient.data.l[2] = 0l;
     ce.xclient.data.l[3] = 0l;
     ce.xclient.data.l[4] = 0l;
@@ -606,10 +653,24 @@
     XKillClient(ob_display, window);
 }
 
+- (void) hilite: (BOOL) flag
+{
+   if (demands_attention == flag) 
+       return; /* no change */
+
+   /* don't allow focused windows to hilite */
+   demands_attention = (flag && ![self focused]);
+   if (demands_attention)
+      [[self frame] flashStart];
+   else
+      [[self frame] flashStop];
+   [self changeState];
+}
+
 - (void) setDesktop: (unsigned int) target hide: (BOOL) donthide
 {
-  [[self searchTopTransient] setDesktopRecursive: target
-	                                  hide: donthide];
+  AZClient *client = [self searchTopParent];
+  [client setDesktopRecursive: target hide: donthide];
 }
 
 - (BOOL) validate
@@ -655,6 +716,7 @@
     BOOL _max_vert = max_vert;
     BOOL _modal = modal;
     BOOL _iconic = iconic;
+    BOOL _demands_attention = demands_attention;
     int i;
 
     if (!(action == prop_atoms.net_wm_state_add ||
@@ -704,6 +766,10 @@
             else if (state == prop_atoms.net_wm_state_below)
                 action = below ? prop_atoms.net_wm_state_remove :
                     prop_atoms.net_wm_state_add;
+            else if (state == prop_atoms.net_wm_state_demands_attention)
+                action = demands_attention ?
+                    prop_atoms.net_wm_state_remove :
+                    prop_atoms.net_wm_state_add;
             else if (state == prop_atoms.ob_wm_state_undecorated)
                 action = _undecorated ? prop_atoms.net_wm_state_remove :
                     prop_atoms.net_wm_state_add;
@@ -732,6 +798,8 @@
             } else if (state == prop_atoms.net_wm_state_below) {
                 above = NO;
                 below = YES;
+            } else if (state == prop_atoms.net_wm_state_demands_attention) {
+                _demands_attention = YES;
             } else if (state == prop_atoms.ob_wm_state_undecorated) {
                 _undecorated = YES;
             }
@@ -757,6 +825,8 @@
                 above = NO;
             } else if (state == prop_atoms.net_wm_state_below) {
                 below = NO;
+            } else if (state == prop_atoms.net_wm_state_demands_attention) {
+                _demands_attention = NO;
             } else if (state == prop_atoms.ob_wm_state_undecorated) {
                 _undecorated = NO;
             }
@@ -766,23 +836,23 @@
         if (_max_horz != max_horz && _max_vert != max_vert) {
             /* toggling both */
             if (_max_horz == _max_vert) { /* both going the same way */
-		[self maximize: _max_horz direction: 0 saveArea: YES];
+		[self maximize: _max_horz direction: 0];
             } else {
-		[self maximize: _max_horz direction: 1 saveArea: YES];
-		[self maximize: _max_vert direction: 2 saveArea: YES];
+		[self maximize: _max_horz direction: 1];
+		[self maximize: _max_vert direction: 2];
             }
         } else {
             /* toggling one */
             if (_max_horz != max_horz)
-		[self maximize: _max_horz direction: 1 saveArea: YES];
+		[self maximize: _max_horz direction: 1];
             else
-		[self maximize: _max_vert direction: 2 saveArea: YES];
+		[self maximize: _max_vert direction: 2];
         }
     }
     /* change fullscreen state before shading, as it will affect if the window
        can shade or not */
     if (_fullscreen != fullscreen)
-	[self fullscreen: _fullscreen saveArea: YES];
+	[self fullscreen: _fullscreen];
     if (_shaded != shaded)
 	[self shade: _shaded];
     if (_undecorated != undecorated)
@@ -796,7 +866,9 @@
     if (_iconic != iconic)
 	[self iconify: _iconic currentDesktop: NO];
 
-    [self calcLayer];
+    if (_demands_attention != demands_attention)
+        [self hilite: _demands_attention];
+
     [self changeState]; /* change the hint to reflect these changes */
 }
 
@@ -804,8 +876,7 @@
 {
     AZClient *child = nil;
      
-    /* if we have a modal child, then focus it, not us */
-    child = [[self searchTopTransient] searchModalChild];
+    child = [self searchModalChild];
     if (child) return child;
     return self;
 }
@@ -858,15 +929,12 @@
     }
 
     if ([oself can_focus]) {
-        /* RevertToPointerRoot causes much more headache than RevertToNone, so
-           I choose to use it always, hopefully to find errors quicker, if any
-           are left. (I hate X. I hate focus events.)
-           
-           Update: Changing this to RevertToNone fixed a bug with mozilla (bug
-           #799. So now it is RevertToNone again.
-        */
-        XSetInputFocus(ob_display, [oself window], RevertToNone,
-                       [[AZEventHandler defaultHandler] eventLastTime]/*event_lasttime*/);
+        /* This can cause a BadMatch error with CurrentTime, or if an app
+           passed in a bad time for _NET_WM_ACTIVE_WINDOW. */
+        AZXErrorSetIgnore(YES);
+        XSetInputFocus(ob_display, [oself window], RevertToPointerRoot,
+                       event_curtime);
+        AZXErrorSetIgnore(NO);
     }
 
     if ([oself focus_notify]) {
@@ -877,7 +945,7 @@
         ce.xclient.window = [oself window];
         ce.xclient.format = 32;
         ce.xclient.data.l[0] = prop_atoms.wm_take_focus;
-        ce.xclient.data.l[1] = [[AZEventHandler defaultHandler] eventLastTime]/*event_lasttime*/;
+        ce.xclient.data.l[1] = event_curtime;
         ce.xclient.data.l[2] = 0l;
         ce.xclient.data.l[3] = 0l;
         ce.xclient.data.l[4] = 0l;
@@ -887,7 +955,7 @@
 #ifdef DEBUG_FOCUS
     AZDebug("%sively focusing %lx at %d\n",
              (oself->can_focus ? "act" : "pass"),
-             oself->window, (int) [[AZEventHandler defaultHandler] eventLastTime]/*event_lasttime*/);
+             oself->window, (int) event_curtime);
 #endif
 
     /* Cause the FocusIn to come back to us. Important for desktop switches,
@@ -897,78 +965,109 @@
     return YES;
 }
 
-/* Used when the current client is closed, focus_last will then prevent
- * focus from going to the mouse pointer */
+#if 0
+/* Used when the current client is closed or otherwise hidden, focus_last will
+   then prevent focus from going to the mouse pointer
+*/
 - (void) unfocus;
 {
-    if ([[AZFocusManager defaultManager] focus_client] == self) {
-#ifdef DEBUG_FOCUS
-        AZDebug("client_unfocus for %lx\n", oself->window);
-#endif
-	[[AZFocusManager defaultManager] fallback: OB_FOCUS_FALLBACK_CLOSED];
+    if ([[AZFocusManager defaultManager] focus_client] == self) 
+    {
+	[[AZFocusManager defaultManager] fallback: NO];
     }
 }
-
-- (void) activateHere: (BOOL) here
+#endif
+- (void) activateHere: (BOOL) here user: (BOOL) user 
 {
+    AZFocusManager *fManager = [AZFocusManager defaultManager];
+    unsigned int last_time = [fManager focus_client] ? [[fManager focus_client] user_time] : CurrentTime;
     AZScreen *screen = [AZScreen defaultScreen];
-    if ([self normal] && [screen showingDesktop])
+    /* XXX do some stuff here if user is false to determine if we really want
+       to activate it or not (a parent or group member is currently
+       active)?
+    */
+    if (!user && event_curtime && last_time &&
+        !event_time_after(event_curtime, last_time))
     {
-	[screen showDesktop: NO];
+      [self hilite: YES];
     }
-    if (iconic)
-	[self iconify: NO currentDesktop: here];
-    if (desktop != DESKTOP_ALL &&
-        desktop != [screen desktop]) {
-        if (here)
+    else 
+    {
+        if ([self normal] && [screen showingDesktop])
+	  [screen showDesktop: NO];
+        if (iconic)
+	  [self iconify: NO currentDesktop: here];
+        if (desktop != DESKTOP_ALL &&
+            desktop != [screen desktop]) 
 	{
-	    [self setDesktop: [screen desktop] hide: NO];
-	}
-        else
-	{
-	  [screen setDesktop: desktop];
-	}
-    } else if (![frame visible])
-        /* if its not visible for other reasons, then don't mess
-           with it */
-        return;
-    if (shaded)
-	[self shade: NO];
+            if (here)
+	      [self setDesktop: [screen desktop] hide: NO];
+            else
+	      [screen setDesktop: desktop];
+        } else if (![frame visible])
+            /* if its not visible for other reasons, then don't mess
+               with it */
+            return;
+        if (shaded)
+ 	  [self shade: NO];
 
-    [self focus];
+        [self focus];
 
-    /* we do this an action here. this is rather important. this is because
-       we want the results from the focus change to take place BEFORE we go
-       about raising the window. when a fullscreen window loses focus, we need
-       this or else the raise wont be able to raise above the to-lose-focus
-       fullscreen window. */
-    [self raise];
+        /* we do this an action here. this is rather important. this is because
+           we want the results from the focus change to take place BEFORE we go
+         about raising the window. when a fullscreen window loses focus, we need
+           this or else the raise wont be able to raise above the to-lose-focus
+           fullscreen window. */
+        [self raise];
+    }
 }
 
 - (void) calcLayer
 {
-    ObStackingLayer l;
     AZClient *orig = nil, *oself = self;
+    NSArray *it = nil;
 
     orig = oself;
 
+    /* I do not fully understand why I need to treate GNUstep specially.
+       If I don't, Azalea will complain in [AZStacking doRestack:...]
+       where 'index == NSNotFound' and crashes most of time.
+       My take is that for regular X-window, transient window has the same
+       level as their parent window. But for GNUstep application,
+       transient window has its own level (floating panel, menu, etc).
+       If we set GNUstep window the same level as their parent,
+       which is probably the main window, it is actually the wrong behavior.
+       Although it does not explain why AZStacking complains and crashes,
+       it behaves well.
+       Another reason I can think about is that since we do not modify
+       window level based on transient relationship,
+       it is consistent with GNUstep, therefore, bug-free.
+       For debug purpose, this happens between r1649 to r1650,
+       or more specifically, in [AZClient calcLayer]. */
+    if ([self isGNUstep])
+    {
+	layer = [self calcStackingLayer];
+	return;
+    }
+
     /* transients take on the layer of their parents */
-    oself = [oself searchTopTransient];
-
-    l = [oself calcStackingLayer];
-
-    [oself calcLayerRecursiveWithOriginal: orig
-	    stackingLayer: l raised: NO];
+    it = [oself searchAllTopParents];
+    int i;
+    for (i = 0; i < [it count]; i++)
+    {
+      [[it objectAtIndex: i]  calcLayerRecursiveWithOriginal: orig
+ 	                      stackingLayer: 0 raised: NO];
+    }
 }
 
 - (void) raise
 {
-    action_run_string(@"Raise", self);
+    action_run_string(@"Raise", self, CurrentTime);
 }
 
 - (void) lower
 {
-    action_run_string(@"Lower", self);
+    action_run_string(@"Lower", self, CurrentTime);
 }
 
 - (void) updateTransientFor
@@ -987,22 +1086,43 @@
                    a dockapp, for example */
                 target = nil;
             }
-            
+
+            /* THIS IS SO ANNOYING ! ! ! ! Let me explain.... have a seat..
+
+               Setting the transient_for to Root is actually illegal, however
+               applications from time have done this to specify transient for
+               their group.
+
+               Now you can do that by being a TYPE_DIALOG and not setting
+               the transient_for hint at all on your window. But people still
+               use Root, and Kwin is very strange in this regard.
+
+               KWin 3.0 will not consider windows with transient_for set to
+               Root as transient for their group *UNLESS* they are also modal.
+               In that case, it will make them transient for the group. This
+               leads to all sorts of weird behavior from KDE apps which are
+               only tested in KWin. I'd like to follow their behavior just to
+               make this work right with KDE stuff, but that seems wrong.
+            */
             if (!target && group) {
                 /* not transient to a client, see if it is transient for a
                    group */
-                if (t == [group leader] ||
-                    t == None ||
-                    t == RootWindow(ob_display, ob_screen))
+                if (t == RootWindow(ob_display, ob_screen))
                 {
                     /* window is a transient for its group! */
                     target = OB_TRAN_GROUP;
                 }
             }
         }
-    } else if (type == OB_CLIENT_TYPE_DIALOG && group) {
-        transient = YES;
-        target = OB_TRAN_GROUP;
+    } else if (group) {
+        if (type == OB_CLIENT_TYPE_DIALOG ||
+            type == OB_CLIENT_TYPE_TOOLBAR ||
+            type == OB_CLIENT_TYPE_MENU ||
+            type == OB_CLIENT_TYPE_UTILITY)
+        {
+            transient = YES;
+            target = OB_TRAN_GROUP;
+        }
     } else
         transient = NO;
 
@@ -1135,7 +1255,6 @@
 - (void) updateWmhints
 {
     XWMHints *hints;
-    BOOL ur = NO;
 
     /* assume a window takes input if it doesnt specify */
     can_focus = YES;
@@ -1149,9 +1268,6 @@
         if (ob_state() != OB_STATE_STARTING && frame == nil)
             if (hints->flags & StateHint)
                 iconic = (hints->initial_state == IconicState);
-
-        if (hints->flags & XUrgencyHint)
-            ur = YES;
 
         if (!(hints->flags & WindowGroupHint))
             hints->window_group = None;
@@ -1212,25 +1328,12 @@
 
         XFree(hints);
     }
-
-    if (ur != urgent) {
-	urgent = ur;
-        /* fire the urgent callback if we're mapped, otherwise, wait until
-           after we're mapped */
-        if (frame)
-	    [self urgentNotify];
-    }
 }
 
 - (void) updateTitle
 {
-    long nums;
-    unsigned int i;
     NSString *s = nil;
-    BOOL read_title;
-    NSString *old_title = nil;
-
-    ASSIGN(old_title, title);
+    NSString *visible = nil;
      
     /* try netwm */
     if (PROP_GETS(window, net_wm_name, utf8, &s)) {
@@ -1242,55 +1345,36 @@
       /* try old x stuff */
       ASSIGNCOPY(title, s);
     } else {
-          // http://developer.gnome.org/projects/gup/hig/draft_hig_new/windows-alert.html
-              if (transient) {
-		  ASSIGN(title, [NSString string]);
-                  goto no_number;
-              } else
-		  ASSIGN(title, [NSString stringWithCString: "Unnamed Window"]);
+      /*
+        GNOME alert windows are not given titles:
+        http://developer.gnome.org/projects/gup/hig/draft_hig_new/windows-alert.html
+       */
+      if (transient) {
+	  ASSIGN(title, [NSString string]);
+      } else {
+	  ASSIGN(title, [NSString stringWithCString: "Unnamed Window"]);
+      }
     }
 
-    /* did the title change? then reset the title_count */
-    if (old_title && [title compare: old_title options: 0 range: NSMakeRange(0, [title length])] != NSOrderedSame)
-	title_count = 1;
-
-    /* look for duplicates and append a number */
-    nums = 0;
-    AZClientManager *cManager = [AZClientManager defaultManager];
-    int j, count = [cManager count];
-    for (j = 0; j < count; j++)
-    {
-      AZClient *c = [cManager clientAtIndex: j];
-      if (c != self) {
-	    if ([title compare: [c title] options: 0 range: NSMakeRange(0, [title length])] == NSOrderedSame)
-                nums |= 1 << [c title_count];
-        }
-    }
-    /* find first free number */
-    for (i = 1; i <= 32; ++i)
-        if (!(nums & (1 << i))) {
-            if (title_count == 1 || i == 1)
-                title_count = i;
-            break;
-        }
-    /* dont display the number for the first window */
-    if (title_count > 1) {
-	ASSIGN(title, ([NSString stringWithFormat: @"%@ - [%u]", title, title_count]));
-    }
-
-no_number:
+#if 0
     PROP_SETS(window, net_wm_visible_name, (char*)[title UTF8String]);
+#else
+    if (client_machine) {
+	ASSIGN(visible, ([NSString stringWithFormat: @"%@ (%@)", title, client_machine]));
+    } else
+	ASSIGNCOPY(visible, title);
+
+    PROP_SETS(window, net_wm_visible_name, (char*)[visible UTF8String]);
+    ASSIGNCOPY(title, visible);
+#endif
 
     if (frame)
 	[frame adjustTitle];
-
-    DESTROY(old_title);
 
     /* update the icon title */
     s = nil;
     DESTROY(icon_title);
 
-    read_title = YES;
     /* try netwm */
     if (PROP_GETS(window, net_wm_icon_name, utf8, &s)) {
       ASSIGNCOPY(icon_title, s);
@@ -1302,12 +1386,6 @@ no_number:
       ASSIGNCOPY(icon_title, s);
     } else {
       ASSIGNCOPY(icon_title, title);
-      read_title = NO;
-    }
-
-    /* append the title count, dont display the number for the first window. */
-    if (read_title && title_count > 1) {
-	ASSIGN(icon_title, ([NSString stringWithFormat: @"%@ - [%u]", icon_title, title_count]));
     }
 
     PROP_SETS(window, net_wm_visible_icon_name, (char*)[icon_title UTF8String]);
@@ -1445,27 +1523,6 @@ no_number:
         }
 
         free(data);
-    } else if (PROP_GETA32(window, kwm_win_icon,
-                           kwm_win_icon, &data, &num)) {
-        if (num == 2) {
-	    int _w, _h;
-	    RrPixel32 *_temp;
-	    AZXErrorSetIgnore(YES);
-            if (!RrPixmapToRGBA(ob_rr_inst, data[0], data[1],
-                                &_w, &_h, &_temp)) {
-            }
-	    else // success
-	    {
-	      AZClientIcon *icon = [[AZClientIcon alloc] init];
-	      [icon setWidth: _w];
-	      [icon setHeight: _h];
-	      [icon setData: _temp];
-	      [self addIcon: icon];
-	      DESTROY(icon);
-	    }
-	    AZXErrorSetIgnore(NO);
-        }
-        free(data);
     } else {
         XWMHints *hints;
 
@@ -1498,6 +1555,21 @@ no_number:
 
     if (frame)
 	[frame adjustIcon];
+}
+
+- (void) updateUserTime
+{
+    unsigned long time;
+
+    if (PROP_GET32([self window], net_wm_user_time, cardinal, &time)) {
+        /* we set this every time, not just when it grows, because in practice
+           sometimes time goes backwards! (ntpdate.. yay....) so.. if it goes
+           backward we don't want all windows to stop focusing. we'll just
+           assume noone is setting times older than the last one, cuz that
+           would be pretty stupid anyways
+        */
+	user_time = time;
+    }
 }
 
 - (void) setupDecorAndFunctions
@@ -1559,7 +1631,8 @@ no_number:
     if (mwmhints.flags & OB_MWM_FLAG_DECORATIONS) {
         if (! (mwmhints.decorations & OB_MWM_DECOR_ALL)) {
             if (! ((mwmhints.decorations & OB_MWM_DECOR_HANDLE) ||
-                   (mwmhints.decorations & OB_MWM_DECOR_TITLE))) {
+                   (mwmhints.decorations & OB_MWM_DECOR_TITLE))) 
+	    {
                 /* if the mwm hints request no handle or title, then all
                    decorations are disabled, but keep the border if that's
 		   specified */
@@ -1823,57 +1896,6 @@ no_number:
     return nil;
 }
 
-- (AZClient *) searchTopTransient
-{
-    /* move up the transient chain as far as possible */
-    if (transient_for) {
-        if (transient_for != OB_TRAN_GROUP) {
-	    return [transient_for searchTopTransient];
-        } else {
-            NSAssert(group, @"Group does not exist");
-	    BOOL found = NO;
-	    AZClient *c = nil;
-            int i, count = [[group members] count];
-	    for (i = 0; i < count; i++) {
-	      c = [group memberAtIndex: i];
-
-                /* checking transient_for prevents infinate loops! */
-                if (c != self && ![c transient_for])
-		{
-		    found = YES;
-                    break;
-		}
-            }
-            if (found)
-                return c;
-        }
-    }
-    return self;
-}
-
-#if 0 // FIXME: not used in anywhere
-- (AZClient *) searchParent: (AZClient *) search
-{
-    if (transient_for->_self) {
-        if (transient_for->_self != OB_TRAN_GROUP) {
-            if (transient_for->_self == search)
-                return search;
-        } else {
-            int i, count = [[group members] count];
-	    for (i = 0; i < count; i++) {
-	      AZClient *c = [group memberAtIndex: i];
-
-                /* checking transient_for prevents infinate loops! */
-                if (c != self && ![c transient_for])
-                    if (c == search)
-                        return search;
-            }
-        }
-    }
-    return nil;
-}
-#endif
-
 - (AZClient *) searchTransient: (AZClient *) search;
 {
     int j, jcount = [transients count];
@@ -1923,8 +1945,7 @@ no_number:
             continue;
         if([cur iconic])
             continue;
-        if([cur focusTarget] == cur &&
-           !([cur can_focus] || [cur focus_notify]))
+        if(!([cur focusTarget] == cur && [cur can_focus]))
             continue;
 
         /* find the centre coords of this window, from the
@@ -2249,32 +2270,62 @@ no_number:
     }
 }
 
-/* Determines which physical monitor a client is on by calculating the
-   area of the part of the client on each monitor.  The number of the
-   monitor containing the greatest area of the client is returned.*/
 - (unsigned int) monitor
 {
-    unsigned int i;
-    unsigned int most = 0;
-    unsigned int mostv = 0;
-    AZScreen *screen = [AZScreen defaultScreen];
+    Rect a = [[self frame] area];
+    return [[AZScreen defaultScreen] findMonitor: &a];
+}
 
-    for (i = 0; i < [screen numberOfMonitors]; ++i) {
-	Rect *_area = [screen physicalAreaOfMonitor: i];
-        if (RECT_INTERSECTS_RECT(*_area, [frame area])) {
-            Rect r;
-            unsigned int v;
+- (NSArray *) searchAllTopParents
+{
+    NSMutableArray *ret = [[NSMutableArray alloc] init];
 
-            RECT_SET_INTERSECTION(r, *_area, [frame area]);
-            v = r.width * r.height;
+    /* move up the direct transient chain as far as possible */
+    AZClient *t_for = self;
+    while ([t_for transient_for] && [t_for transient_for] != OB_TRAN_GROUP)
+      t_for = [t_for transient_for];
 
-            if (v > mostv) {
-                mostv = v;
-                most = i;
-            }
-        }
+    if ([t_for transient_for] == nil)
+    {
+        [ret addObject: t_for]; 
     }
-    return most;
+    else
+    {
+	if ([t_for group] == nil)
+	    NSLog(@"Internal Error: not group");
+
+	NSEnumerator *e = [[[t_for group] members] objectEnumerator];
+	AZClient *c = nil;
+	while ((c = [e nextObject]))
+	{
+	    if (([c transient_for] == nil) && [c normal])
+		[ret insertObject: c atIndex: 0];
+ 	}
+	if ([ret count] == 0) /* no group parents */
+	    [ret addObject: t_for];
+    }
+    return AUTORELEASE(ret);
+}
+
+- (AZClient *) searchTopParent
+{
+    /* move up the direct transient chain as far as possible */
+    AZClient *t_for = self;
+    while ([t_for transient_for] && [t_for transient_for] != OB_TRAN_GROUP &&
+	   [t_for normal])
+    {
+      t_for = [t_for transient_for];
+    }
+
+    return t_for;
+}
+
+- (BOOL) hasDirectChild: (AZClient *) child
+{
+    while (child != self &&
+           [child transient_for] && [child transient_for] != OB_TRAN_GROUP)
+        child = [child transient_for];
+    return [child isEqual: self];
 }
 
 - (void) updateSmClientId;
@@ -2301,20 +2352,24 @@ no_number:
 - (void) getAll
 {
     [self getArea];
-    [self updateTransientFor];
-    [self updateWmhints];
-    [self getStartupId];
-    [self getDesktop];
-    [self getShaped];
-
     [self getMwmHints];
-    [self getType];/* this can change the mwmhints for special cases */
 
     /* The transient hint is used to pick a type, but the type can also affect
-       transiency (dialogs are always made transients). This is Havoc's idea,
-       but it is needed to make some apps work right (eg tsclient). */
+       transiency (dialogs are always made transients of their group if they
+       have one). This is Havoc's idea, but it is needed to make some apps
+       work right (eg tsclient). */
     [self updateTransientFor];
+    [self getType];/* this can change the mwmhints for special cases */
     [self getState];
+    [self updateTransientFor];
+
+    [self updateWmhints];
+    [self getStartupId];
+    [self getDesktop];/* uses transient data/group/startup id if a
+                                desktop is not specified */
+    [self getShaped];
+    [self getLayer]; /* if layer hasn't been specified, get it from
+                               other sources if possible */
 
     {
         /* a couple type-based defaults for new windows */
@@ -2339,10 +2394,12 @@ no_number:
        (min/max sizes), so we're ready to set up the decorations/functions */
     [self setupDecorAndFunctions];
   
+    [self getClientMachine];
     [self updateTitle];
     [self updateSmClientId];
     [self updateStrut];
     [self updateIcons];
+    [self updateUserTime];
 }
 
 - (void) restoreSessionState
@@ -2378,15 +2435,32 @@ no_number:
     max_vert = [session max_vert];
 }
 
-- (void) changeState
+- (void) changeWMState
 {
     unsigned long state[2];
+    long old;
+
+    old = [self wmstate];
+
+    if (shaded || iconic || ![frame visible])
+        wmstate = IconicState;
+    else
+        wmstate = NormalState;
+
+    if (old != wmstate) {
+        PROP_MSG(window, kde_wm_change_state,
+                 wmstate, 1, 0, 0);
+
+        state[0] = wmstate;
+        state[1] = None;
+        PROP_SETA32(window, wm_state, wm_state, state, 2);
+    }
+}
+
+- (void) changeState
+{
     unsigned long netstate[11];
     unsigned int num;
-
-    state[0] = wmstate;
-    state[1] = None;
-    PROP_SETA32(window, wm_state, wm_state, state, 2);
 
     num = 0;
     if (modal)
@@ -2409,11 +2483,11 @@ no_number:
         netstate[num++] = prop_atoms.net_wm_state_above;
     if (below)
         netstate[num++] = prop_atoms.net_wm_state_below;
+    if (demands_attention)
+        netstate[num++] = prop_atoms.net_wm_state_demands_attention;
     if (undecorated)
         netstate[num++] = prop_atoms.ob_wm_state_undecorated;
     PROP_SETA32(window, net_wm_state, atom, netstate, num);
-
-    [self calcLayer];
 
     if (frame)
 	[frame adjustState];
@@ -2475,17 +2549,24 @@ no_number:
 
     if (show) {
         XSetWindowBorderWidth(ob_display, window, border_width);
-
-        /* move the client so it is back it the right spot _with_ its
-           border! */
-        if (x != oldx || y != oldy)
-            XMoveWindow(ob_display, window, x, y);
+        /* set border_width to 0 because there is no border to add into
+           calculations anymore */
+        border_width = 0;
     } else
         XSetWindowBorderWidth(ob_display, window, 0);
 }
 
-- (void) applyStartupState
+- (void) applyStartupStateAtX: (int) x y: (int) y
 {
+    BOOL pos = NO; /* has the window's position been configured? */
+    int ox, oy;
+
+    /* save the position, and set self->area for these to use */
+    ox = area.x;
+    oy = area.y;
+    area.x = x;
+    area.y = y;
+
     /* these are in a carefully crafted order.. */
 
     if (iconic) {
@@ -2494,7 +2575,8 @@ no_number:
     }
     if (fullscreen) {
         fullscreen = NO;
-	[self fullscreen: YES saveArea: NO];
+	[self fullscreen: YES];
+	pos = YES;
     }
     if (undecorated) {
         undecorated = NO;
@@ -2504,19 +2586,38 @@ no_number:
         shaded = NO;
 	[self shade: YES];
     }
-    if (urgent)
-	[self urgentNotify];
+    if (demands_attention) 
+    {
+        demands_attention = NO;
+	[self hilite: YES];
+    }
+
   
     if (max_vert && max_horz) {
         max_vert = NO;
 	max_horz = NO;
-	[self maximize: YES direction: 0 saveArea: NO];
+	[self maximize: YES direction: 0];
+	pos = YES;
     } else if (max_vert) {
         max_vert = NO;
-	[self maximize: YES direction: 2 saveArea: NO];
+	[self maximize: YES direction: 2];
+	pos = YES;
     } else if (max_horz) {
         max_horz = NO;
-	[self maximize: YES direction: 1 saveArea: NO];
+	[self maximize: YES direction: 1];
+	pos = YES;
+    }
+
+    /* if the client didn't get positioned yet, then do so now
+       call client_move even if the window is not being moved anywhere, because
+       when we reparent it and decorate it, it is getting moved and we need to
+       be telling it so with a ConfigureNotify event.
+    */
+    if (!pos) {
+        /* use the saved position */
+        area.x = ox;
+        area.y = oy;
+	[self moveToX: x y: y];
     }
 
     /* nothing to do for the other states:
@@ -2556,12 +2657,50 @@ no_number:
     }
 }
 
+- (void) show
+{
+    if ([self shouldShow])
+    {
+      [[self frame] show];
+    }
+
+    /* According to the ICCCM (sec 4.1.3.1) when a window is not visible, it
+       needs to be in IconicState. This includes when it is on another
+       desktop!
+    */
+    [self changeWMState];
+}
+
+- (void) hide
+{
+    if ([self shouldShow] == NO)
+    {
+      [[self frame] hide];
+    }
+
+    /* According to the ICCCM (sec 4.1.3.1) when a window is not visible, it
+       needs to be in IconicState. This includes when it is on another
+       desktop!
+    */
+    [self changeWMState];
+}
+
 - (void) showhide
 {
     if ([self shouldShow])
+    {
 	[frame show];
+    }
     else
+    {
 	[frame hide];
+    }
+
+    /* According to the ICCCM (sec 4.1.3.1) when a window is not visible, it
+       needs to be in IconicState. This includes when it is on another
+       desktop!
+    */
+    [self changeWMState];
 }
 
 /* Accessories */
@@ -2596,7 +2735,6 @@ no_number:
 - (void) set_startup_id: (NSString *) s { ASSIGN(startup_id, s); }
 
 - (NSString *) title { return title; }
-- (unsigned int ) title_count { return title_count; }
 - (NSString *) icon_title { return icon_title; }
 - (NSString *) name { return name; }
 - (NSString *) class { return class; }
@@ -2604,7 +2742,6 @@ no_number:
 - (NSString *) sm_client_id { return sm_client_id; }
 - (ObClientType) type { return type; }
 - (void) set_title: (NSString *) t { ASSIGN(title, t); }
-- (void) set_title_count: (unsigned int ) t { title_count = t; }
 - (void) set_icon_title: (NSString *) i { ASSIGN(icon_title, i); }
 - (void) set_name: (NSString *) n { ASSIGN(name, n); }
 - (void) set_class: (NSString *) c { ASSIGN(class, c); }
@@ -2651,11 +2788,9 @@ no_number:
 - (void) set_layer: (ObStackingLayer) l { layer = l; }
 
 - (BOOL) can_focus { return can_focus; }
-- (BOOL) urgent { return urgent; }
 - (BOOL) focus_notify { return focus_notify; }
 - (BOOL) shaped { return shaped; }
 - (void) set_can_focus: (BOOL) b { can_focus = b; }
-- (void) set_urgent: (BOOL) b { urgent = b; }
 - (void) set_focus_notify: (BOOL) b { focus_notify = b; }
 - (void) set_shaped: (BOOL) b { shaped = b; }
 
@@ -2679,6 +2814,9 @@ no_number:
 - (void) set_fullscreen: (BOOL) b { fullscreen = b; }
 - (void) set_above: (BOOL) b { above = b; }
 - (void) set_below: (BOOL) b { below = b; }
+
+- (void) set_user_time: (Time) time { user_time = time; }
+- (Time) user_time { return user_time; }
 
 - (unsigned int) decorations { return decorations; }
 - (void) set_decorations: (unsigned int) i { decorations = i; }
@@ -2710,6 +2848,8 @@ no_number:
   DESTROY(name);
   DESTROY(class);
   DESTROY(role);
+  DESTROY(client_machine);
+  DESTROY(sm_client_id);
   [super dealloc];
 }
 
@@ -2756,13 +2896,17 @@ no_number:
     }
     if (!(functions & OB_CLIENT_FUNC_FULLSCREEN) && fullscreen) {
         if (frame) 
-		[self fullscreen: NO saveArea: YES];
-        else fullscreen = NO;
+	  [self fullscreen: NO];
+        else 
+	  fullscreen = NO;
     }
     if (!(functions & OB_CLIENT_FUNC_MAXIMIZE) && (max_horz || max_vert)) {
-        if (frame) {
-          [self maximize: NO direction: 0 saveArea: YES];
-	} else {
+        if (frame) 
+	{
+          [self maximize: NO direction: 0];
+	}
+	else 
+	{
 	  max_vert = NO;
 	  max_horz = NO;
 	}
@@ -2820,14 +2964,6 @@ AZClient *AZUnderPointer()
 
 @implementation AZClient (AZPrivate)
 
-- (void) urgentNotify
-{
-    if (urgent)
-      [frame flashStart];
-    else
-      [frame flashStop];
-}
-
 - (void) getStartupId
 {
     NSString *data = nil;
@@ -2854,6 +2990,7 @@ AZClient *AZUnderPointer()
     NSAssert(ret != BadWindow, @"Bad Window");
 
     RECT_SET(area, wattrib.x, wattrib.y, wattrib.width, wattrib.height);
+    POINT_SET(root_pos, wattrib.x, wattrib.y);
     border_width =  wattrib.border_width;
 }
 
@@ -2935,28 +3072,34 @@ AZClient *AZUnderPointer()
                 above = YES;
             else if (state[i] == prop_atoms.net_wm_state_below)
                 below = YES;
+            else if (state[i] == prop_atoms.net_wm_state_demands_attention)
+                demands_attention = YES;
             else if (state[i] == prop_atoms.ob_wm_state_undecorated)
                 undecorated = YES;
         }
 
         free(state);
     }
+}
 
+- (void) getLayer
+{
     if (!(above || below)) {
         if (group) {
             /* apply stuff from the group */
-            int _layer = -2;
-	    int i, count = [[group members] count];
-	    for (i = 0; i < count; i++) {
-	      AZClient *c = [group memberAtIndex: i];
-              if (c != self && ![self searchTransient: c] &&
-                    [self normal] && [c normal])
-                {
-                    _layer = MAX(_layer,
-                                ([c above] ? 1 : ([c below] ? -1 : 0)));
-                }
+            int ly= -2;
+	    int i;
+	    NSArray *members = [[self group] members];
+	    for (i = 0; i < [members count]; i++)
+	    {
+	      AZClient *c = [members objectAtIndex: i];
+	      if ((c != self) && ![self searchTransient: c] &&
+		  [self normal] && [c normal])
+	      {
+                    ly = MAX(ly, ([c above] ? 1 : ([c below] ? -1 : 0)));
+              }
             }
-            switch (_layer) {
+            switch (ly) {
             case -1:
                 below = YES;
                 break;
@@ -2967,12 +3110,13 @@ AZClient *AZUnderPointer()
                 above = YES;
                 break;
             default:
-		NSAssert(0, @"Should not reach here");
+		NSLog(@"Internal Error: getLayer shouldn't read here");
                 break;
             }
         }
     }
 }
+
 
 - (void) getShaped
 {
@@ -3050,24 +3194,24 @@ AZClient *AZUnderPointer()
 }
 
 - (void) calcLayerRecursiveWithOriginal: (AZClient *)orig
-        stackingLayer: (ObStackingLayer) l raised: (BOOL) raised
+        stackingLayer: (ObStackingLayer) min raised: (BOOL) raised
 {
     ObStackingLayer old, own;
     AZStacking *stacking = [AZStacking stacking];
 
     old = layer;
     own = [self calcStackingLayer];
-    layer = (l > own ? l : own);
+    layer = MAX(own, min);
 
     int j, jcount = [transients count];
     AZClient *temp = nil;
     for (j = 0; j < jcount; j++) {
 	temp = [transients objectAtIndex: j];
 	[temp calcLayerRecursiveWithOriginal: orig
-		stackingLayer: l raised: (raised ? raised : l != old)];
+		stackingLayer: layer raised: (raised ? raised : layer != old)];
     }
 
-    if (!raised && l != old)
+    if (!raised && layer != old)
         if ([orig frame]) { /* only restack if the original window is managed */
             [stacking removeWindow: self];
             [stacking addWindow: self];
@@ -3083,16 +3227,9 @@ AZClient *AZUnderPointer()
         AZDebug("%sconifying window: 0x%lx\n", (_iconic ? "I" : "Uni"),
                  window);
 
-        iconic = _iconic;
-
         if (_iconic) {
             if (functions & OB_CLIENT_FUNC_ICONIFY) {
-                long old;
-
-                old = wmstate;
-                wmstate = IconicState;
-                if (old != wmstate)
-                    PROP_MSG(window, kde_wm_change_state, wmstate, 1, 0, 0);
+		iconic = _iconic;
 
                 /* update the focus lists.. iconic windows go to the bottom of
                    the list, put the new iconic window at the 'top of the
@@ -3102,16 +3239,11 @@ AZClient *AZUnderPointer()
                 changed = YES;
             }
         } else {
-            long old;
+	    iconic = _iconic;
 
             if (curdesk)
 		[self setDesktop: [[AZScreen defaultScreen] desktop]
 			     hide: NO];
-
-            old = wmstate;
-            wmstate = (shaded ? IconicState : NormalState);
-            if (old != wmstate)
-                PROP_MSG(window, kde_wm_change_state, wmstate, 1, 0, 0);
 
             /* this puts it after the current focused window */
 	    AZFocusManager *fManager = [AZFocusManager defaultManager];
@@ -3125,16 +3257,20 @@ AZClient *AZUnderPointer()
     if (changed) {
 	[self changeState];
 	[self showhide];
-	[[AZScreen defaultScreen] updateAreas];
+	if (STRUT_EXISTS([self strut]))
+	  [[AZScreen defaultScreen] updateAreas];
     }
 
-    /* iconify all transients */
+    /* iconify all direct transients */
     int j, jcount = [transients count];
     AZClient *temp = nil;
     for (j = 0; j < jcount; j++) {
         temp = [transients objectAtIndex: j];
 	if (temp != self) {
-	    [temp iconifyRecursive: _iconic currentDesktop: curdesk];
+	    if ([self hasDirectChild: temp])
+	    {
+		[temp iconifyRecursive: _iconic currentDesktop: curdesk];
+	    }
 	}
     }
 }
@@ -3165,7 +3301,8 @@ AZClient *AZUnderPointer()
         /* raise if it was not already on the desktop */
         if (old != DESKTOP_ALL)
 	    [self raise];
-	[[AZScreen defaultScreen] updateAreas];
+	if (STRUT_EXISTS([self strut]))
+	  [[AZScreen defaultScreen] updateAreas];
 
         /* add to the new desktop(s) */
         if (config_focus_new)
@@ -3177,10 +3314,15 @@ AZClient *AZUnderPointer()
     /* move all transients */
     int j, jcount = [transients count];
     AZClient *temp = nil;
-    for (j = 0; j < jcount; j++) {
+    for (j = 0; j < jcount; j++) 
+    {
         temp = [transients objectAtIndex: j];
-	if (temp != self) {
-	    [temp setDesktopRecursive: target hide: donthide];
+	if (temp != self) 
+	{
+	    if ([self hasDirectChild: temp])
+	    {
+	        [temp setDesktopRecursive: target hide: donthide];
+	    }
 	}
     }
 }
@@ -3232,6 +3374,25 @@ AZClient *AZUnderPointer()
 	return [icons objectAtIndex: si];
     }
     return [icons objectAtIndex: li];
+}
+
+- (void) getClientMachine
+{
+    NSString *data = nil;
+    char localhost[128];
+
+    DESTROY(client_machine);
+
+    if (PROP_GETS(window, wm_client_machine, locale, &data)) {
+        gethostname(localhost, 127);
+        localhost[127] = '\0';
+        NSString *l = [NSString stringWithUTF8String: localhost];
+        /*if (strcmp(localhost, data))*/
+        if ([data isEqualToString: l] == NO)
+        {
+            ASSIGN(client_machine, data);
+        }
+    }
 }
 
 @end

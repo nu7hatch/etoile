@@ -32,6 +32,11 @@ NSString *const AZApplicationDidTerminateNotification = @"AZApplicationDidTermin
   NSLog(@"showAction: %@", sender);
 }
 
+- (void) newAction: (id) sender
+{
+  NSLog(@"newAction: %@", sender);
+}
+
 - (void) quitAction: (id) sender
 {
   NSLog(@"quitAction: %@", sender);
@@ -41,14 +46,24 @@ NSString *const AZApplicationDidTerminateNotification = @"AZApplicationDidTermin
 
 - (void) mouseUp: (NSEvent *) event
 {
-  [self showAction: self];
+  NSEventType eventType = [event type];
+  unsigned int modifier = [event modifierFlags];
+//  int clickCount = [event clickCount];
+//NSLog(@"modifier %d, click %d", modifier, clickCount);
+  if (eventType == NSLeftMouseUp)
+  {
+    if (modifier & NSCommandKeyMask)
+      [self newAction: self]; 
+    else
+      [self showAction: self];
+  }
 }
 
 - (id) init
 {
   self = [super init];
 
-  NSRect rect = NSMakeRect(0, 0, 64, 64);
+  NSRect rect = NSMakeRect(0, 0, DOCK_SIZE, DOCK_SIZE);
   view = [[AZDockView alloc] initWithFrame: rect];
   [view setDelegate: self];
   window = [[XWindow alloc] initWithContentRect: rect

@@ -55,18 +55,19 @@ static AZMenu *client_list_menu;
 - (void) update: (AZMenuFrame *) frame 
 {
     AZMenu *menu = [frame menu];
-    int i;
-    int j, jcount;
+    int i, j;
     BOOL icons = NO;
     BOOL empty = YES;
 
     [menu clearEntries];
 
     AZFocusManager *fManager = [AZFocusManager defaultManager];
-    jcount = [fManager numberOfFocusOrderInScreen: data];
-    for (j = 0, i = 0; j < jcount; j++, ++i) {
-        AZClient *c = [fManager focusOrder: j inScreen: data];
-        if ([c normal] && (![c skip_taskbar] || [c iconic])) {
+    for (j = 0, i = 0; j < [[fManager focus_order] count]; j++, ++i)
+    {
+        AZClient *c = [[fManager focus_order] objectAtIndex: j];
+        if ([c normal] && (![c skip_taskbar] || [c iconic]) &&
+            ([c desktop] == data || [c desktop] == DESKTOP_ALL))
+	{
 	    NSMutableArray *acts = [[NSMutableArray alloc] init];
             AZAction* act;
             AZNormalMenuEntry *e;
@@ -113,7 +114,8 @@ static AZMenu *client_list_menu;
 
 /* executes it using the client in the actions, since we set that
    when we make the actions! */
-- (BOOL) execute: (AZMenuEntry *) entry state: (unsigned int) state
+- (BOOL) execute: (AZMenuEntry *) entry 
+           state: (unsigned int) state time: (Time) time
 {
     AZAction *a;
 
@@ -121,7 +123,7 @@ static AZMenu *client_list_menu;
 		    [(AZNormalMenuEntry *)entry actions]) {
 	AZNormalMenuEntry *e = (AZNormalMenuEntry *) entry;
         a = [[e actions] objectAtIndex: 0];
-        action_run([e actions], [a data].any.c, state);
+        action_run([e actions], [a data].any.c, state, time);
     }
     return YES;
 }

@@ -50,10 +50,11 @@ ObState ob_state();
 void ob_restart_other(const char *path);
 void ob_restart();
 void ob_exit(int code);
+void ob_exit_replace();
 
 void ob_reconfigure();
 
-void ob_exit_with_error(char *msg);
+void ob_exit_with_error(const char *msg);
 
 Cursor ob_cursor(ObCursor cursor);
 

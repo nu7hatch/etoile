@@ -222,17 +222,13 @@
   [super dealloc];
 }
 
-- (void) pipeExecute
-{
-  menu_pipe_execute(self);
-}
-
 - (void) update: (AZMenuFrame *) frame 
 {
   // subclass
 }
 
 - (BOOL) execute: (AZMenuEntry *) entry state: (unsigned int) state 
+            time: (Time) time
 {
   return NO;
 }
@@ -242,11 +238,9 @@
 - (NSString *) title { return title; }
 - (NSString *) execute { return execute; }
 - (NSMutableArray *) entries { return entries; }
-- (AZMenu *) pipe_creator { return pipe_creator; }
 - (void) set_name: (NSString *) n { ASSIGNCOPY(name, n); }
 - (void) set_title: (NSString *) t { ASSIGNCOPY(title, t); }
 - (void) set_execute: (NSString *) e { ASSIGNCOPY(execute, e); }
-- (void) set_pipe_creator: (AZMenu *) p { pipe_creator = p; }
 
 @end
 

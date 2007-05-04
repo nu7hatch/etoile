@@ -1,6 +1,7 @@
 #import "AZDock.h"
 #import "AZXWindowApp.h"
 #import "AZGNUstepApp.h"
+#import "AZDockletApp.h"
 #import "AZWorkspaceView.h"
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
@@ -12,8 +13,11 @@ static NSString *AZUserDefaultDockCommand = @"Command";
 static NSString *AZUserDefaultDockWMInstance = @"WMInstance"; // For xwindow
 static NSString *AZUserDefaultDockWMClass = @"WMClass"; // For xwindow
 static NSString *AZUserDefaultDockedApp = @"DockedApplications";
+static NSString *AZUserDefaultDockAutoHidden = @"AutoHidden";
 
 static AZDock *sharedInstance;
+
+int autoHiddenSpace = 1; /* Must larger than 0 */
 
 @interface GSDisplayServer (AZPrivate) 	 
  - (void) processEvent: (XEvent *) event; 	 
@@ -39,6 +43,32 @@ static AZDock *sharedInstance;
 @implementation AZDock
 
 /** Private **/
+- (void) reserveSpaceForWindow: (XWindow *) window
+{
+  /* Finally, we occupy a strip of screen so that full-screen window
+     will not be covered. Ideally we should update the space according
+     to the real area of docks. But for now, we occupy the whole side
+     of screen. */
+  switch(position)
+  {
+    case AZDockBottomPosition:
+      [window reserveScreenAreaOn: XScreenBottomSide 
+                            width: (isHidden) ? autoHiddenSpace : DOCK_SIZE
+                            start: NSMinX(dockFrame) end: NSMaxX(dockFrame)];
+      break;
+    case AZDockRightPosition:
+      [window reserveScreenAreaOn: XScreenRightSide 
+                            width: (isHidden) ? autoHiddenSpace : DOCK_SIZE
+                            start: NSMinY(dockFrame) end: NSMaxY(dockFrame)];
+      break;
+    case AZDockLeftPosition:
+    default:
+      [window reserveScreenAreaOn: XScreenLeftSide 
+                            width: (isHidden) ? autoHiddenSpace : DOCK_SIZE
+                            start: NSMinY(dockFrame) end: NSMaxY(dockFrame)];
+  }
+}
+
 - (BOOL) isGNUstepAppAlive: (NSString *) name
 {
   NSConnection *conn = nil;
@@ -106,6 +136,7 @@ static AZDock *sharedInstance;
   [app setState: AZDockAppNotRunning]; 
   [apps addObject: app];
   [self addBookmark: app];
+  [self reserveSpaceForWindow: [app window]];
   [[app window] orderFront: self];
   return AUTORELEASE(app);
   /* Do not organize applications here 
@@ -161,6 +192,7 @@ static AZDock *sharedInstance;
                                             instance: instance class: class];
   [apps addObject: app];
   [self addBookmark: app];
+  [self reserveSpaceForWindow: [app window]];
   [[app window] orderFront: self];
   return AUTORELEASE(app);
 }
@@ -230,6 +262,7 @@ static AZDock *sharedInstance;
   [app setState: AZDockAppRunning];
   [apps addObject: app];
   [self addBookmark: app];
+  [self reserveSpaceForWindow: [app window]];
   [[app window] orderFront: self];
   DESTROY(app);
 }
@@ -268,6 +301,49 @@ static AZDock *sharedInstance;
   }
 }
 
+- (AZDockletApp *) addDockletWithCommand: (NSString *) cmd
+                   instance: (NSString *) instance class: (NSString *) class
+{
+  AZDockletApp *app = [[AZDockletApp alloc] initWithCommand: cmd 
+                                            instance: instance class: class];
+  [apps addObject: app];
+  [self addBookmark: app];
+  [self reserveSpaceForWindow: [app window]];
+  [[app window] orderFront: self];
+  return AUTORELEASE(app);
+}
+
+- (void) addDockletWithID: (int) wid 
+{
+  /* Let's see whether any dockapp will take it.
+     We cannot use addXWindowWithID: because docklet's window is not mapped
+     yet. And Azalea does not send docklet as regular xwindow. */
+  AZDockletApp *app = nil;
+  int j;
+  for (j = 0; j < [apps count]; j++)
+  {
+    app = [apps objectAtIndex: j];
+    if ([app type] == AZDockWindowMakerDocklet) 
+    {
+      if ([(AZDockletApp *)app acceptXWindow: wid]) 
+      {
+        [app setState: AZDockAppRunning];
+        return;
+      }
+    }
+  }
+
+  //NSLog(@"addDockletWithID %d", wid);
+  app = [[AZDockletApp alloc] initWithXWindow: wid];
+  [app setState: AZDockAppRunning];
+  [apps addObject: app];
+  [self addBookmark: app];
+  [self reserveSpaceForWindow: [app window]];
+  [[app window] orderFront: self];
+  DESTROY(app);
+}
+
+/* Notification from Azalea */
 - (void) gnustepAppWillLaunch: (NSNotification *) not
 {
 //  Not working ?
@@ -284,7 +360,6 @@ static AZDock *sharedInstance;
 
 - (void) gnustepAppDidTerminate: (NSNotification *) not
 {
-//  NSLog(@"did terminate %@", not);
   NSString *name = [[not userInfo] objectForKey: @"NSApplicationName"];
   [self removeGNUstepAppNamed: name];
   [self organizeApplications];
@@ -292,7 +367,6 @@ static AZDock *sharedInstance;
 
 - (void) xwindowAppDidLaunch: (NSNotification *) not
 {
-//  NSLog(@"xwindow launch %@", not);
   [self addXWindowWithID: 
            [[[not userInfo] objectForKey: @"AZXWindowID"] intValue]];
   [self organizeApplications];
@@ -301,6 +375,14 @@ static AZDock *sharedInstance;
 - (void) xwindowAppDidTerminate: (NSNotification *) not
 {
   [self removeXWindowWithID:
+           [[[not userInfo] objectForKey: @"AZXWindowID"] intValue]];
+  [self organizeApplications];
+}
+
+- (void) dockletAppDidLaunch: (NSNotification *) not
+{
+//NSLog(@"docklet did launch");
+  [self addDockletWithID: 
            [[[not userInfo] objectForKey: @"AZXWindowID"] intValue]];
   [self organizeApplications];
 }
@@ -382,14 +464,14 @@ static AZDock *sharedInstance;
         w += [[(AZDockApp *)[apps objectAtIndex: i] window] frame].size.width;
       }
       x = (size.width-w)/2;
-      y = 0;
+      y = (isHidden) ? -[iconWindow frame].size.height+autoHiddenSpace : 0;
       break;
     case AZDockRightPosition:
       for (i = 0; i < [apps count]; i++)
       {
         h += [[(AZDockApp *)[apps objectAtIndex: i] window] frame].size.height;
       }
-      x = size.width-w;
+      x = (isHidden) ? size.width-autoHiddenSpace : size.width-w;
       y = (size.height+h)/2;
       break;
     case AZDockLeftPosition:
@@ -398,13 +480,14 @@ static AZDock *sharedInstance;
       {
         h += [[(AZDockApp *)[apps objectAtIndex: i] window] frame].size.height;
       }
-      x = 0;
+      x = (isHidden) ? -w+autoHiddenSpace : 0;
       y = (size.height+h)/2;
       break;
   }
 
   [iconWindow setFrameOrigin: NSMakePoint(x, y)];
   NSRect rect = [iconWindow frame];
+  dockFrame = NSUnionRect(dockFrame, rect);
 
   switch (position)
   {
@@ -417,6 +500,7 @@ static AZDock *sharedInstance;
         win = [(AZDockApp *)[apps objectAtIndex: i] window];
         [win setFrameOrigin: NSMakePoint(x, y)];
         rect = [win frame];
+	dockFrame = NSUnionRect(dockFrame, rect);
         x += rect.size.width;
       }
       break;
@@ -431,6 +515,7 @@ static AZDock *sharedInstance;
         win = [(AZDockApp *)[apps objectAtIndex: i] window];
         [win setFrameOrigin: NSMakePoint(x, y)];
         rect = [win frame];
+	dockFrame = NSUnionRect(dockFrame, rect);
         y -= rect.size.height;
       }
       break;
@@ -462,6 +547,44 @@ static AZDock *sharedInstance;
   }
 }
 #endif
+
+- (void) handleEnterNotify: (XEvent *) event
+{
+  if (autoHidden == YES)
+  {
+    if (isHidden == NO)
+      return;
+    isHidden = NO;
+    [self organizeApplications];
+  }
+}
+
+- (void) handleLeaveNotify: (XEvent *) event
+{
+  if (autoHidden == YES)
+  {
+    if (isHidden == YES)
+      return;
+    /* Are we still in the range of the whole dock ? */
+    //NSLog(@"(%d, %d) <%d, %d>", event->xcrossing.x, event->xcrossing.y, event->xcrossing.x_root, event->xcrossing.y_root);
+    NSPoint p;
+    p.x = event->xcrossing.x_root;
+    p.y = event->xcrossing.y_root;
+    /* convert from X to GNUstep */
+    p.y = [[NSScreen mainScreen] frame].size.height - p.y;
+    switch(position) {
+      case AZDockBottomPosition:
+      case AZDockRightPosition:
+      case AZDockLeftPosition:
+      default:
+        if (NSPointInRect(p, dockFrame))
+          return;
+    }
+    //NSLog(@"%@ in %@", NSStringFromPoint(p), NSStringFromRect(dockFrame));
+    isHidden = YES;
+    [self organizeApplications];
+  }
+}
 
 - (void) handlePropertyNotify: (XEvent *) event
 {
@@ -527,6 +650,12 @@ static AZDock *sharedInstance;
 	[self handleDestroyNotify: &event];
 	break;
 #endif
+      case EnterNotify:
+	[self handleEnterNotify: &event];
+ 	break;
+      case LeaveNotify:
+	[self handleLeaveNotify: &event];
+ 	break;
       case PropertyNotify:
 	[self handlePropertyNotify: &event];
 	break;
@@ -543,6 +672,9 @@ static AZDock *sharedInstance;
 
 - (void) applicationWillFinishLaunching: (NSNotification *) not
 {
+  isHidden = NO;
+  dockFrame = NSZeroRect;
+
   apps = [[NSMutableArray alloc] init];
   blacklist = [[NSMutableArray alloc] init];
 
@@ -581,8 +713,11 @@ static AZDock *sharedInstance;
   X_NET_WM_STATE_SKIP_PAGER = XInternAtom(dpy, "_NET_WM_STATE_SKIP_PAGER", False);
   X_NET_WM_STATE_SKIP_TASKBAR = XInternAtom(dpy, "_NET_WM_STATE_SKIP_TASKBAR", False);
 
-  /* Decide position */
+  /* user defaults */
   position = [[NSUserDefaults standardUserDefaults] integerForKey: AZUserDefaultDockPosition];
+  autoHidden = [[NSUserDefaults standardUserDefaults] boolForKey: AZUserDefaultDockAutoHidden];
+  if (autoHidden == YES)
+    isHidden = YES;
 
   /* Put up docked application */
   NSArray *array = [[NSUserDefaults standardUserDefaults] objectForKey: AZUserDefaultDockedApp];
@@ -627,6 +762,12 @@ static AZDock *sharedInstance;
         }
       }
     }
+    else if (type == AZDockWindowMakerDocklet)
+    {
+      NSString *inst = [dict objectForKey: AZUserDefaultDockWMInstance];
+      NSString *clas = [dict objectForKey: AZUserDefaultDockWMClass];
+      app = [self addDockletWithCommand: cmd instance: inst class: clas];
+    }
     else
     {
     }
@@ -644,6 +785,7 @@ static AZDock *sharedInstance;
 				          defer: NO];
   [iconWindow setDesktop: ALL_DESKTOP];
   [iconWindow skipTaskbarAndPager];
+  [self reserveSpaceForWindow: iconWindow];
   [iconWindow setLevel: NSNormalWindowLevel+1];
 
   workspaceView = [[AZWorkspaceView alloc] initWithFrame: [[iconWindow contentView] bounds]];
@@ -719,6 +861,21 @@ static AZDock *sharedInstance;
                      selector: @selector(xwindowAppDidTerminate:)
                      name: @"AZXWindowDidTerminateNotification"
                      object: nil];
+  [[workspace notificationCenter]
+                     addObserver: self
+                     selector: @selector(dockletAppDidLaunch:)
+                     name: @"AZDockletDidLaunchNotification"
+                     object: nil];
+
+  /* We start docklet here */
+  for (i = 0; i < [apps count]; i++)
+  {
+    AZDockletApp *app = [apps objectAtIndex: i];
+    if ([app type] == AZDockWindowMakerDocklet)
+    {
+      [app showAction: self];
+    }
+  }
 }
 
 - (void) applicationWillTerminate: (NSNotification *) not
@@ -759,7 +916,8 @@ static AZDock *sharedInstance;
     app = [apps objectAtIndex: i];
     if ([app isKeptInDock]) 
     {
-      if ([app type] == AZDockXWindowApplication) {
+      if ([app type] == AZDockXWindowApplication) 
+      {
         AZXWindowApp *xapp = (AZXWindowApp *) app;
         dict = [NSDictionary dictionaryWithObjectsAndKeys:
          [NSString stringWithFormat: @"%d", [app type]], AZUserDefaultDockType,
@@ -778,10 +936,22 @@ static AZDock *sharedInstance;
           //NSLog(@"Write to %@", p);
           [data writeToFile: p atomically: YES];
         }
-      } else if ([app type] == AZDockGNUstepApplication) {
+      } 
+      else if ([app type] == AZDockGNUstepApplication) 
+      {
         dict = [NSDictionary dictionaryWithObjectsAndKeys:
          [NSString stringWithFormat: @"%d", [app type]], AZUserDefaultDockType,
          [(AZGNUstepApp *)app applicationName], AZUserDefaultDockCommand,
+         nil];
+      }
+      else if ([app type] == AZDockWindowMakerDocklet) 
+      {
+        AZDockletApp *xapp = (AZDockletApp *) app;
+        dict = [NSDictionary dictionaryWithObjectsAndKeys:
+         [NSString stringWithFormat: @"%d", [app type]], AZUserDefaultDockType,
+         [xapp command], AZUserDefaultDockCommand,
+         [xapp wmInstance], AZUserDefaultDockWMInstance,
+         [xapp wmClass], AZUserDefaultDockWMClass,
          nil];
       }
       [array addObject: dict];

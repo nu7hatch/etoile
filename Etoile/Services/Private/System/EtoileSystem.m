@@ -68,9 +68,13 @@ static id serverInstance = nil;
 static NSConnection *serverConnection = nil;
 static id proxyInstance = nil;
 static NSString *SCSystemNamespace = nil;
-NSString * const EtoileSystemServerName = @"etoile_system";
 
-static BOOL powerOffRequested = NO;
+NSString *SCNoneOperation = @"SCNoneOperation";
+NSString *SCLogOutOperation = @"SCLogOutOperation";
+NSString *SCShutDownOperation = @"SCShutDownOperation";
+NSString *SCRebootOperation = @"SCRebootOperation";
+
+NSString * const EtoileSystemServerName = @"etoile_system";
 
 /* NSError related extensions */
 
@@ -92,40 +96,55 @@ const int EtoileSystemTaskLaunchingError = 1;
  *      the error. Following it is a variable number of arguments,
  *      all of which are arguments to this format string.
  */
-static void
+static void 
 SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 {
-  if (error != NULL)
-    {
-      NSDictionary * userInfo;
-      NSString * reason;
-      va_list arglist;
+	if (error != NULL)
+	{
+		NSDictionary * userInfo;
+		NSString * reason;
+		va_list arglist;
 
-      va_start (arglist, reasonFormat);
-      reason = [NSString stringWithFormat: reasonFormat arguments: arglist];
-      va_end (arglist);
+		va_start (arglist, reasonFormat);
+		reason = [NSString stringWithFormat: reasonFormat arguments: arglist];
+		va_end (arglist);
 
-      userInfo = [NSDictionary
-        dictionaryWithObject: reason forKey: NSLocalizedDescriptionKey];
-      *error = [NSError errorWithDomain: EtoileSystemErrorDomain
-                                   code: code
-                               userInfo: userInfo];
-    }
+		userInfo = [NSDictionary
+			dictionaryWithObject: reason forKey: NSLocalizedDescriptionKey];
+		*error = [NSError errorWithDomain: EtoileSystemErrorDomain
+		                             code: code
+		                         userInfo: userInfo];
+	}
 }
 
+/* Private SCHardware interface */
+
+BOOL SCHardwareIsShutDownSupported();
+BOOL SCHardwareIsRebootSupported();
+BOOL SCHardwareShutDown();
+BOOL SCHardwareReboot();
+BOOL SCHardwareSuspend();
+
 @interface SCSystem (Private)
+- (id) initWithArguments: (NSArray *)args;
+
+/* Notifications */
 - (void) noteApplicationLaunched: (NSNotification *) notif;
+
+/* Launch Queue methods */
 - (NSMutableArray *) processQueueWithProcesses: (NSDictionary *)processes;
 - (NSMutableArray *) processGroupQueueWithProcessQueue: (NSArray *)processQueue;
 - (void) startProcessesSequentiallyByPriorityOrder: 
 	(NSMutableArray *)launchQueue;
 - (void) startProcessesParallely: (NSArray *)processGroup;
+
+- (void) terminateSession;
+- (void) reportPowerOffError: (NSString *)op;
 @end
 
 @interface SCSystem (HelperMethodsPrivate)
 - (void) checkConfigFileUpdate;
 - (void) findConfigFileAndStartUpdateMonitoring;
-
 - (void) synchronizeProcessesWithConfigFile;
 
 - (void) startProcessWithUserFeedbackForDomain: (NSString *)domain;
@@ -154,11 +173,15 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 	}
 }
 
+/* Returns SCSystem singleton. You should use this method to access SCSystem 
+   inside etoile_system process. */
 + (id) serverInstance
 {
 	return serverInstance;
 }
 
+/* Set up SCSystem singleton by registering it into DO. This makes possible to 
+   have it returned as a proxy by -sharedInstance in remote applications. */
 + (BOOL) setUpServerInstance: (id)instance
 {
 	ASSIGN(serverInstance, instance);
@@ -183,8 +206,10 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 	return YES;
 }
 
-/** Reserved for client side. It's mandatory to have call -setUpServerInstance: 
-    before usually in the server process itself. */
+/** Returns SCSystem proxy that can be used to interact with Etoile main daemon
+    It should only be used on client side. */
+/* It's mandatory to have call -setUpServerInstance: before usually in the 
+   server process itself. */
 + (SCSystem *) sharedInstance
 {
 	proxyInstance = [NSConnection 
@@ -203,41 +228,44 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
     return [self initWithArguments: nil];
 }
 
+/* Designated initializer */
 - (id) initWithArguments: (NSArray *)args
 {
-    if ((self = [super init]) != nil)
-    {
-        _processes = [[NSMutableDictionary alloc] initWithCapacity: 20];
+	if ((self = [super init]) != nil)
+	{
+		_processes = [[NSMutableDictionary alloc] initWithCapacity: 20];
 		_launchQueue = [[NSMutableArray alloc] initWithCapacity: 20];
 		//_launchGroup = [[NSMutableArray alloc] initWithCapacity: 20];
 
-        return self;
-    }
-    
-    return nil;
+		return self;
+	}
+	
+	return nil;
 }
 
 - (void) dealloc
 {
-    DESTROY(_processes);
+	DESTROY(_processes);
 	DESTROY(_launchQueue);
 
-    TEST_RELEASE(monitoringTimer);
-    TEST_RELEASE(configFilePath);
-    TEST_RELEASE(modificationDate);
-    
-    [super dealloc];
+	TEST_RELEASE(monitoringTimer);
+	TEST_RELEASE(configFilePath);
+	TEST_RELEASE(modificationDate);
+	
+	[super dealloc];
 }
 
+/** First creates ApplicationManager instance, then starts NSApplication-based
+    run loop used by SCSystem at this point. */
 - (void) run
 {
-    /* We trigger the ApplicationManager singleton creation in order it 
-       starts to monitor user applications. The return value is ignored. */
-    [ApplicationManager sharedInstance];
-    /* We trigger the NSApplication singleton creation in order we can use
-       UI stuff like window, panel etc. The return value is ignored. */
-    [[NSApplication sharedApplication] setDelegate: self];
-    [[NSApplication sharedApplication] run];
+	/* We trigger the ApplicationManager singleton creation in order it 
+	   starts to monitor user applications. The return value is ignored. */
+	[ApplicationManager sharedInstance];
+	/* We trigger the NSApplication singleton creation in order we can use
+	   UI stuff like window, panel etc. The return value is ignored. */
+	[[NSApplication sharedApplication] setDelegate: self];
+	[[NSApplication sharedApplication] run];
 }
 
 /* Notification invoked when an NSWorkspaceDidLaunchApplicationNotification
@@ -280,6 +308,8 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 	NSMutableArray *processQueue = nil;
 	NSMutableArray *launchQueue = nil;
 
+	_launchQueueScheduled = YES;
+
 	/* Find task list config file and synchronize _processes data structure 
 	   with it */ 
 	[self findConfigFileAndStartUpdateMonitoring];
@@ -304,7 +334,13 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 	processQueue = [self processQueueWithProcesses: _processes];
 	launchQueue = [self processGroupQueueWithProcessQueue: processQueue];
 	[self startProcessesSequentiallyByPriorityOrder: launchQueue];
+
+	_launchQueueScheduled = NO;
 }
+
+/*
+ * Launch queue related code (launch by priority support)
+ */ 
 
 /** Returns a process launch queue by sorting processes values based on their
     launch priority. The queue is ordered by ascending priority number values. */
@@ -425,27 +461,30 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 	}
 }
 
-/**
- * Launches a workspace process.
- *
- * @param processDescription The description of the process which to launch.
- * @param error A pointer to an NSError variable which will be filled with
- *      an NSError instance in case of a launch error.
- *
- * @return YES if the launch succeeds, NO if it doesn't and indicates the
- *      reason in the ``error'' argument.
- */
+/** <p>Launchs process identified by <var>domain</domain>.</p>
+    <p>Note this method has no effect if you call it on a suspended process.
+    </p>
+    <deflist>
+    <term>domain</term><desc>A path which the process has been bound to. Note
+    that a process might be bind to more than one domain, though this should
+    not happen. In a similar way, an executable might be referenced and used by 
+    several processes. Hence SCSystem does not prevent to launch an already
+    running executable through itself or in another manner.</desc>
+    <term>error</term><desc>A pointer to an NSError variable which will be 
+    filled with an NSError instance in case of a launch error.</desc>
+    </deflist>
+    <p>Returns YES if the launch succeeds, NO if it doesn't and indicates the
+    reason in <var>error</var> argument.</p> */
 - (BOOL) startProcessWithDomain: (NSString *)domain error: (NSError **)error
 {
-    SCTask *process = [_processes objectForKey: domain];
-    /* We should pass process specific flags obtained in arguments (and the
-       ones from main function probably too) */
-    //NSArray *args = [NSArray arrayWithObjects: nil];
+	SCTask *process = [_processes objectForKey: domain];
 
-	/* Look for an already running process with the same domain.
+	/* May be we should check whether an already running process with the same 
+       domain exists...
 	   Well, I'm not sure we should do this, but it could be nice, we would 
-	   have to identify the process in one way or another (partially to not
+	   have to identify the process in one way or another (partially not to
 	   compromise the security). */
+
 	if (process == nil)
 	{
 		// FIXME: Set up an error explaing no process has been bound to this
@@ -472,49 +511,64 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 		[_processes setObject: process forKey: domain];
 	}
 
-    // NOTE: the next line triggers an invalid argument exception, although the
-    // array isn't nil.
-    // [process setArguments: args];
-
-    NS_DURING
-        /* We don't relaunch any processes that already failed to launch three 
-           times */
-        if ([process launchFailureCount] < 3)
-            [process launchForDomain: domain];
+	NS_DURING
+		/* We don't relaunch any processes that already failed to launch three 
+		   times */
+		if ([process launchFailureCount] < 3)
+			[process launchForDomain: domain];
     NS_HANDLER
-        SetNonNullError (error, EtoileSystemTaskLaunchingError,
-            _(@"Error launching program at %@: %@"), [process path],
-            [localException reason]);
+			SetNonNullError (error, EtoileSystemTaskLaunchingError,
+				_(@"Error launching program at %@: %@"), [process path],
+				[localException reason]);
 
-        return NO;
-    NS_ENDHANDLER
+			return NO;
+	NS_ENDHANDLER
 
-    [[NSNotificationCenter defaultCenter] addObserver: self
-        selector: @selector(processTerminated:) 
-            name: NSTaskDidTerminateNotification
-          object: process];
-    
-    return YES;
+	[[NSNotificationCenter defaultCenter] 
+		addObserver: self
+		   selector: @selector(processTerminated:) 
+		       name: NSTaskDidTerminateNotification
+		     object: process];
+
+	return YES;
 }
 
+/** <p>Restarts process identified by <var>domain</var> which was suspended 
+    previously with -suspendProcessWithDomain:error:. Doesn't do anything if
+    you call it on a process which hasn't been suspended first.</p>
+    <p>This method should make any suspended processes reactive UI level if 
+    they have one.</p>
+    <p>Works by sending POSIX signal SIGCONT behind the scene. You should 
+    signal suspended processes with SIGCONT directly.</p>
+    <p>Note that calling this method on a stopped process has no effect.</p>
+    <p>Returns YES if the restart succeeds, NO if it doesn't and indicates the
+    reason in <var>error</var> argument.</p> */
 - (BOOL) restartProcessWithDomain: (NSString *)domain error: (NSError **)error
 {
-    BOOL stopped = NO;
-    BOOL restarted = NO;
-    
-    stopped = [self stopProcessWithDomain: domain error: NULL];
-    
-    /* The process has been properly stopped or was already, then we restart it now. */
-    if (stopped)
-        restarted = [self restartProcessWithDomain: domain error: NULL];
+	BOOL stopped = NO;
+	BOOL restarted = NO;
 
-    return restarted;
+	stopped = [self stopProcessWithDomain: domain error: NULL];
+
+	/* The process has been properly stopped or was already, then we restart it 
+	   now. */
+	if (stopped)
+		restarted = [self restartProcessWithDomain: domain error: NULL];
+
+	return restarted;
 }
 
+/** <p>Terminates process identified by <var>domain</var>.</p>
+    <p>When the process is an AppKit-based application, the application is 
+    stopped by sending -terminate message. If it does not exits after a five
+    seconds delay it, the termination occurs by signaling it with SIGKILL. For
+    other processes, SIGQUIT is sent before falling back on SIGKILL.</p>
+    <p>Returns YES if the stop succeeds, NO if it doesn't and indicates the
+    reason in <var>error</var> argument.</p> */
 - (BOOL) stopProcessWithDomain: (NSString *)domain error: (NSError **)error
 {
-    NSTask *process = [_processes objectForKey: domain];
-    
+	NSTask *process = [_processes objectForKey: domain];
+
 	NSDebugLLog(@"SCSystem", @"Trying to terminate process %@ with domain %@", 
 		[process launchPath], domain);
 
@@ -540,76 +594,93 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 			// FIXME: Set up a timer to check whether the task has terminated 
 			// in 5 seconds from now. Well could be better to thread this object
 			// and make such method reentrant.
-			NSLog(@"Process still running...");
+			NSLog(@"Process %@ still running...", process);
             return YES;
 		}
     }
-    
+
     return NO;
 }
 
+/** <p>Suspends process identified by <var>domain</var>. Any suspended 
+    processes will appear frozen at UI level if they have one, in all cases 
+    they won't reply to any events.</p>
+    <p>Finally they will only resume if you call 
+    -restartProcessWithDomain:error: or if you send them POSIX signals like 
+    SIGCONT. Note that you should not signal a process with SIGCONT to resume, 
+    but rather uses -restartProcessWithDomain:error: otherwise SCSystem will 
+    still consider the process as suspended.</p>
+    </p>Works by sending SIGSTOP signal behind the scene. If you signal a 
+    process with SIGSTOP directly, SCSystem would still consider it as 
+    running.</p>
+    <p>Returns YES if the suspend succeeds, NO if it doesn't and indicates the
+    reason in <var>error</var> argument.</p> */
 - (BOOL) suspendProcessWithDomain: (NSString *)domain error: (NSError **)error
 {
-    NSTask *process = [_processes objectForKey: domain];
-    
-    if ([process isRunning])
-    {
-        return [process suspend];
-    }
-    
-    return NO;
+	NSTask *process = [_processes objectForKey: domain];
+
+	if ([process isRunning])
+	{
+		return [process suspend];
+	}
+	
+	return NO;
 }
 
+/** <p>Synchronizes processes returned by -processes which SCSystem is in 
+    charge of with the config list <file>SystemTaskList.plist</file>. The 
+    config list file describes processes which must be launched in precise 
+    circumstances and ways to have a working Etoile environment.</p>
+    <p>This method is automatically called every two seconds by default.</p> */
 - (void) loadConfigList
 {
-    [self checkConfigFileUpdate];
+	[self checkConfigFileUpdate];
 }
 
+/** <p>Synchronizes the config list <file>SystemTaskList.plist</file> with the
+    processes returned by -processes method. Uses this method with care since 
+    it will overwrite the inital settings of <file>SystemTaskList</file>.
+    Etoile environment may then not start properly on next login. It is mostly
+    reserved to Etoile internal use.</p>
+    <p><strong>Not implemented</strong></p> */
 - (void) saveConfigList
 {
-    // TODO: Write the code to sync the _processes ivar and the config file
+	// TODO: Write the code to sync the _processes ivar and the config file
 }
 
-/**
- * Returns a list of Etoile system processes invisible to the user.
- *
- * This list is used by the application manager to determine which
- * apps it should ommit from its output and from terminating when
- * shutting down gracefully.
- *
- * @return An array of process names of processes to be kept masked
- */
+/** <p>Returns a list of Etoile system processes invisible to the user.</p>
+    <p>This list is used by the application manager to determine which 
+    applications it should ommit from its output and from terminating when
+    shutting down gracefully.</p>
+    <p>Returns an array of process names of processes to be kept masked.</p> */
 - (NSArray *) maskedProcesses
 {
-    NSMutableArray *array = 
-            [NSMutableArray arrayWithCapacity: [_processes count]];
-    NSEnumerator *e = [_processes objectEnumerator];
-    SCTask *processesEntry;
+	NSMutableArray *array = 
+		[NSMutableArray arrayWithCapacity: [_processes count]];
+	NSEnumerator *e = [_processes objectEnumerator];
+	SCTask *processesEntry;
 
 	/* Don't forget to add myself else ApplicationManager will kill us on log 
 	   out or shut down. */
 	[array addObject: @"etoile_system"];
-    
-    while ((processesEntry = [e nextObject]) != nil)
-    {
-        if ([processesEntry isHidden])
-        {
-            // NOTE: we could a Name key to the Task config file schema rather
-            // than always extracting the name from the task/executable path.
-            [array addObject: [processesEntry name]];
-        }
-    }
-    
-    return [[array copy] autorelease];
+
+	while ((processesEntry = [e nextObject]) != nil)
+	{
+		if ([processesEntry isHidden])
+		{
+			// NOTE: we could a Name key to the Task config file schema rather
+			// than always extracting the name from the task/executable path.
+			[array addObject: [processesEntry name]];
+		}
+	}
+	
+	return [[array copy] autorelease];
 }
 
-/**
- * Gracefully terminates all workspace processes at log out or power
- * off time.
- *
- * @return YES if the log out/power off operation can proceed, NO
- *      if an app requested the operation to be halted.
- */
+/** <p>Gracefully terminates all Etoile system processes at log out or power
+    off time.</p>
+    <p>Returns YES if the log out/power off operation can proceed, NO if an 
+    app requested the operation to be halted.</p> */
 - (BOOL) terminateAllProcessesOnOperation: (NSString *)op
 {
 	NSEnumerator *e = [[_processes allKeys] objectEnumerator];
@@ -624,28 +695,123 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
   return stoppedAll;
 }
 
-- (oneway void) logOutAndPowerOff: (BOOL) powerOff
+/** Delays any log out, shut down or reboot operations underway by 
+    <var>delay</var> value expressed in milliseconds. 
+    <p><strong>Not implemented</strong></p> */
+- (void) extendPowerOffBy: (int)delay
 {
-	NSString * operation;
+	NSLog(@"-extendPowerOffBy: not implemented");
+}
 
+/* Log out implementation called by both  -logOut and -powerOff: */
+- (void) terminateSession
+{
+	/* Ask to close all applications gracefully and wait for a asynchronous 
+       reply to be handled in -replyToLogOutOrPowerOff: */
+	[[ApplicationManager sharedInstance] terminateAllApplicationsOnOperation: _operation];
+}
+
+/** Triggers log out operation. It asks ApplicationManager to terminate all 
+    applications for the requested operation. Then SCSystem will wait 
+    ApplicationManager reply through -replyToLogOutOrPowerOff: before doing 
+    anything. If no applications has cancelled the log out, SCSystem exits. */
+- (oneway void) logOut
+{
 	NSDebugLLog(@"SCSystem", @"Log out requested");
 
-	if (powerOff == NO)
+	if (_operation != nil)
 	{
-		operation = _(@"Log Out");
+		NSLog(@"System cannot log out now. SCSystem is carrying on %@", _operation);
+		return;
 	}
 	else
 	{
-		operation = _(@"Power Off");
-		powerOffRequested = YES;
-	}
+		_operation = SCLogOutOperation;
 
-	// Ask to close all applications gracefully and wait for a reply
-	//[NSThread detachNewThreadSelector: @selector(terminateAllApplicationsOnOperation:) 
-	//	toTarget: [ApplicationManager sharedInstance] withObject: operation];
-	[[ApplicationManager sharedInstance] terminateAllApplicationsOnOperation: operation];
+		[self terminateSession];
+	}
 }
 
+/** <p>Shuts down or reboots the computer depending on <var>reboot</var> flag 
+    value. Initially triggers lot out.</p>
+    <p>Read -logOut documentation to know more about it.</p> */
+- (oneway void) powerOff: (BOOL)reboot
+{
+	NSDebugLLog(@"SCSystem", @"Power off requested");
+
+	if (_operation != nil)
+	{
+		NSLog(@"System cannot power off now. SCSystem is carrying on %@", _operation);
+		return;
+	}
+
+	if (reboot)
+	{
+		if (SCHardwareIsRebootSupported())
+		{
+			_operation = SCRebootOperation;
+			[self terminateSession];
+		}
+		else
+		{
+			[self reportPowerOffError: SCRebootOperation];
+		}
+	}
+	else
+	{
+		if (SCHardwareIsShutDownSupported())
+		{
+			_operation = SCShutDownOperation;
+			[self terminateSession];
+		}
+		else
+		{
+			[self reportPowerOffError: SCShutDownOperation];
+		}
+	}
+}
+
+- (void) reportPowerOffError: (NSString *)op
+{
+	if ([op isEqual: SCShutDownOperation])
+	{
+		NSRunAlertPanel(_(@"The computer cannot be shutdown."),
+			_(@"This limitation may occur either because you aren't allowed to shutdown or your configuration doesn't support shutdown properly."), nil, nil, nil);
+	}
+	else if ([op isEqual: SCRebootOperation])
+	{
+		NSRunAlertPanel(_(@"The computer cannot be reboot."), 
+			_(@"This limitation may occur either because you aren't allowed to reboot or your configuration doesn't support reboot properly."), nil, nil, nil);
+	}
+}
+
+/** Puts the computer into sleep mode until the user awake it through mouse or 
+    keyboard events. */
+- (oneway void) suspend
+{
+	NSDebugLLog(@"SCSystem", @"Suspend requested");
+
+	if (_operation != nil)
+	{
+		NSLog(@"System cannot suspend now. SCSystem is carrying on %@", _operation);
+	}
+	else
+	{
+		if (SCHardwareSuspend() == NO)
+		{
+			NSRunAlertPanel(_(@"The computer cannot be put in sleep mode."), 
+				_(@"This limitation may occur either because you aren't allowed to put it in sleep mode or your configuration doesn't support sleep mode properly."), nil, nil, nil);
+		}
+	}
+}
+
+/** Method called by ApplicationManager when this latter class has finished to
+    to handle the log out work it is in charge of (usually application
+    termination). Two replies can be passed:
+    <enum>
+    <item>Ready to log out (or power off)</item>
+    <item>Log out cancelled by an application</item>
+    </enum> */
 - (void) replyToLogOutOrPowerOff: (NSDictionary *)info
 {
 	NSString *appName = [info objectForKey: @"NSApplicationName"];
@@ -655,27 +821,37 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 
 	if (appName == nil)
 	{
-		/* All applications have been terminated, time to terminate our own tasks */
-		BOOL readyToEnd = [self terminateAllProcessesOnOperation: nil];
+		/* All applications have been terminated, time to terminate our own 
+           tasks. */
+		BOOL readyToEnd = [self terminateAllProcessesOnOperation: _operation];
 
 		if (readyToEnd == NO)
 		{
-			// TODO: handle the possibility that some processes fail to
+			// TODO: handle the possibility that some processes fail to 
 			// terminate
 		}
 
-		if (powerOffRequested)
+		if ([_operation isEqual: SCShutDownOperation])
 		{
-          // TODO: initiate the power off process here
+			if (SCHardwareShutDown() == NO)
+				NSLog(@"System fails to trigger shut down before logging out");
+		}
+		else if ([_operation isEqual: SCRebootOperation])
+		{
+			if (SCHardwareReboot() == NO)
+				NSLog(@"System fails to trigger reboot before logging out");
 		}
 
-		/* Time to put an end to our own life. */
+		/* Time to put an end to our own life */
 		exit(0);
 	}
 	else
 	{
-		NSRunAlertPanel(_(@"Log out or shut down cancelled"),
+		NSRunAlertPanel(_(@"Log out, shut down or reboot has been cancelled."),
 			replyText, nil, nil, nil);
+
+		/* Ready to accept new operation */
+		_operation = nil;
 	}
 }
 
@@ -687,267 +863,266 @@ SetNonNullError (NSError ** error, int code, NSString * reasonFormat, ...)
 
 @implementation SCSystem (HelperMethodsPrivate)
 
-/**
- * Launches a workspace process. This method is special in that if launching
- * the process fails, it queries the user whether to log out (fatal failure),
- * retry launching it or ignore it.
- *
- * @param processDescription A description dictionary of the process
- *      which to launch.
- */
+/** <p>Launches a workspace process. This method is special in that if 
+   launching the process fails, it queries the user whether to log out (fatal 
+   failure), retry launching it or ignore it.</p>
+   <p><deflist>
+   <term>processDescription</term><desc>A description dictionary of the process
+   which to launch.</desc>
+   </deflist></p> */
 - (void) startProcessWithUserFeedbackForDomain: (NSString *)domain
 {
-    NSError *error;
-    
-    relaunchProcess:
-    if (![self startProcessWithDomain: domain error: &error])
-    {
-        int result;
-    
-        result = NSRunAlertPanel(_(@"Failed to launch the process"),
-            _(@"Failed to launch the process \"%@\"\n"
-            @"Reason: %@.\n"),
-            _(@"Log Out"), _(@"Retry"), _(@"Ignore"),
-            [[_processes objectForKey: domain] path],
-            [[error userInfo] objectForKey: NSLocalizedDescriptionKey]);
-    
-        switch (result)
-        {
-            case NSAlertDefaultReturn:
-                [NSApp terminate: self];
-            case NSAlertAlternateReturn:
-                goto relaunchProcess;
-            default:
-                break;
-        }
-    }
+	NSError *error;
+	
+	relaunchProcess:
+	if (![self startProcessWithDomain: domain error: &error])
+	{
+		int result;
+	
+		result = NSRunAlertPanel(_(@"Failed to launch the process"),
+			_(@"Failed to launch the process \"%@\"\n"
+			@"Reason: %@.\n"),
+			_(@"Log Out"), _(@"Retry"), _(@"Ignore"),
+			[[_processes objectForKey: domain] path],
+			[[error userInfo] objectForKey: NSLocalizedDescriptionKey]);
+	
+		switch (result)
+		{
+			case NSAlertDefaultReturn:
+				[NSApp terminate: self];
+			case NSAlertAlternateReturn:
+				goto relaunchProcess;
+			default:
+				break;
+		}
+	}
 }
 
 /*
  * Config file private methods
  */
 
-/**
- * Finds the Etoile system config file for the receiver and starts the file's
- * monitoring (watching for changes to the file).
- *
- * The config file is located in the following order:
- *
- * - first the user defaults database is searched for a key named
- *      "EtoileSystemTaskListFile". The path may contain a '~'
- *      abbreviation - this will be expanded according to standard
- *      shell expansion rules.
- * - next, the code looks for the file in
- *      $GNUSTEP_USER_ROOT/Etoile/SystemTaskList.plist
- * - next, the code tries all other domains' Library subdirectory
- *      "Etoile/SystemTaskList.plist"
- * - if even that fails, the file "SystemTaskList.plist" is looked
- *      for inside the app bundle's resources files.
- *
- * If everything fails, no process set is loaded and a warning message
- * is printed.
- */
+/** <p>Finds the Etoile system config file for the receiver and starts the 
+    file's monitoring (watching for changes to the file).</p>
+    <p>The config file is located in the following order:
+    <enum>
+    <item>first the user defaults database is searched for a key named 
+    "EtoileSystemTaskListFile". The path may contain a '~' abbreviation - this 
+     will be expanded according to standard shell expansion rules.</item>
+    <item>next, the code looks for the file in
+    $GNUSTEP_USER_ROOT/Etoile/SystemTaskList.plist</item>
+    <item>next, the code tries all other domains' Library subdirectory
+    "Etoile/SystemTaskList.plist"</item>
+    <item>if even that fails, the file "SystemTaskList.plist" is looked
+    for inside the app bundle's resources files.</item>
+    </enum></p>
+    <p>If everything fails, no process set is loaded and a warning message is
+    printed.</p> */
 - (void) findConfigFileAndStartUpdateMonitoring
 {
-    NSString *tmp;
-    NSString *configPath;
+	NSString *tmp;
+	NSString *configPath;
 	NSString *suffix;
-    NSEnumerator *e;
-    NSMutableArray *searchPaths = [NSMutableArray array];
-    NSFileManager *fm = [NSFileManager defaultManager];
+	NSEnumerator *e;
+	NSMutableArray *searchPaths = [NSMutableArray array];
+	NSFileManager *fm = [NSFileManager defaultManager];
 
 	NSDebugLLog(@"SCSystem", @"Looking for config file");
-    
-    // try looking in the user defaults
-    tmp = [[NSUserDefaults standardUserDefaults]
-        objectForKey: @"EtoileSystemTaskListFile"];
-    if (tmp != nil)
-    {
-        [searchPaths addObject: [tmp stringByExpandingTildeInPath]];
-    }
-    
+	
+	/* Try looking in the user defaults */
+	tmp = [[NSUserDefaults standardUserDefaults]
+		objectForKey: @"EtoileSystemTaskListFile"];
+	if (tmp != nil)
+	{
+		[searchPaths addObject: [tmp stringByExpandingTildeInPath]];
+	}
+	
 	suffix = [@"Etoile" stringByAppendingPathComponent: @"SystemTaskList.plist"];
-    // if that fails, try
-    // $GNUSTEP_USER_ROOT/Library/EtoileWorkspace/WorkspaceProcessSet.plist
-    tmp = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
-        NSUserDomainMask, YES) objectAtIndex: 0];
+	/* If that fails, try
+	   $GNUSTEP_USER_ROOT/Library/Etoile/SystemTaskList.plist */
+	tmp = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
+		NSUserDomainMask, YES) objectAtIndex: 0];
 	[searchPaths addObject: [tmp stringByAppendingPathComponent: suffix]];
-    
-    // and if that fails, try all domains
-    e = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
-        NSLocalDomainMask | NSNetworkDomainMask | NSSystemDomainMask, YES)
-        objectEnumerator];
-    while ((tmp = [e nextObject]) != nil)
-    {
+	
+	/* And if that fails, try all domains */
+	e = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
+		NSLocalDomainMask | NSNetworkDomainMask | NSSystemDomainMask, YES)
+		objectEnumerator];
+	while ((tmp = [e nextObject]) != nil)
+	{
 		[searchPaths addObject: [tmp stringByAppendingPathComponent: suffix]];
-    }
-    
-    // finally, try the application bundle's WorkspaceProcessSet.plist resource
-    tmp = [[NSBundle mainBundle] pathForResource: @"SystemTaskList"
-                                            ofType: @"plist"];
-    if (tmp != nil)
-    {
-        [searchPaths addObject: tmp];
-    }
-    
-    e = [searchPaths objectEnumerator];
-    while ((configPath = [e nextObject]) != nil)
-    {
-        if ([fm isReadableFileAtPath: configPath])
-        {
-            break;
-        }
-    }
-    
-    if (configPath != nil)
-    {
-        NSInvocation * inv;
-    
-        ASSIGN(configFilePath, configPath);
+	}
+	
+	/* Finally, try the application bundle's SystemTaskList.plist resource */
+	tmp = [[NSBundle mainBundle] pathForResource: @"SystemTaskList" 
+	                                      ofType: @"plist"];
+	if (tmp != nil)
+	{
+		[searchPaths addObject: tmp];
+	}
+	
+	e = [searchPaths objectEnumerator];
+	while ((configPath = [e nextObject]) != nil)
+	{
+		if ([fm isReadableFileAtPath: configPath])
+		{
+			break;
+		}
+	}
+	
+	if (configPath != nil)
+	{
+		NSInvocation * inv;
+	
+		ASSIGN(configFilePath, configPath);
 
 		NSDebugLLog(@"SCSystem", @"Triggering config monitoring");
-	// NOTE: The next line corrupts the stack frame and leads to really 
-	// strange segfaults related to gnustep lock objects or thread 
-	// dictionary.
-	// inv = NS_MESSAGE(self, checkConfigFileUpdate);
-	inv = [[NSInvocation alloc] initWithTarget: self selector: 
-		@selector(checkConfigFileUpdate)];
-	AUTORELEASE(inv);
-        ASSIGN(monitoringTimer, [NSTimer scheduledTimerWithTimeInterval: 2.0
-                                                             invocation: inv
-                                                                repeats: YES]);
-    }
-    else
-    {
-        NSLog(_(@"WARNING: no usable workspace process set file found. "
-                @"I'm not going to do workspace process management."));
-    }
+
+		// NOTE: The next line corrupts the stack frame and leads to really 
+		// strange segfaults related to gnustep lock objects or thread 
+		// dictionary.
+		//inv = NS_MESSAGE(self, checkConfigFileUpdate);
+		inv = [[NSInvocation alloc] initWithTarget: self selector: 
+			@selector(checkConfigFileUpdate)];
+		AUTORELEASE(inv);
+		ASSIGN(monitoringTimer, [NSTimer scheduledTimerWithTimeInterval: 2.0
+		                                                     invocation: inv
+		                                                        repeats: YES]);
+	}
+	else
+	{
+		NSLog(_(@"WARNING: no usable workspace process set file found. "
+			@"I'm not going to do workspace process management."));
+	}
 }
 
 /** This method is called by -loadConfigFile. The parsing of the config file 
-    and the update of the running processes is let to -synchronizeProcessesWithConfigFile 
-    method. */
+    and the update of the running processes is let to 
+    -synchronizeProcessesWithConfigFile method. */
 - (void) checkConfigFileUpdate
 {
-    NSDate *latestModificationDate = [[[NSFileManager defaultManager]
-        fileAttributesAtPath: configFilePath traverseLink: YES]
-        fileModificationDate];
+	NSDate *latestModificationDate = [[[NSFileManager defaultManager]
+		fileAttributesAtPath: configFilePath traverseLink: YES]
+		fileModificationDate];
 
 	/* We discard automatic synchronization with config file when we are in the
 	   middle of any process launch. */
-	// FIXME: Will change when I settle on which data structures are used.
-	//if ([_processLaunchQueue count] > 0 || [_processLaunchGroup count] > 0)
+	if (_launchQueueScheduled)
 		return;
-    
-    if ([latestModificationDate compare: modificationDate] ==
-        NSOrderedDescending)
-    {
-        NSDebugLLog(@"SCSystem",
-            @"Config file %@ changed, reloading...", configFilePath);
-    
-        [self synchronizeProcessesWithConfigFile];
-     }
+	
+	if ([latestModificationDate compare: modificationDate] ==
+		NSOrderedDescending)
+	{
+		NSDebugLLog(@"SCSystem",
+			@"Config file %@ changed, reloading...", configFilePath);
+	
+		[self synchronizeProcessesWithConfigFile];
+	 }
 }
 
-/**
- * Refreshes the processes list from the config file and modifies the
- * running processes accordingly - kills those which are not supposed
- * to be there and starts the new ones.
- */
+/** Refreshes the processes list from the config file and modifies the running 
+    processes accordingly by killing those which are not supposed to be there
+    and starts the new ones. */
 - (void) synchronizeProcessesWithConfigFile
 {
-    //NSUserDefaults *df = [NSUserDefaults standardUserDefaults];
-    NSDictionary *newProcessTable;
-    NSDictionary *fileAttributes = [[NSFileManager defaultManager]
-            fileAttributesAtPath: configFilePath traverseLink: YES];
+	NSDictionary *newProcessTable = nil;
+	NSDictionary *fileAttributes = [[NSFileManager defaultManager]
+		fileAttributesAtPath: configFilePath traverseLink: YES];
 
 	NSDebugLLog(@"SCSystem", @"Synchronizing processes with config file...");
 
-    newProcessTable = [NSDictionary dictionaryWithContentsOfFile: configFilePath];
-    if (newProcessTable != nil)
-    {
-        NSEnumerator *e;
-        NSString *domain;
+	newProcessTable = [NSDictionary dictionaryWithContentsOfFile: configFilePath];
+	if (newProcessTable != nil)
+	{
+		NSEnumerator *e = nil;
+		NSString *domain = nil;
 
-      // kill any old, left-over processes or changed processes.
-      // N.B. we can't use -keyEnumerator here, because it isn't guaranteed
-      // that the array over which the enumerator enumerates won't change
-      // as we remove left-over process entries from the underlying dict.
-        e = [[_processes allKeys] objectEnumerator];
-        while ((domain = [e nextObject]) != nil)
-        {
-            SCTask *oldEntry = [_processes objectForKey: domain],
-            *newEntry = [newProcessTable objectForKey: domain];
+		/* Kill any old, left-over processes or changed processes.
+		   NOTE: we can't use -keyEnumerator here, because it isn't guaranteed
+		   that the array over which the enumerator enumerates won't change as
+		   we remove left-over process entries from the underlying dict. */
+		e = [[_processes allKeys] objectEnumerator];
+		while ((domain = [e nextObject]) != nil)
+		{
+			SCTask *oldEntry = [_processes objectForKey: domain];
+			SCTask *newEntry = [newProcessTable objectForKey: domain];
 
-            /* If this entry isn't defined in the config file now, we must stop it. */
-            if (newEntry == nil)
-            {
-                [[NSNotificationCenter defaultCenter] removeObserver: self
-                    name: nil object: oldEntry];
-                // NOTE: The next line is equivalent to [oldEntry terminate]; 
-                // with extra checks.
-                [self stopProcessWithDomain: domain error: NULL];
-                [_processes removeObjectForKey: domain];
-            }
-        }
+			/* If this entry isn't defined in the config file now, we must stop it. */
+			if (newEntry == nil)
+			{
+				[[NSNotificationCenter defaultCenter] removeObserver: self
+					name: nil object: oldEntry];
 
-      // and bring in new processes
-        e = [newProcessTable keyEnumerator];
-        while ((domain = [e nextObject]) != nil)
-        {
-            if ([_processes objectForKey: domain] == nil)
-            {
-                NSDictionary *processInfo = [newProcessTable objectForKey: domain]; 
-				BOOL launchNow = YES;
+				// NOTE: The next line is equivalent to [oldEntry terminate]; 
+				// with extra checks.
+				[self stopProcessWithDomain: domain error: NULL];
+				[_processes removeObjectForKey: domain];
+			}
+		}
 
-				if ([[processInfo allKeys] containsObject: @"OnStart"])
-					launchNow = [[processInfo objectForKey: @"OnStart"] boolValue];
-            
-                // FIXME: Add support for Persistent keys as 
-                // described in Task config file schema (see EtoileSystem.h).
-                SCTask *entry = [SCTask taskWithLaunchPath: [processInfo objectForKey: @"LaunchPath"] 
-                    priority: [[processInfo objectForKey: @"LaunchPriority"] boolValue]
-                     onStart: launchNow
-                    onDemand: [[processInfo objectForKey: @"OnDemand"] boolValue]
-                    withUserName: [processInfo objectForKey: @"UserName"]];
-		// It is better not to have space in each arguments
-		[entry setArguments: [processInfo objectForKey: @"Arguments"]];
-                [_processes setObject: entry forKey: domain];
+		/* Afterwards bring in new processes */
+		e = [newProcessTable keyEnumerator];
+		while ((domain = [e nextObject]) != nil)
+		{
+			if ([_processes objectForKey: domain] == nil)
+			{
+				NSDictionary *processInfo = [newProcessTable objectForKey: domain]; 
+				NSString *launchPath = [processInfo objectForKey: @"LaunchPath"];
+				NSString *launchIdentity = [processInfo objectForKey: @"UserName"];
+				int launchPriority = [[processInfo objectForKey: @"LaunchPriority"] intValue];
+				BOOL launchNow = [[processInfo objectForKey: @"OnStart"] boolValue];
+				BOOL launchLazily = [[processInfo objectForKey: @"OnDemand"] boolValue];
 
-                //[self startProcessWithDomain: domain error: NULL];
-            }
-        }
-    }
-    else
-    {
-        NSLog(_(@"WARNING: unable to read SystemTaskList file."));
-    }
+				/* Now we create the new task with paramaters supplied in the 
+				  config file. */
+				SCTask *entry = [SCTask taskWithLaunchPath: launchPath 
+				                                  priority: launchPriority
+				                                   onStart: launchNow
+				                                  onDemand: launchLazily
+				                              withUserName: launchIdentity];
 
-    ASSIGN(modificationDate, [fileAttributes fileModificationDate]);
+				[entry setArguments: [processInfo objectForKey: @"Arguments"]];
+				// FIXME: 'Persistent' key support should be added.
+
+				[_processes setObject: entry forKey: domain];
+
+				/* When the session has already been started, we can start the
+				   process immediately, because no launch queue is going to 
+				   collect processes to launch them. */
+				if (_launchQueueScheduled == NO)
+					[self startProcessWithDomain: domain error: NULL];
+			}
+		}
+	}
+	else
+	{
+		NSLog(_(@"WARNING: unable to read SystemTaskList file."));
+	}
+
+	ASSIGN(modificationDate, [fileAttributes fileModificationDate]);
 }
 
-/**
- * Notification method invoked when a workspace process terminates. This method
- * causes the given process to be relaunched again. Note the process isn't
- * relaunched when it is stopped by calling -stopProcessForDomain:.
-   Take note this notification is not related to NSTaskDidTerminateNotification
-   which is usually sent soon after the task launch.
- */
+/** <p>Notification method invoked when a workspace process terminates. This 
+    method causes the given process to be relaunched again. Note the process 
+    isn't relaunched when it is stopped by calling -stopProcessForDomain:.</p>
+    <p>Take note this notification is not related to 
+    NSTaskDidTerminateNotification which is usually sent soon after the task 
+    launch.</p> */
 - (void) processTerminated: (NSNotification *)notif
 {
-    SCTask *task = [notif object];
-    NSString *domain = [[_processes allKeysForObject: task] objectAtIndex: 0];
+	SCTask *task = [notif object];
+	NSString *domain = [[_processes allKeysForObject: task] objectAtIndex: 0];
 
-    NSDebugLLog(@"SCSystem", @"Process %@ terminated", [task name]);
+	NSDebugLLog(@"SCSystem", @"Process %@ terminated", [task name]);
 
-    /* We relaunch every processes that exit and still referenced by the 
-        process table, unless they are special daemons launched on demand 
-        (in other words, not always running). */
-    // FIXME: Checks the process isn't stopped by -stopProcessForDomain:.
-    if (domain != nil && [task launchOnDemand] == NO)
-    {
-        //[self startProcessWithDomain: domain error: NULL];
-    }
+	/* We relaunch every processes that exit and still referenced by the 
+	    process table, unless they are special daemons launched on demand 
+	    (in other words, not always running). */
+	// FIXME: Checks the process isn't stopped by -stopProcessForDomain:.
+	if (domain != nil && [task launchOnDemand] == NO)
+	{
+	    //[self startProcessWithDomain: domain error: NULL];
+	}
 }
 
 @end

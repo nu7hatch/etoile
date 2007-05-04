@@ -23,13 +23,15 @@
 #import <X11/Xlib.h>
 #import "AZMainLoop.h"
 
+/* The time for the current event being processed */
+extern Time event_curtime;
+
+BOOL event_time_after(Time t1, Time t2);
+
 @class AZClient;
 
 @interface AZEventHandler: NSObject <AZXHandler, NSCopying>
 {
-  /*! Time at which the last event with a timestamp occured. */
-  Time event_lasttime;
-
   /*! The value of the mask for the NumLock modifier */
   unsigned int NumLockMask;
 
@@ -52,19 +54,12 @@
 - (void) startup: (BOOL) reconfig;
 - (void) shutdown: (BOOL) reconfig;
 
-/*! Make as if the mouse just entered the client, use only when using focus
-  follows mouse */
-- (void) enterClient: (AZClient *) client;
-
 /*! Request that any queued EnterNotify events not be used for distributing
   focus */
 - (void) ignoreQueuedEnters;
 
-/* Halts any focus delay in progress, use this when the user is selecting a
-   window for focus */
-- (void) haltFocusDelay;
+- (void) setCurrentTime: (XEvent *) e;
 
-- (Time) eventLastTime;
 - (unsigned int) numLockMask;
 - (unsigned int) scrollLockMask;
 

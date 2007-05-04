@@ -1,10 +1,19 @@
 #import <XWindowServerKit/XWindow.h>
+#import <XWindowServerKit/XFunctions.h>
+#import <GNUstepGUI/GSServicesManager.h>
 #import "AZBackground.h"
 #import <X11/Xutil.h>
+#import <X11/Xatom.h>
 
 NSString *const FileUserDefaults = @"File";
+static NSString *AZPerformServiceNotification = @"AZPerformServiceNotification";
+static NSString *AZServiceItem = @"AZServiceItem";
 
 static AZBackground *sharedInstance;
+
+@interface GSDisplayServer (AZPrivate)
+ - (void) processEvent: (XEvent *) event;
+@end
 
 @implementation AZBackground
 /** Private **/
@@ -42,10 +51,116 @@ static AZBackground *sharedInstance;
       break;
     }
   }
-  NSLog(@"path %@", path);
 
   return AUTORELEASE([[NSImage alloc] initWithContentsOfFile: path]);
 } 
+
+- (void) performServiceRequested: (NSNotification *) not
+{
+  ASSIGN(serviceItem, [[not userInfo] objectForKey: AZServiceItem]);
+  Window activeXWindow = XWindowActiveWindow();
+
+  if (activeXWindow != None)
+  {
+    NSString *wm_class = nil, *wm_instance = nil;
+    if (XWindowClassHint(activeXWindow, &wm_class, &wm_instance))
+    {
+      if ([wm_class isEqualToString: @"GNUstep"])
+      {
+        NSLog(@"This is a GNUstep application (%@.%@).", wm_instance, wm_class);
+        id proxy = [NSConnection rootProxyForConnectionWithRegisteredName: wm_instance host: @""];
+        if (proxy)
+        {
+	  NSLog(@"Got proxy");
+          [proxy application: nil serviceRequested: serviceItem];
+        }
+	[proxy invalidate];
+	return;
+      }
+    }
+    else
+    {
+      NSLog(@"Cannot get class and instance");
+      return;
+    }
+  }
+
+  /* This is only work for XWindow and string type for now */
+  XConvertSelection(dpy, XA_PRIMARY, XA_STRING, X_PROPERTY_NAME, window, CurrentTime);
+  XSync(dpy, False);
+}
+
+- (void)receivedEvent:(void *)data
+                 type:(RunLoopEventType)type
+                extra:(void *)extra
+              forMode:(NSString *)mode
+{
+  XEvent event;
+  
+  while (XPending(dpy))
+  {
+    XNextEvent (dpy, &event);
+    switch (event.type) {
+      case SelectionNotify:
+      {
+        if (event.xselection.selection != XA_PRIMARY) 
+	{
+	  /* Not from PRIMARY buffer. */
+	  break;
+	}
+	if (event.xselection.property == None) 
+	{
+	  NSLog(@"Conversion fails.");
+	  break;
+	} 
+	else 
+	{
+	  unsigned long num;
+	  unsigned char *data = NULL;
+	  Atom type_ret;
+	  int format_ret;
+	  unsigned long after_ret;
+	  int result = XGetWindowProperty(dpy, window, X_PROPERTY_NAME,
+                                  0, 0x7FFFFFFF, False, (Atom)AnyPropertyType,
+                                  &type_ret, &format_ret, &num,
+                                  &after_ret, &data);
+	  if ((result != Success)) {
+	    NSLog(@"Error: cannot get string from primary buffer.");
+	    if (data != NULL) {
+	      XFree(data);
+	    }
+	    break;
+	  }
+
+	  NSString *string = [NSString stringWithCString: (char *)data];
+	  XFree(data);
+          NSPasteboard *pb = [NSPasteboard pasteboardWithUniqueName];
+          NSArray *types = [NSArray arrayWithObject:NSStringPboardType];
+	  [pb declareTypes: types owner: nil];
+	  NSLog(@"###%@###", serviceItem);
+	  if ([pb setString: string forType: NSStringPboardType] == NO)
+	  {
+	    NSLog(@"Fail to write to pasteboard");
+	    break;
+	  }
+	  if (NSPerformService(serviceItem, pb) == NO)
+	  {
+            NSLog(@"Perform service fails.");
+	  }
+#if 0 // Should we clean up the selection ?
+        XDeleteProperty (dpy, window, X_PROPERTY_NAME);
+#endif
+        }
+      }
+
+      default:
+        if (event.xany.window != window)
+        {
+          [server processEvent: &event];
+        }
+    }
+  }
+}
 
 /** Private **/
 
@@ -158,6 +273,52 @@ static AZBackground *sharedInstance;
   dpy = (Display*)[server serverDevice];
   screen = [[NSScreen mainScreen] screenNumber];
   root_win = RootWindow(dpy, screen);
+
+  /* Listen event */
+  NSRunLoop *loop = [NSRunLoop currentRunLoop];
+  int xEventQueueFd = XConnectionNumber(dpy);
+
+  [loop addEvent: (void*)(gsaddr)xEventQueueFd
+                        type: ET_RDESC
+                     watcher: (id<RunLoopEvents>)self
+                     forMode: NSDefaultRunLoopMode];
+
+  /* window to receive X notify */
+  window = XCreateSimpleWindow (dpy, root_win, 0, 0, 1, 1, 0, 0, 0);
+  XSelectInput(dpy, window, PropertyChangeMask);
+
+  /* We listen to request of perform service, probably from service menulet */
+  [[[NSWorkspace sharedWorkspace] notificationCenter]
+	addObserver: self
+	   selector: @selector(performServiceRequested:)
+	       name: AZPerformServiceNotification
+	     object: nil];
+
+  X_PROPERTY_NAME = XInternAtom(dpy, "X_PROPERTY_NAME", False);
+  X_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+  X_NET_CLIENT_LIST_STACKING = XInternAtom(dpy, "_NET_CLIENT_LIST_STACKING", False);
+
+#if 0 // Not ncessary
+  GSServicesManager *gManager = [GSServicesManager newWithApplication: NSApp];
+  [gManager rebuildServices];
+  [gManager rebuildServicesMenu];
+#endif
+#if 0 // Not necessary
+  /* We need to setup menu in order to have service work */
+  NSMenu *menu = [[NSMenu alloc] initWithTitle: @"AZBackground"];
+  NSMenu *services = [[NSMenu alloc] initWithTitle: @"Services"];
+  id <NSMenuItem> item = [menu addItemWithTitle: @"Services"
+                                action: NULL
+                        keyEquivalent: @""];
+  [menu setSubmenu: services forItem: item];
+  [menu addItemWithTitle: @"Quit"
+                        action: @selector(terminate:)
+                        keyEquivalent: @"q"];
+//  [NSApp setServicesMenu: services];
+//  [NSApp setMainMenu: menu];
+  DESTROY(services);
+  DESTROY(menu);
+#endif
 }
 
 - (void) applicationDidFinishLaunching:(NSNotification *) not

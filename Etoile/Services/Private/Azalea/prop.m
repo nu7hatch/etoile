@@ -53,9 +53,12 @@ void prop_startup()
     CREATE(wm_icon_name, "WM_ICON_NAME");
     CREATE(wm_class, "WM_CLASS");
     CREATE(wm_window_role, "WM_WINDOW_ROLE");
+    CREATE(wm_window_role, "WM_CLIENT_MACHINE");
     CREATE(motif_wm_hints, "_MOTIF_WM_HINTS");
 
     CREATE(sm_client_id, "SM_CLIENT_ID");
+
+    CREATE(net_wm_full_placement, "_NET_WM_FULL_PLACEMENT");
 
     CREATE(net_supported, "_NET_SUPPORTED");
     CREATE(net_client_list, "_NET_CLIENT_LIST");
@@ -89,6 +92,7 @@ void prop_startup()
     CREATE(net_wm_icon, "_NET_WM_ICON");
 /*   CREATE(net_wm_pid, "_NET_WM_PID"); */
     CREATE(net_wm_allowed_actions, "_NET_WM_ALLOWED_ACTIONS");
+    CREATE(net_wm_user_time, "_NET_WM_USER_TIME");
     CREATE(net_frame_extents, "_NET_FRAME_EXTENTS");
 
 /*   CREATE(net_wm_ping, "_NET_WM_PING"); */
@@ -113,6 +117,7 @@ void prop_startup()
     prop_atoms.net_wm_moveresize_move = 8;
     prop_atoms.net_wm_moveresize_size_keyboard = 9;
     prop_atoms.net_wm_moveresize_move_keyboard = 10;
+    prop_atoms.net_wm_moveresize_cancel = 11;
 
     CREATE(net_wm_action_move, "_NET_WM_ACTION_MOVE");
     CREATE(net_wm_action_resize, "_NET_WM_ACTION_RESIZE");
@@ -135,6 +140,7 @@ void prop_startup()
     CREATE(net_wm_state_fullscreen, "_NET_WM_STATE_FULLSCREEN");
     CREATE(net_wm_state_above, "_NET_WM_STATE_ABOVE");
     CREATE(net_wm_state_below, "_NET_WM_STATE_BELOW");
+    CREATE(net_wm_state_demands_attention, "_NET_WM_STATE_DEMANDS_ATTENTION");
   
     prop_atoms.net_wm_state_add = 1;
     prop_atoms.net_wm_state_remove = 0;
@@ -147,17 +153,15 @@ void prop_startup()
     prop_atoms.net_wm_bottomright = 2;
     prop_atoms.net_wm_bottomleft = 3;
 
-    CREATE(kde_net_wm_frame_strut, "_KDE_NET_WM_FRAME_STRUT");
     CREATE(kde_wm_change_state, "_KDE_WM_CHANGE_STATE");
     CREATE(kde_net_wm_window_type_override,"_KDE_NET_WM_WINDOW_TYPE_OVERRIDE");
 
-    CREATE(kwm_win_icon, "KWM_WIN_ICON");
-  
     CREATE(rootpmapid, "_XROOTPMAP_ID");
     CREATE(esetrootid, "ESETROOT_PMAP_ID");
 
     CREATE(openbox_pid, "_OPENBOX_PID");
     CREATE(ob_wm_state_undecorated, "_OB_WM_STATE_UNDECORATED");
+    CREATE(ob_control, "_OB_CONTROL");
 
     CREATE(gnustep_wm_attr, _GNUSTEP_WM_ATTR);
 }
@@ -364,7 +368,7 @@ void prop_set_array32(Window win, Atom prop, Atom type, unsigned long *val,
                     (unsigned char*)val, num);
 }
 
-void prop_set_string_utf8(Window win, Atom prop, char *val)
+void prop_set_string_utf8(Window win, Atom prop, const char *val)
 {
     XChangeProperty(ob_display, win, prop, prop_atoms.utf8, 8,
                     PropModeReplace, (unsigned char*)val, strlen(val));
