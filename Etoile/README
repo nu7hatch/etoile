@@ -79,6 +79,10 @@ related dependencies, you should read about GNUstep install on
     
     * OniGuruma <http://www.geocities.jp/kosako3/oniguruma/>
 
+    For PopplerKit
+
+    * Poppler <http://poppler.freedesktop.org/>
+
     For System
 
     * DBus <http://www.freedesktop.org/wiki/Software/dbus>
