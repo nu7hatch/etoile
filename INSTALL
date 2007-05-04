@@ -31,6 +31,17 @@ environment or the whole repository:
     See <http://www.geocities.jp/kosako3/oniguruma/> for further information. 
     This dependency is also available in trunk/Dependencies/oniguruma (within 
     Etoile repository).
+
+    For PopplerKit
+
+    * Poppler <http://poppler.freedesktop.org/>
+
+    For System
+
+    * DBus <http://www.freedesktop.org/wiki/Software/dbus>
+    * HAL <http://www.freedesktop.org/wiki/Software_2fhal>
+
+
     
 Notation
 --------
