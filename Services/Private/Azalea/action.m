@@ -19,7 +19,6 @@
    See the COPYING file for a copy of the GNU General Public License.
 */
 
-#import "AZDock.h"
 #import "AZStacking.h"
 #import "AZClient.h"
 #import "AZMoveResizeHandler.h"
@@ -35,33 +34,15 @@
 #import "AZFocusManager.h"
 #import "AZMenuFrame.h"
 #import "AZMenuManager.h"
+#import "AZStartupHandler.h"
 #import <AppKit/AppKit.h>
 
 inline void client_action_start(union ActionData *data)
 {
-    if (config_focus_follow)
-        if (data->any.context != OB_FRAME_CONTEXT_CLIENT && !data->any.button)
-            grab_pointer(YES, OB_CURSOR_NONE);
 }
 
 inline void client_action_end(union ActionData *data)
 {
-    if (config_focus_follow)
-        if (data->any.context != OB_FRAME_CONTEXT_CLIENT) {
-            if (!data->any.button) {
-                grab_pointer(NO, OB_CURSOR_NONE);
-            } else {
-                AZClient *c;
-
-                /* usually this is sorta redundant, but with a press action
-                   the enter event will come as a GrabNotify which is
-                   ignored, so this will handle that case */
-                if ((c = AZUnderPointer()))
-		{
-		  [[AZEventHandler defaultHandler] enterClient: c];
-		}
-            }
-        }
 }
 
 typedef struct
@@ -361,6 +342,11 @@ void setup_action_showmenu(AZAction **a, ObUserAction uact)
     }
 }
 
+void setup_action_focus(AZAction **a, ObUserAction uact)
+{
+    [(*a) data_pointer]->any.client_action = OB_CLIENT_ACTION_OPTIONAL;
+}
+
 void setup_client_action(AZAction **a, ObUserAction uact)
 {
     [(*a) data_pointer]->any.client_action = OB_CLIENT_ACTION_ALWAYS;
@@ -421,7 +407,7 @@ ActionString actionstrings[] =
     {
         @"focus",
         action_focus,
-        setup_client_action
+        setup_action_focus
     },
     {
         @"unfocus",
@@ -662,11 +648,6 @@ ActionString actionstrings[] =
         @"resize",
         action_moveresize,
         setup_action_resize
-    },
-    {
-        @"toggledockautohide",
-        action_toggle_dockautohide,
-        NULL
     },
     {
         @"toggleshowdesktop",
@@ -939,8 +920,6 @@ AZAction *action_parse(xmlDocPtr doc, xmlNodePtr node, ObUserAction uact)
                        [act func] == action_raiselower ||
                        [act func] == action_shadelower ||
                        [act func] == action_unshaderaise) {
-                if ((n = parse_find_node("group", node->xmlChildrenNode)))
-                    [act data_pointer]->stacking.group = parse_bool(doc, n);
             }
             INTERACTIVE_LIMIT(act, uact);
         }
@@ -948,29 +927,29 @@ AZAction *action_parse(xmlDocPtr doc, xmlNodePtr node, ObUserAction uact)
     return act;
 }
 
-void action_run_mouse(NSArray *acts, AZClient *c, ObFrameContext n, unsigned int s, unsigned int b, int x, int y)
+void action_run_mouse(NSArray *acts, AZClient *c, ObFrameContext n, unsigned int s, unsigned int b, int x, int y, Time time)
 {
-    action_run_list(acts, c, n, s, b, x, y, NO, NO);
+    action_run_list(acts, c, n, s, b, x, y, NO, NO, time);
 }
 
-void action_run_interactive(NSArray *acts, AZClient *c, unsigned int s, BOOL n, BOOL d)
+void action_run_interactive(NSArray *acts, AZClient *c, unsigned int s, Time t, BOOL n, BOOL d)
 {
-    action_run_list(acts, c, OB_FRAME_CONTEXT_NONE, s, 0, -1, -1, n, d);
+    action_run_list(acts, c, OB_FRAME_CONTEXT_NONE, s, 0, -1, -1, t, n, d);
 }
 
-void action_run_key(NSArray *acts, AZClient *c, unsigned int state, int x, int y)
+void action_run_key(NSArray *acts, AZClient *c, unsigned int state, int x, int y, Time t)
 {
-    action_run_list(acts, c, OB_FRAME_CONTEXT_NONE, state, 0, x, y, NO, NO);
+    action_run_list(acts, c, OB_FRAME_CONTEXT_NONE, state, 0, x, y, t, NO, NO);
 }
 
-void action_run(NSArray *acts, AZClient *c, unsigned int state)
+void action_run(NSArray *acts, AZClient *c, unsigned int state, Time t)
 {
-    action_run_list(acts, c, OB_FRAME_CONTEXT_NONE, state, 0, -1, -1, NO, NO);
+    action_run_list(acts, c, OB_FRAME_CONTEXT_NONE, state, 0, -1, -1, t, NO, NO);
 }
 
 void action_run_list(NSArray *acts, AZClient *c, ObFrameContext context,
                      unsigned int state, unsigned int button, int x, int y,
-                     BOOL cancel, BOOL done)
+                     Time time, BOOL cancel, BOOL done)
 {
     AZAction *a;
     BOOL inter = NO;
@@ -1002,7 +981,7 @@ void action_run_list(NSArray *acts, AZClient *c, ObFrameContext context,
            it won't work right unless we XUngrabKeyboard first,
            even though we grabbed the key/button Asychronously.
            e.g. "gnome-panel-control --main-menu" */
-        XUngrabKeyboard(ob_display, [[AZEventHandler defaultHandler] eventLastTime]);
+	grab_keyboard(NO);
     }
 
     count = [acts count];
@@ -1016,6 +995,8 @@ void action_run_list(NSArray *acts, AZClient *c, ObFrameContext context,
             [a data_pointer]->any.y = y;
 
             [a data_pointer]->any.button = button;
+
+	    [a data_pointer]->any.time = time;
 
             if ([a data].any.interactive) {
                 [a data_pointer]->inter.cancel = cancel;
@@ -1043,7 +1024,7 @@ void action_run_list(NSArray *acts, AZClient *c, ObFrameContext context,
     }
 }
 
-void action_run_string(NSString *name, AZClient *c)
+void action_run_string(NSString *name, AZClient *c, Time time)
 {
     AZAction *a = [AZAction actionWithName: name userAction: OB_USER_ACTION_NONE];
     if (a == nil) {
@@ -1051,7 +1032,7 @@ void action_run_string(NSString *name, AZClient *c)
       return;
     }
 
-    action_run([NSArray arrayWithObjects: a, nil], c, 0);
+    action_run([NSArray arrayWithObjects: a, nil], c, 0, time);
 }
 
 void action_execute(union ActionData *data)
@@ -1061,6 +1042,7 @@ void action_execute(union ActionData *data)
       if ([data->execute.path isAbsolutePath])
 	p = data->execute.path;
       else {
+        // FIXME: we need to port this part again 
 	/* Look through paths */
 	NSProcessInfo *pi = [NSProcessInfo processInfo];
 	NSArray *ps = [[[pi environment] objectForKey: @"PATH"] componentsSeparatedByString: @":"];
@@ -1088,24 +1070,36 @@ void action_execute(union ActionData *data)
 
 void action_activate(union ActionData *data)
 {
-    [data->activate.any.c activateHere: data->activate.here];
+    /* similar to the openbox dock for dockapps, don't let user actions give
+       focus to 3rd-party docks (panels) either (unless they ask for it
+       themselves). */
+    if ([data->client.any.c type] != OB_CLIENT_TYPE_DOCK) {
+        [data->activate.any.c activateHere: data->activate.here user: YES];
+    }
 }
 
 void action_focus(union ActionData *data)
 {
-    /* if using focus_delay, stop the timer now so that focus doesn't go moving
-       on us */
-    [[AZEventHandler defaultHandler] haltFocusDelay];
-
-    [data->client.any.c focus];
+    /* similar to the openbox dock for dockapps, don't let user actions give
+       focus to 3rd-party docks (panels) either (unless they ask for it
+       themselves). */
+    if (data->client.any.c) {
+	if ([data->client.any.c type] != OB_CLIENT_TYPE_DOCK) {
+	    [data->client.any.c focus];
+	}
+    } else {
+        /* focus action on something other than a client, make keybindings
+           work for this openbox instance, but don't focus any specific client
+        */
+        [[AZFocusManager defaultManager] focusNothing];
+    }
 }
 
 void action_unfocus (union ActionData *data)
 {
   AZFocusManager *fmanager = [AZFocusManager defaultManager];
-//    [data->client.any.c unfocus];
-    if (data->client.any.c == [fmanager focus_client])
-      [fmanager fallbackTarget: OB_FOCUS_FALLBACK_UNFOCUSING];
+  if (data->client.any.c == [fmanager focus_client])
+    [fmanager fallbackTarget: NO old: nil];
 }
 
 void action_iconify(union ActionData *data)
@@ -1154,8 +1148,7 @@ void action_raiselower(union ActionData *data)
 void action_raise(union ActionData *data)
 {
     client_action_start(data);
-    [[AZStacking stacking] raiseWindow: data->client.any.c
-	                   group: data->stacking.group];
+    [[AZStacking stacking] raiseWindow: data->client.any.c];
     client_action_end(data);
 }
 
@@ -1178,8 +1171,7 @@ void action_shadelower(union ActionData *data)
 void action_lower(union ActionData *data)
 {
     client_action_start(data);
-    [[AZStacking stacking] lowerWindow: data->client.any.c
-	                   group: data->stacking.group];
+    [[AZStacking stacking] lowerWindow: data->client.any.c];
     client_action_end(data);
 }
 
@@ -1284,27 +1276,35 @@ void action_move_relative(union ActionData *data)
 void action_resize_relative(union ActionData *data)
 {
   AZClient *c = data->relative.any.c;
+  int x, y, ow, w, oh, h, lw, lh;
   client_action_start(data);
-  [c moveAndResizeToX: [c area].x - data->relative.deltaxl * [c size_inc].width
-	  y: [c area].y - data->relative.deltayu * [c size_inc].height
-	  width: [c area].width + data->relative.deltax * [c size_inc].width
-		 + data->relative.deltaxl * [c size_inc].width
-         height: [c area].height + data->relative.deltay * [c size_inc].height
-	         + data->relative.deltayu * [c size_inc].height];
+  x = [c area].x;
+  y = [c area].y;
+  ow = [c area].width;
+  w = ow + data->relative.deltax * [c size_inc].width
+      + data->relative.deltaxl * [c size_inc].width;
+  oh = [c area].height;
+  h = oh + data->relative.deltay * [c size_inc].height
+      + data->relative.deltayu * [c size_inc].height;
+
+  [c tryConfigureToCorner: OB_CORNER_TOPLEFT x: &x y: &y width: &w height: &h
+               logicalW: &lw logicalH: &lh user: YES];
+  [c moveAndResizeToX: x + (ow - w) y: y + (oh - h) width: w height: h];
+
   client_action_end(data);
 }
 
 void action_maximize_full(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c maximize: YES direction: 0 saveArea: YES];
+    [data->client.any.c maximize: YES direction: 0];
     client_action_end(data);
 }
 
 void action_unmaximize_full(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c maximize: NO direction: 0 saveArea: YES];
+    [data->client.any.c maximize: NO direction: 0];
     client_action_end(data);
 }
 
@@ -1314,21 +1314,21 @@ void action_toggle_maximize_full(union ActionData *data)
     [data->client.any.c maximize:  
 	       !([data->client.any.c max_horz] || 
 		 [data->client.any.c max_vert])
-	    direction: 0 saveArea: YES];
+	    direction: 0];
     client_action_end(data);
 }
 
 void action_maximize_horz(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c maximize: YES direction: 1 saveArea: YES];
+    [data->client.any.c maximize: YES direction: 1];
     client_action_end(data);
 }
 
 void action_unmaximize_horz(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c maximize: NO direction: 1 saveArea: YES];
+    [data->client.any.c maximize: NO direction: 1];
     client_action_end(data);
 }
 
@@ -1336,21 +1336,21 @@ void action_toggle_maximize_horz(union ActionData *data)
 {
     client_action_start(data);
     [data->client.any.c maximize: ![data->client.any.c max_horz]
-	    direction: 1 saveArea: YES];
+	               direction: 1];
     client_action_end(data);
 }
 
 void action_maximize_vert(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c maximize: YES direction: 2 saveArea: YES];
+    [data->client.any.c maximize: YES direction: 2];
     client_action_end(data);
 }
 
 void action_unmaximize_vert(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c maximize: NO direction: 2 saveArea: YES];
+    [data->client.any.c maximize: NO direction: 2];
     client_action_end(data);
 }
 
@@ -1358,15 +1358,14 @@ void action_toggle_maximize_vert(union ActionData *data)
 {
     client_action_start(data);
     [data->client.any.c maximize: ![data->client.any.c max_vert]
-	    direction: 2 saveArea: YES];
+	               direction: 2];
     client_action_end(data);
 }
 
 void action_toggle_fullscreen(union ActionData *data)
 {
     client_action_start(data);
-    [data->client.any.c fullscreen: !([data->client.any.c fullscreen])
-	                       saveArea: YES];
+    [data->client.any.c fullscreen: !([data->client.any.c fullscreen])];
     client_action_end(data);
 }
 
@@ -1577,10 +1576,6 @@ void action_showmenu(union ActionData *data)
 
 void action_cycle_windows(union ActionData *data)
 {
-    /* if using focus_delay, stop the timer now so that focus doesn't go moving
-       on us */
-    [[AZEventHandler defaultHandler] haltFocusDelay];
-
     [[AZFocusManager defaultManager] cycleForward: data->cycle.forward
 	    linear: data->cycle.linear
 	    interactive:  data->any.interactive
@@ -1592,10 +1587,6 @@ void action_cycle_windows(union ActionData *data)
 
 void action_directional_focus(union ActionData *data)
 {
-    /* if using focus_delay, stop the timer now so that focus doesn't go moving
-       on us */
-    [[AZEventHandler defaultHandler] haltFocusDelay];
-
     [[AZFocusManager defaultManager] 
             directionalCycle: data->interdiraction.direction
             interactive: data->any.interactive
@@ -1721,12 +1712,6 @@ void action_toggle_layer(union ActionData *data)
         [c setLayer: [c above] ? 0 : 1];
     }
     client_action_end(data);
-}
-
-void action_toggle_dockautohide(union ActionData *data)
-{
-    config_dock_hide = !config_dock_hide;
-    [[AZDock defaultDock] configure];
 }
 
 void action_toggle_show_desktop(union ActionData *data)

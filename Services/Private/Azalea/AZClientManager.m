@@ -24,7 +24,6 @@
 #import "AZClient+Place.h"
 #import "AZClient+GNUstep.h"
 #import "AZScreen.h"
-#import "AZDock.h"
 #import "AZStartupHandler.h"
 #import "AZEventHandler.h"
 #import "AZGroup.h"
@@ -38,12 +37,12 @@
 #import "grab.h"
 #import "prop.h"
 #import "AZMenuFrame.h"
+#import "AZDebug.h"
 
 NSString *AZClientDestroyNotification = @"AZClientDestroyNotification";
 
 /*! The event mask to grab on client windows */
-#define CLIENT_EVENTMASK (PropertyChangeMask | FocusChangeMask | \
-                          StructureNotifyMask)
+#define CLIENT_EVENTMASK (PropertyChangeMask | StructureNotifyMask)
 
 #define CLIENT_NOPROPAGATEMASK (ButtonPressMask | ButtonReleaseMask | \
                                 ButtonMotionMask)
@@ -133,16 +132,19 @@ static AZClientManager *sharedInstance;
     XSetWindowAttributes attrib_set;
     XWMHints *wmhint;
     BOOL activate = NO;
+    int newx, newy;
     AZScreen *screen = [AZScreen defaultScreen];
+    AZFocusManager *fManager = [AZFocusManager defaultManager];
 
     grab_server(YES);
 
-    /* check if it has already been unmapped by the time we started mapping
+    /* check if it has already been unmapped by the time we started mapping.
        the grab does a sync so we don't have to here */
     if (XCheckTypedWindowEvent(ob_display, window, DestroyNotify, &e) ||
         XCheckTypedWindowEvent(ob_display, window, UnmapNotify, &e)) {
         XPutBackEvent(ob_display, &e);
 
+	/* Trying to manage unmapped window. Aborting that. */
         grab_server(NO);
         return; /* don't manage it */
     }
@@ -155,10 +157,18 @@ static AZClientManager *sharedInstance;
     }
   
     /* is the window a docking app */
-    if ((wmhint = XGetWMHints(ob_display, window))) {
+    if ((wmhint = XGetWMHints(ob_display, window))) 
+    {
         if ((wmhint->flags & StateHint) &&
-            wmhint->initial_state == WithdrawnState) {
-	    [[AZDock defaultDock] addWindow: window hints: wmhint];
+            wmhint->initial_state == WithdrawnState) 
+	{
+            [[workspace notificationCenter]
+                       postNotificationName: @"AZDockletDidLaunchNotification"
+                       object: workspace
+                       userInfo: [NSDictionary dictionaryWithObjectsAndKeys:
+                   [NSString stringWithFormat: @"%d", window], @"AZXWindowID",
+                                 nil]
+                       ];
             grab_server(NO);
             XFree(wmhint);
             return;
@@ -181,21 +191,27 @@ static AZClientManager *sharedInstance;
     [client set_window: window];
 
     /* non-zero defaults */
-    [client set_title_count: 1];
-    [client set_wmstate: NormalState];
+    [client set_wmstate: WithdrawnState]; /* make sure it gets updated first time */
     [client set_layer: -1];
     [client set_desktop: [screen numberOfDesktops]]; /* always an invalid value */
+    [client set_user_time: CurrentTime]; 
 
     [client getAll];
     [client restoreSessionState];
 
-    [[AZStartupHandler defaultHandler] applicationStarted: (char*)[[client class] cString]];
+    [client calcLayer];
+ 
+    {
+      Time t = [[AZStartupHandler defaultHandler] 
+                 applicationStarted: (char*)[[client startup_id] cString]
+                              class: (char*)[[client class] cString]];
+      if (t) 
+        [client set_user_time: t];
+    }
 
     /* update the focus lists, do this before the call to change_state or
        it can end up in the list twice! */
-    [[AZFocusManager defaultManager] focusOrderAdd: client];
-
-    [client changeState];
+    [fManager focusOrderAdd: client];
 
     /* remove the client's border (and adjust re gravity) */
     [client toggleBorder: NO];
@@ -205,15 +221,18 @@ static AZClientManager *sharedInstance;
     XChangeSaveSet(ob_display, window, SetModeInsert);
 
     /* create the decoration frame for the client window */
-    [client set_frame: AUTORELEASE([[AZFrame alloc] init])];
+    [client set_frame: AUTORELEASE([[AZFrame alloc] initWithClient: client])];
 
     [[client frame] grabClient: client];
 
+    /* do this after we have a frame.. it uses the frame to help determine the
+       WM_STATE to apply. */
+    [client changeState];
+
     grab_server(NO);
 
-    [client applyStartupState];
-
-    [[AZStacking stacking] addWindow: client];
+//    [[AZStacking stacking] addWindow: client];
+    [[AZStacking stacking] addWindowNonIntrusively: client];
     [client restoreSessionStacking];
 
     /* focus the new window? */
@@ -228,13 +247,16 @@ static AZClientManager *sharedInstance;
         activate = YES;
     }
 
+    /* get the current position */
+    newx = [client area].x;
+    newy = [client area].y;
+ 
+    /* figure out placement for the window */
     if (ob_state() == OB_STATE_RUNNING) {
-        int x = [client area].x, ox = x;
-        int y = [client area].y, oy = y;
-	BOOL transient = [client placeAtX: &x y: &y];
+	BOOL transient = [client placeAtX: &newx y: &newy];
 
         /* make sure the window is visible. */
-	[client findOnScreenAtX: &x y: &y
+	[client findOnScreenAtX: &newx y: &newy
 		width: [[client frame] area].width
 		height: [[client frame] area].height
                              /* non-normal clients has less rules, and
@@ -252,14 +274,71 @@ static AZClientManager *sharedInstance;
                               !([client positioned] & USPosition)) &&
                              [client normal] &&
                              ![client session])];
-        if (x != ox || y != oy) 	 
-	    [client moveToX: x y: y];
     }
+
+    /* do this after the window is placed, so the premax/prefullscreen numbers
+       won't be all wacko!!
+       also, this moves the window to the position where it has been placed
+    */
+    [client applyStartupStateAtX: newx y: newy];
 
     [[AZKeyboardHandler defaultHandler] grab: YES forClient: client];
     [[AZMouseHandler defaultHandler] grab: YES forClient: client];
 
-    [client showhide];
+    if (activate) {
+	unsigned int last_time = [fManager focus_client] ? [[fManager focus_client] user_time] : CurrentTime;
+        /* This is focus stealing prevention */
+
+        /* If a nothing at all, or a parent was focused, then focus this
+           always
+        */
+        if (![fManager focus_client] || [client searchFocusParent] != nil)
+	{
+            activate = YES;
+	}
+        else
+        {
+            /* If time stamp is old, don't steal focus */
+            if ([client user_time] && last_time &&
+                !event_time_after([client user_time], last_time))
+            {
+                activate = NO;
+            }
+            /* Don't steal focus from globally active clients.
+               I stole this idea from KWin. It seems nice.
+             */
+            if (!([[fManager focus_client] can_focus] || 
+	          [[fManager focus_client] focus_notify]))
+                activate = NO;
+        }
+
+        if (activate)
+        {
+            /* since focus can change the stacking orders, if we focus the
+               window then the standard raise it gets is not enough, we need
+               to queue one for after the focus change takes place */
+	    [client raise];
+        } else {
+            /* if the client isn't focused, then hilite it so the user
+               knows it is there */
+	    [client hilite: YES];
+        }
+    }
+    else {
+        /* This may look rather odd. Well it's because new windows are added
+           to the stacking order non-intrusively. If we're not going to focus
+           the new window or hilite it, then we raise it to the top. This will
+           take affect for things that don't get focused like splash screens.
+           Also if you don't have focus_new enabled, then it's going to get
+           raised to the top. Legacy begets legacy I guess?
+        */
+	[client raise];
+    }
+
+    /* this has to happen before we try focus the window, but we want it to
+       happen after the client's stacking has been determined or it looks bad
+    */
+    [client show];
 
     /* use client_focus instead of client_activate cuz client_activate does
        stuff like switch desktops etc and I'm not interested in all that when
@@ -267,18 +346,10 @@ static AZClientManager *sharedInstance;
        clicking a window to activate is. so keep the new window out of the way
        but do focus it. */
     if (activate) {
-        /* if using focus_delay, stop the timer now so that focus doesn't go
-           moving on us */
-	[[AZEventHandler defaultHandler] haltFocusDelay];
-
 	[client focus];
-        /* since focus can change the stacking orders, if we focus the window
-           then the standard raise it gets is not enough, we need to queue one
-           for after the focus change takes place */
-	[client raise];
     }
 
-    /* client_activate does this but we aret using it so we have to do it
+    /* client_activate does this but we aren't using it so we have to do it
        here as well */
     if ([screen showingDesktop])
       [screen showDesktop: NO];
@@ -288,7 +359,8 @@ static AZClientManager *sharedInstance;
     [window_map setObject: client forKey: [NSNumber numberWithInt: [client window]]];
 
     /* this has to happen after we're in the client_list */
-    [screen updateAreas];
+    if (STRUT_EXISTS([client strut]))
+      [screen updateAreas];
 
     /* update the list hints */
     [self setList];
@@ -314,48 +386,19 @@ static AZClientManager *sharedInstance;
 
 - (void) unmanageClient: (AZClient *) client
 {
-//    unsigned int j;
-
-    AZDebug("Unmanaging window: %lx (%s)\n", [client window], [client class]);
-
     NSAssert(client != NULL, @"Client cannot be nil");
+    AZFocusManager *fManager = [AZFocusManager defaultManager];
 
-    [[AZKeyboardHandler defaultHandler] grab: NO forClient: client];
-    [[AZMouseHandler defaultHandler] grab: NO forClient: client];
-
-    /* potentially fix focusLast */
-    if (config_focus_last)
-        grab_pointer(YES, OB_CURSOR_NONE);
-
-    /* remove the window from our save set */
-    XChangeSaveSet(ob_display, [client window], SetModeDelete);
-
-    /* we dont want events no more */
+    /* we dont want events no more. do this before hiding the frame so we
+       don't generate more events */
     XSelectInput(ob_display, [client window], NoEventMask);
 
     [[client frame] hide];
+    /* flush to send the hide to the server quickly */
+    XFlush(ob_display);
 
-    [clist removeObject: client];
-    [[AZStacking stacking] removeWindow: client];
-    [window_map removeObjectForKey: [NSNumber numberWithInt: [client window]]];
-
-    /* update the focus lists */
-    [[AZFocusManager defaultManager] focusOrderRemove: client];
-
-    /* once the client is out of the list, update the struts to remove it's
-       influence */
-    [[AZScreen defaultScreen] updateAreas];
-
-    [[NSNotificationCenter defaultCenter] postNotificationName: AZClientDestroyNotification
-	    object: client];
-    /* Taken from menu (AZMenu in the future). Since it uses global function,
-     * it is not really suitable in object, or it will be called multiple
-     * time in each object, which is not good */
-    /* menus can be associated with a client, so close any that are since
-       we are disappearing now */
-    AZMenuFrameHideAllClient(client);
-
-    if ([[AZFocusManager defaultManager] focus_client] == client) {
+    if ([fManager focus_client] == client) {
+#if 0
         XEvent e;
 
         /* focus the last focused window on the desktop, and ignore enter
@@ -367,7 +410,49 @@ static AZClientManager *sharedInstance;
         [client set_focus_notify: NO];
         [client set_modal: NO];
 	[client unfocus];
+#endif
+        /* ignore enter events from the unmap so it doesnt mess with the focus
+         */
+	[[AZEventHandler defaultHandler] ignoreQueuedEnters];
     }
+#if 0
+    /* potentially fix focusLast */
+    if (config_focus_last)
+        grab_pointer(YES, OB_CURSOR_NONE);
+
+    [[client frame] hide];
+    XFlush(ob_display);
+#endif
+    [[AZKeyboardHandler defaultHandler] grab: NO forClient: client];
+    [[AZMouseHandler defaultHandler] grab: NO forClient: client];
+
+    /* remove the window from our save set */
+    XChangeSaveSet(ob_display, [client window], SetModeDelete);
+
+#if 0
+    /* we dont want events no more */
+    XSelectInput(ob_display, [client window], NoEventMask);
+#endif
+    /* update the focus lists */
+    [fManager focusOrderRemove: client];
+
+    [clist removeObject: client];
+    [[AZStacking stacking] removeWindow: client];
+    [window_map removeObjectForKey: [NSNumber numberWithInt: [client window]]];
+
+    /* once the client is out of the list, update the struts to remove its
+       influence */
+    if (STRUT_EXISTS([client strut]))
+      [[AZScreen defaultScreen] updateAreas];
+
+    [[NSNotificationCenter defaultCenter] postNotificationName: AZClientDestroyNotification
+	    object: client];
+    /* Taken from menu (AZMenu in the future). Since it uses global function,
+     * it is not really suitable in object, or it will be called multiple
+     * time in each object, which is not good */
+    /* menus can be associated with a client, so close any that are since
+       we are disappearing now */
+    AZMenuFrameHideAllClient(client);
 
     /* tell our parent(s) that we're gone */
     if ([client transient_for] == OB_TRAN_GROUP) { /* transient of group */
@@ -403,11 +488,38 @@ static AZClientManager *sharedInstance;
 
     /* give the client its border back */
     [client toggleBorder: YES];
+    /* restore the window's original geometry so it is not lost */
+    {
+        Rect a = [client area];
+
+        if ([client fullscreen])
+            a = [client pre_fullscreen_area];
+        else if ([client max_horz] || [client max_vert]) {
+            if ([client max_horz]) {
+                a.x = [client pre_max_area].x;
+                a.width = [client pre_max_area].width;
+            }
+            if ([client max_vert]) {
+                a.y = [client pre_max_area].y;
+                a.height = [client pre_max_area].height;
+            }
+        }
+
+        /* give the client its border back */
+        [client toggleBorder: YES];
+
+        [client set_fullscreen: NO];
+	[client set_max_horz: NO];
+	[client set_max_vert: NO];
+	[client set_decorations: 0];  /* unmanaged windows have no decor */ 
+
+	[client moveAndResizeToX: a.x y: a.y width: a.width height: a.height];
+    }
 
     /* reparent the window out of the frame, and free the frame */
     [[client frame] releaseClient: client];
     [client set_frame: nil];
-     
+
     if (ob_state() != OB_STATE_EXITING) {
         /* these values should not be persisted across a window
            unmapping/mapping */
@@ -438,10 +550,10 @@ static AZClientManager *sharedInstance;
      
     /* update the list hints */
     [self setList];
-
+#if 0
     if (config_focus_last)
         grab_pointer(NO, OB_CURSOR_NONE);
-
+#endif
 }
 
 - (AZClient *) clientAtIndex: (int) index

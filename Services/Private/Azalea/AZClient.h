@@ -119,11 +119,10 @@ typedef enum
 
     /*! Normal window title */
     NSString *title;
-    /*! The count for the title. When another window with the same title
-      exists, a count will be appended to it. */
-    unsigned int title_count;
     /*! Window title when iconified */
     NSString *icon_title;
+    /*! Hostname of machine running the client */
+    NSString *client_machine;
 
     /*! The application that created the window */
     NSString *name;
@@ -144,6 +143,8 @@ typedef enum
     */
     Rect area;
 
+    /*! Position of the client window relative to the root window */
+    Point root_pos;
     /*! Position and size of the window prior to being maximized */
     Rect pre_max_area;
     /*! Position and size of the window prior to being fullscreened */
@@ -223,8 +224,6 @@ typedef enum
 
     /*! Can the window receive input focus? */
     BOOL can_focus;
-    /*! Urgency flag */
-    BOOL urgent;
     /*! Notify the window when it receives focus? */
     BOOL focus_notify;
 
@@ -255,6 +254,8 @@ typedef enum
     /*! The window should be underneath other windows of the same type.
       above takes priority over below. */
     BOOL below;
+    /*! Demands attention flag */
+    BOOL demands_attention;
 
     /*! A bitmask of values in the ObFrameDecorations enum
       The values in the variable are the decorations that the client wants to
@@ -275,6 +276,8 @@ typedef enum
 
     /*! Icons for the client as specified on the client window */
     NSMutableArray *icons;
+
+    unsigned int user_time;
 }
 
 /*! Determines if the client should be shown or hidden currently.
@@ -293,7 +296,31 @@ typedef enum
 - (void) configureToCorner: (ObCorner) anchor x: (int) x y: (int) y 
                      width: (int) w height: (int) h
 		     user: (BOOL) user final: (BOOL) final;
+/*! Figure out where a window will end up and what size it will be if you
+  told it to move/resize to these coordinates.
 
+  These values are what client_configure_full will give the window.
+
+  @param anchor The corner to keep in the same position when resizing.
+  @param x The x coordiante of the new position for the client.
+  @param y The y coordiante of the new position for the client.
+  @param w The width component of the new size for the client.
+  @param h The height component of the new size for the client.
+  @param logicalw Returns the width component of the new logical width.
+                  This value is only returned when the new w or h calculated
+                  differ from the ones passed in.
+  @param logicalh Returns the height component of the new logical height.
+                  This value is only returned when the new w or h calculated
+                  differ from the ones passed in.
+  @param user Specifies whether this is a user-requested change or a
+              program requested change. For program requested changes, the
+              constraints are not checked.
+*/
+- (void) tryConfigureToCorner: (ObCorner) anchor
+                     x: (int *) x y: (int *) y 
+                     width: (int *) w  height: (int *) h
+                     logicalW: (int *) logicalw logicalH: (int *) logicalh
+                     user: (BOOL) user;
 /*! Move and/or resize the window.
     This also maintains things like the client's minsize, and size increments.
     @param anchor The corner to keep in the same position when resizing.
@@ -344,12 +371,8 @@ typedef enum
 /*! Fullscreen's or unfullscreen's the client window
     @param fs true if the window should be made fullscreen; false if it should
     be returned to normal state.
-    @param savearea true to have the client's current size and position saved;
-    otherwise, they are not. You should not save when mapping a
-    new window that is set to fullscreen. This has no effect
-    when restoring a window from fullscreen.
  */
-- (void) fullscreen: (BOOL) fs saveArea: (BOOL) savearea;
+- (void) fullscreen: (BOOL) fs;
 
 /*! Iconifies or uniconifies the client window
     @param iconic true if the window should be iconified; false if it should be
@@ -364,18 +387,18 @@ typedef enum
     @param max true if the window should be maximized; false if it should be
     returned to normal size.
     @param dir 0 to set both horz and vert, 1 to set horz, 2 to set vert.
-    @param savearea true to have the client's current size and position saved;
-    otherwise, they are not. You should not save when mapping a
-    new window that is set to fullscreen. This has no effect
-    when unmaximizing a window.
  */
-- (void) maximize: (BOOL) max direction: (int) dir saveArea: (BOOL) savearea;
+- (void) maximize: (BOOL) max direction: (int) dir;
 
 /*! Shades or unshades the client window
     @param shade true if the window should be shaded; false if it should be
     unshaded.
  */
 - (void) shade: (BOOL) shade;
+
+
+/*! Hilite the window to make the user notice it */
+- (void) hilite: (BOOL) hilite;
 
 /*! Request the client to close its window */
 - (void) close;
@@ -390,6 +413,17 @@ typedef enum
     @param donthide If TRUE, the window will not be shown/hidden after its
     desktop has been changed. Generally this should be FALSE. */
 - (void) setDesktop: (unsigned int) target hide: (BOOL) donthide;
+
+/*! Show the client if it should be shown. */
+- (void) show;
+
+/*! Show the client if it should be shown. */
+- (void) hide;
+
+/*! Show the client if it should be shown, and hide it if it should be
+  hidden. This is for example, when switching desktops.
+*/
+- (void) showhide;
 
 /*! Validate client, by making sure no Destroy or Unmap events exist in
     the event queue for the window.
@@ -418,18 +452,19 @@ typedef enum
  *   without focusing it or modifying the focus order lists. */
 - (BOOL) canFocus;
 
-/*! Attempt to focus the client window */
+/*! Attempt to focus the client window
+  NOTE: You should validate the client before calling this !! (client_validate)
+*/
 - (BOOL) focus;
-
-/*! Remove focus from the client window */
-- (void) unfocus;
 
 /*! Activates the client for use, focusing, uniconifying it, etc. To be used
     when the user deliberately selects a window for use.
     @param here If true, then the client is brought to the current desktop;
     otherwise, the desktop is changed to where the client lives.
+    @param user If true, then a user action is what requested the activation;
+    otherwise, it means an application requested it on its own
  */
-- (void) activateHere: (BOOL) here;
+- (void) activateHere: (BOOL) here user: (BOOL) user;
 
 /*! Calculates the stacking layer for the client window */
 - (void) calcLayer;
@@ -483,6 +518,9 @@ typedef enum
 /*! Updates the window's icons */
 - (void) updateIcons;
 
+/*! Updates the window's user time */
+- (void) updateUserTime;
+
 /*! Set up what decor should be shown on the window and what functions should
     be allowed (ObClient::decorations and ObClient::functions).
     This also updates the NET_WM_ALLOWED_ACTIONS hint.
@@ -518,7 +556,19 @@ typedef enum
  */
 - (AZClient *) searchModalChild;
 
-- (AZClient *) searchTopTransient;
+/*! Returns a list of top-level windows which this is a transient for.
+  It will only contain more than 1 element if the client is transient for its
+  group.
+*/
+- (NSArray *) searchAllTopParents;
+
+/*! Returns a window's top level parent. This only counts direct parents,
+  not groups if it is transient for its group.
+*/
+- (AZClient *) searchTopParent;
+
+/*! Is one client a direct child of self (i.e. not through the group.) */
+- (BOOL) hasDirectChild: (AZClient *) child;
 
 /*! Search for a transient of a client. The transient is returned if it is one,
      NULL is returned if the given search is not a transient of the client. */
@@ -547,10 +597,10 @@ typedef enum
 - (void) getAll;
 - (void) restoreSessionState;
 - (void) changeState;
+- (void) changeWMState;
 - (void) toggleBorder: (BOOL) show;
-- (void) applyStartupState;
+- (void) applyStartupStateAtX: (int) x y: (int) y;
 - (void) restoreSessionStacking;
-- (void) showhide;
 
 /* Accessories */
 - (AZFrame *) frame;
@@ -585,7 +635,6 @@ typedef enum
 - (void) set_startup_id: (NSString *) startup_id;
 
 - (NSString *) title;
-- (unsigned int ) title_count;
 - (NSString *) icon_title;
 - (NSString *) name;
 - (NSString *) class;
@@ -593,7 +642,6 @@ typedef enum
 - (NSString *) sm_client_id;
 - (ObClientType) type;
 - (void) set_title: (NSString *) title;
-- (void) set_title_count: (unsigned int ) title_count;
 - (void) set_icon_title: (NSString *) icon_title;
 - (void) set_name: (NSString *) name;
 - (void) set_class: (NSString *) class;
@@ -641,11 +689,9 @@ typedef enum
 
 
 - (BOOL) can_focus;
-- (BOOL) urgent;
 - (BOOL) focus_notify;
 - (BOOL) shaped;
 - (void) set_can_focus: (BOOL) can_focus;
-- (void) set_urgent: (BOOL) urgent;
 - (void) set_focus_notify: (BOOL) focus_notify;
 - (void) set_shaped: (BOOL) shaped;
 
@@ -669,6 +715,9 @@ typedef enum
 - (void) set_fullscreen: (BOOL) fullscreen;
 - (void) set_above: (BOOL) above;
 - (void) set_below: (BOOL) below;
+
+- (void) set_user_time: (Time) time;
+- (Time) user_time;
 
 - (unsigned int) decorations;
 - (void) set_decorations: (unsigned int) decorations;

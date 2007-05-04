@@ -162,6 +162,16 @@ New Features since Étoilé 0.1
 	* Vindallo
 
 	  Bug-fixing release.
+
+	* Login
+	
+	  First release.
+	  A greeter for GDM.
+
+	* OuterSpace
+
+	  First release.
+	  A simple file manager.
 	  
 	* StepChat
 

@@ -8,10 +8,7 @@
 
 <focus>
   <focusNew>yes</focusNew>
-  <followMouse>no</followMouse>
   <focusLast>no</focusLast>
-  <focusDelay>0</focusDelay>
-  <raiseOnFocus>no</raiseOnFocus>
 </focus>
 
 <theme>
@@ -33,17 +30,6 @@
 <resize>
   <drawContents>yes</drawContents>
 </resize>
-
-<dock>
-  <position>Right</position>
-  <stacking>Top</stacking>
-  <direction>Vertical</direction>
-  <floatingX>0</floatingX>
-  <floatingY>0</floatingY>
-  <autoHide>no</autoHide>
-  <hideDelay>300</hideDelay>
-  <moveButton>A-Left</moveButton>
-</dock>
 
 <keyboard>
   <chainQuitKey>C-g</chainQuitKey>

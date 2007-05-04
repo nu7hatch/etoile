@@ -29,7 +29,8 @@
 #import "config.h"
 #import "extensions.h"
 
-#define PLATE_EVENTMASK (SubstructureRedirectMask | ButtonPressMask)
+#define PLATE_EVENTMASK (SubstructureRedirectMask | ButtonPressMask | \
+			 FocusChangeMask)
 #define FRAME_EVENTMASK (EnterWindowMask | LeaveWindowMask | \
                          ButtonPressMask | ButtonReleaseMask | \
                          VisibilityChangeMask)
@@ -39,20 +40,36 @@
 
 #define FRAME_HANDLE_Y(f) (innersize.top + [_client area].height + cbwidth_y)
 
-static Window createWindow(Window parent, unsigned long mask,
-                           XSetWindowAttributes *attrib)
+static Window createWindow(Window parent, Visual *visual,
+                           unsigned long mask, XSetWindowAttributes *attrib)
 {
     return XCreateWindow(ob_display, parent, 0, 0, 1, 1, 0,
-                         [ob_rr_inst depth], InputOutput,
-                         [ob_rr_inst visual], mask, attrib);
-                       
+                         (visual ? 32 : [ob_rr_inst depth]), InputOutput,
+                         (visual ? visual : [ob_rr_inst visual]),
+                         mask, attrib);
 }
+
+static Visual *check_32bit_client(AZClient *c)
+{
+    XWindowAttributes wattrib;
+    Status ret;
+
+    ret = XGetWindowAttributes(ob_display, [c window], &wattrib);
+    if (ret == BadDrawable)
+      NSLog(@"Error: Bad Drawable");
+    if (ret == BadWindow)
+      NSLog(@"Error: Bad Window");
+
+    if (wattrib.depth == 32)
+        return wattrib.visual;
+    return NULL;
+}
+
 
 @interface AZFrame (AZPrivate)
 - (void) layoutTitle;
 - (void) setThemeStatics;
 - (void) freeThemeStatics;
-- (void) setFrameExtents; /* Set _NET_FRAME_EXTENTS */
 
 /* callback */
 - (BOOL) flashTimeout: (id) data;
@@ -82,11 +99,10 @@ static Window createWindow(Window parent, unsigned long mask,
        req's) the ButtonPress is to catch clicks on the client border */
     XSelectInput(ob_display, plate, PLATE_EVENTMASK);
 
+    [self adjustAreaWithMoved: YES resized: YES fake: NO];
+
     /* map the client so it maps when the frame does */
     XMapWindow(ob_display, [client window]);
-
-    [self adjustAreaWithMoved: YES resized: YES fake: NO];
-    [self setFrameExtents];
 
     /* set all the windows for the frame in the window_map */
     [window_map setObject: client forKey: [NSNumber numberWithInt: window]];
@@ -166,6 +182,8 @@ static Window createWindow(Window parent, unsigned long mask,
      */
     [self freeThemeStatics];
     XDestroyWindow(ob_display, window);
+    if (colormap)
+      XFreeColormap(ob_display, colormap);
 }
 
 - (void) show
@@ -181,7 +199,7 @@ static Window createWindow(Window parent, unsigned long mask,
 {
     if (visible) {
         visible = NO;
-        [_client set_ignore_unmaps: [_client ignore_unmaps]+2];
+        [_client set_ignore_unmaps: [_client ignore_unmaps]+1];
         /* we unmap the client itself so that we can get MapRequest
            events, and because the ICCCM tells us to! */
         XUnmapWindow(ob_display, window);
@@ -248,6 +266,7 @@ static Window createWindow(Window parent, unsigned long mask,
 {
   focused = hilite;
   [self render];
+  XFlush(ob_display);
 }
 
 - (void) adjustTitle
@@ -361,12 +380,6 @@ static Window createWindow(Window parent, unsigned long mask,
                     XUnmapWindow(ob_display, lgrip);
                     XUnmapWindow(ob_display, rgrip);
                 }
-
-                /* XXX make a subwindow with these dimentions?
-                   ob_rr_theme->grip_width + bwidth, 0,
-                   width - (ob_rr_theme->grip_width + bwidth) * 2,
-                   ob_rr_theme->handle_height);
-                */
             } else
                 XUnmapWindow(ob_display, handle);
 
@@ -415,7 +428,7 @@ static Window createWindow(Window parent, unsigned long mask,
             vals[1] = size.right;
             vals[2] = size.top;
             vals[3] = size.bottom;
-            PROP_SETA32([_client window], kde_net_wm_frame_strut,
+            PROP_SETA32([_client window], net_frame_extents,
                         cardinal, vals, 4);
         }
 
@@ -557,67 +570,87 @@ static Window createWindow(Window parent, unsigned long mask,
     flashing = NO;
 }
 
-- (id) init
+- (id) initWithClient: (AZClient *) client
 {
   self = [super init];
 
-  {
-    XSetWindowAttributes attrib;
-    unsigned long mask;
+  XSetWindowAttributes attrib;
+  unsigned long mask;
+  Visual *visual;
 
-    obscured = YES;
+  obscured = YES;
 
-    /* create all of the decor windows */
-    mask = CWEventMask;
-    attrib.event_mask = FRAME_EVENTMASK;
-    window = createWindow(RootWindow(ob_display, ob_screen),
+  visual = check_32bit_client(client);
+
+  /* create the non-visible decor windows */
+
+  mask = CWEventMask;
+  if (visual) {
+    /* client has a 32-bit visual */
+    mask |= CWColormap | CWBackPixel | CWBorderPixel;
+    /* create a colormap with the visual */
+    colormap = attrib.colormap =
+        XCreateColormap(ob_display,
+                        RootWindow(ob_display, ob_screen),
+                        visual, AllocNone);
+    attrib.background_pixel = BlackPixel(ob_display, 0);
+    attrib.border_pixel = BlackPixel(ob_display, 0);
+  }
+  attrib.event_mask = FRAME_EVENTMASK;
+  window = createWindow(RootWindow(ob_display, ob_screen), visual,
                                 mask, &attrib);
 
-    mask = 0;
-    plate = createWindow(window, mask, &attrib);
+  mask &= ~CWEventMask;
+  plate = createWindow(window, visual, mask, &attrib);
+  /* create the visible decor windows */
 
-    mask = CWEventMask;
-    attrib.event_mask = ELEMENT_EVENTMASK;
-    title = createWindow(window, mask, &attrib);
+  mask = CWEventMask;
+  if (visual) { 
+    /* client has a 32-bit visual */
+    mask |= CWColormap | CWBackPixel | CWBorderPixel;
+    attrib.colormap = [ob_rr_inst colormap];
+  }
+
+  attrib.event_mask = ELEMENT_EVENTMASK;
+  title = createWindow(window, NULL, mask, &attrib);
 
 
-    mask |= CWCursor;
-    attrib.cursor = ob_cursor(OB_CURSOR_NORTHWEST);
-    tlresize = createWindow(title, mask, &attrib);
-    attrib.cursor = ob_cursor(OB_CURSOR_NORTHEAST);
-    trresize = createWindow(title, mask, &attrib);
+  mask |= CWCursor;
+  attrib.cursor = ob_cursor(OB_CURSOR_NORTHWEST);
+  tlresize = createWindow(title, NULL, mask, &attrib);
+  attrib.cursor = ob_cursor(OB_CURSOR_NORTHEAST);
+  trresize = createWindow(title, NULL, mask, &attrib);
 
-    mask &= ~CWCursor;
-    label = createWindow(title, mask, &attrib);
-    max = createWindow(title, mask, &attrib);
-    close = createWindow(title, mask, &attrib);
-    desk = createWindow(title, mask, &attrib);
-    shade = createWindow(title, mask, &attrib);
-    icon = createWindow(title, mask, &attrib);
-    iconify = createWindow(title, mask, &attrib);
-    handle = createWindow(window, mask, &attrib);
+  mask &= ~CWCursor;
+  label = createWindow(title, NULL, mask, &attrib);
+  max = createWindow(title, NULL, mask, &attrib);
+  close = createWindow(title, NULL, mask, &attrib);
+  desk = createWindow(title, NULL, mask, &attrib);
+  shade = createWindow(title, NULL, mask, &attrib);
+  icon = createWindow(title, NULL, mask, &attrib);
+  iconify = createWindow(title, NULL, mask, &attrib);
+  handle = createWindow(window, NULL, mask, &attrib);
 
-    mask |= CWCursor;
-    attrib.cursor = ob_cursor(OB_CURSOR_SOUTHWEST);
-    lgrip = createWindow(handle, mask, &attrib);
-    attrib.cursor = ob_cursor(OB_CURSOR_SOUTHEAST);
-    rgrip = createWindow(handle, mask, &attrib); 
+  mask |= CWCursor;
+  attrib.cursor = ob_cursor(OB_CURSOR_SOUTHWEST);
+  lgrip = createWindow(handle, NULL, mask, &attrib);
+  attrib.cursor = ob_cursor(OB_CURSOR_SOUTHEAST);
+  rgrip = createWindow(handle, NULL, mask, &attrib); 
 
-    focused = NO;
+  focused = NO;
 
-    /* the other stuff is shown based on decor settings */
-    XMapWindow(ob_display, plate);
-    XMapWindow(ob_display, lgrip);
-    XMapWindow(ob_display, rgrip);
-    XMapWindow(ob_display, label);
+  /* the other stuff is shown based on decor settings */
+  XMapWindow(ob_display, plate);
+  XMapWindow(ob_display, lgrip);
+  XMapWindow(ob_display, rgrip);
+  XMapWindow(ob_display, label);
 
-    max_press = close_press = desk_press = 
+  max_press = close_press = desk_press = 
         iconify_press = shade_press = NO;
-    max_hover = close_hover = desk_hover = 
+  max_hover = close_hover = desk_hover = 
         iconify_hover = shade_hover = NO;
 
-    [self setThemeStatics];
-  }
+  [self setThemeStatics];
   return self;
 }
 
@@ -856,17 +889,6 @@ static Window createWindow(Window parent, unsigned long mask,
     a_unfocused_handle = [ob_rr_theme->a_unfocused_handle copy];
     a_focused_handle = [ob_rr_theme->a_focused_handle copy];
     a_icon = [ob_rr_theme->a_icon copy];
-}
-
-- (void) setFrameExtents /* Set _NET_FRAME_EXTENTS */
-{
-  unsigned long *extents = calloc(sizeof(unsigned long), 4);
-  extents[0] = innersize.left+bwidth;
-  extents[1] = innersize.right+bwidth;
-  extents[2] = innersize.top+bwidth;
-  extents[3] = innersize.bottom+bwidth;
-  PROP_SETA32([_client window], net_frame_extents, cardinal, extents, 4);
-  free(extents);
 }
 
 - (void) freeThemeStatics

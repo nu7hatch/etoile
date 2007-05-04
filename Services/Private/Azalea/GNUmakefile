@@ -15,8 +15,6 @@ Azalea_OBJC_FILES = \
 	AZClient+Place.m \
 	AZClient+Resist.m \
 	AZDebug.m \
-	AZDock.m \
-	AZDockApp.m \
 	AZEventHandler.m \
 	AZFocusManager.m \
 	AZFrame.m \
@@ -36,7 +34,6 @@ Azalea_OBJC_FILES = \
 	AZStartupHandler.m \
 	action.m \
 	client_list_menu.m \
-	client_list_combined_menu.m \
 	client_menu.m \
 	config.m \
 	extensions.m \
@@ -63,26 +60,28 @@ ADDITIONAL_CPPFLAGS += -DPACKAGE_VERSION=\"3.3-rc2\" -DPACKAGE_BUGREPORT=\"http:
 ADDITIONAL_LIB_DIRS += `pkg-config --libs freetype2` `pkg-config --libs libxml-2.0` `pkg-config --libs fontconfig` 
 
 # Xwindow
-ADDITIONAL_CPPFLAGS += -DHAVE_LIBX11=1
+ADDITIONAL_CPPFLAGS += -DHAVE_LIBX11=1 
 ADDITIONAL_INCLUDE_DIRS += -I/usr/X11R6/include
 ADDITIONAL_LIB_DIRS += -L/usr/X11R6/lib -lX11 -lXft
+ADDITIONAL_CPPFLAGS += -DUSE_XCURSOR=1
+ADDITIONAL_LIB_DIRS += -lXcursor
 
-# Xwindow extra
+# Startup Notification
+ADDITIONAL_CPPFLAGS += -DUSE_LIBSN=1
+ADDITIONAL_INCLUDE_DIRS += `pkg-config --cflags libstartup-notification-1.0`
+ADDITIONAL_LIB_DIRS += `pkg-config --libs libstartup-notification-1.0`
+
+# Xwindow extra (optional)
 #ADDITIONAL_CPPFLAGS += -DXKB=1 -DXRANDR=1 -DSHAPE=1
 #ADDITIONAL_LIB_DIRS += -lXext -lXrender -lXrandr
 
-# Session Manager
+# Session Manager (optional)
 #ADDITIONAL_CPPFLAGS += -DHAVE_X11_SM_SMLIB_H=1 -DUSE_SM=1
 #ADDITIONAL_LIB_DIRS += -lSM -lICE
 
-# Xinerama
+# Xinerama (optional)
 #ADDITIONAL_CPPFLAGS += -DXINERAMA=1 
 #ADDITIONAL_LIB_DIRS += -lXinerama
-
-# Startup Notification
-#ADDITIONAL_CPPFLAGS += -DUSE_LIBSN=1
-#ADDITIONAL_INCLUDE_DIRS += `pkg-config --cflags libstartup-notification-1.0`
-#ADDITIONAL_LIB_DIRS += `pkg-config --libs libstartup-notification-1.0`
 
 -include GNUmakefile.preamble
 

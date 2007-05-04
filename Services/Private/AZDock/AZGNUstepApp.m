@@ -1,6 +1,8 @@
 #import "AZGNUstepApp.h"
 #import "AZDock.h"
 #import <X11/Xutil.h>
+#import <XWindowServerKit/XFunctions.h>
+#import <XWindowServerKit/XScreen.h>
 
 #ifdef ETOILE
 #import <WorkspaceCommKit/NSWorkspace+Communication.h>
@@ -16,22 +18,37 @@
   if ([self state] == AZDockAppLaunching) {
     /* Do nothing during launching */
     return;
+  } else if ([self state] == AZDockAppRunning) {
+    int currentDesktop = [[NSScreen mainScreen] currentWorkspace];
+    int desk = XWindowDesktopOfWindow([[xwindows lastObject] unsignedLongValue]);
+    if ((desk > -1) && (desk != 0xFFFFFFFF) && (currentDesktop != desk))
+    {
+      [[NSScreen mainScreen] setCurrentWorkspace: desk];
+    }
   }
 
   NSString *path = [self command];
   BOOL success = [[NSWorkspace sharedWorkspace] launchApplication: path];
-  if (success == NO) {
+  if (path && (success == NO)) 
+  {
     /* Try regular execute */
     [NSTask launchedTaskWithLaunchPath: path arguments: nil];
   }
-  if ([self state] == AZDockAppNotRunning) {
+  if ([self state] == AZDockAppNotRunning) 
+  {
     [self setState: AZDockAppLaunching];
   }
 }
 
+- (void) newAction: (id) sender
+{
+  /* For GNUstep application,
+     we do not create new window because GNUstep is not desktop-safe */
+  [self showAction: sender];
+}
+
 - (void) quitAction: (id) sender
 {
-  NSLog(@"quit %@", appName);
   /* Connect to application */
 #ifdef ETOILE // Use System's WorkspaceCommKit
   id appProxy = [[NSWorkspace sharedWorkspace] connectToApplication: appName launch: NO];
@@ -90,20 +107,17 @@
       DESTROY(command);
     }
   }
-
   /* Try to get the icon */
   if (command) {
     ASSIGN(icon, [[NSWorkspace sharedWorkspace] iconForFile: command]);
   }
-  if (!icon) {
+  if (icon == nil) {
     /* use default icon */
     ASSIGN(icon, [NSImage imageNamed: @"Unknown.tiff"]);
   }
   if (icon)
     [view setImage: icon];
-
   [[view menu] setTitle: appName];
-
   return self;
 }
 

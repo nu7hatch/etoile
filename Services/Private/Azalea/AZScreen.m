@@ -23,7 +23,6 @@
 #import "AZStartupHandler.h"
 #import "AZEventHandler.h"
 #import "AZDebug.h"
-#import "AZDock.h"
 #import "AZClientManager.h"
 #import "AZStacking.h"
 #import "AZPopUp.h"
@@ -38,7 +37,7 @@
 /*! The event mask to grab on the root window */
 #define ROOT_EVENTMASK (StructureNotifyMask | PropertyChangeMask | \
                         EnterWindowMask | LeaveWindowMask | \
-                        SubstructureNotifyMask | SubstructureRedirectMask | \
+                        SubstructureRedirectMask | FocusChangeMask | \
                         ButtonPressMask | ButtonReleaseMask | ButtonMotionMask)
 
 static inline void
@@ -88,7 +87,7 @@ static AZScreen *sharedInstance;
                                        CopyFromParent, InputOutput,
                                        CopyFromParent,
                                        CWOverrideRedirect, &attrib);
-    XMapRaised(ob_display, screen_support_win);
+    XMapWindow(ob_display, screen_support_win);
 
     if (![self replaceWM]) {
         XDestroyWindow(ob_display, screen_support_win);
@@ -124,9 +123,10 @@ static AZScreen *sharedInstance;
                window, screen_support_win);
 
     /* set the _NET_SUPPORTED_ATOMS hint */
-    num_support = 51;
+    num_support = 55;
     i = 0;
     supported = calloc(sizeof(unsigned long), num_support);
+    supported[i++] = prop_atoms.net_wm_full_placement;
     supported[i++] = prop_atoms.net_current_desktop;
     supported[i++] = prop_atoms.net_number_of_desktops;
     supported[i++] = prop_atoms.net_desktop_geometry;
@@ -175,8 +175,11 @@ static AZScreen *sharedInstance;
     supported[i++] = prop_atoms.net_wm_state_fullscreen;
     supported[i++] = prop_atoms.net_wm_state_above;
     supported[i++] = prop_atoms.net_wm_state_below;
+    supported[i++] = prop_atoms.net_wm_state_demands_attention;
     supported[i++] = prop_atoms.net_moveresize_window;
     supported[i++] = prop_atoms.net_wm_moveresize;
+    supported[i++] = prop_atoms.net_wm_user_time;
+    supported[i++] = prop_atoms.net_frame_extents;
     supported[i++] = prop_atoms.ob_wm_state_undecorated;
     NSAssert(i == num_support, @"Out of range");
 /*
@@ -277,7 +280,6 @@ static AZScreen *sharedInstance;
         return;
 
     [self updateAreas];
-    [[AZDock defaultDock] configure];
 
     AZClientManager *cManager = [AZClientManager defaultManager];
     int i, count = [cManager count];
@@ -330,11 +332,6 @@ static AZScreen *sharedInstance;
     /* change our desktop if we're on one that no longer exists! */
     if (screen_desktop >= screen_num_desktops)
 	[self setDesktop: num-1];
-
-   /* update the focus lists */
-    AZFocusManager *fManager = [AZFocusManager defaultManager];
-    /* free our lists for the desktops which have disappeared */
-    [fManager setNumberOfScreens: num old: old];
 }
 
 - (unsigned int) numberOfDesktops
@@ -344,6 +341,7 @@ static AZScreen *sharedInstance;
 
 - (void) setDesktop: (unsigned int) num
 {
+    AZClient *c;
     int i, count;
     unsigned int old;
     AZStacking *stacking = [AZStacking stacking];
@@ -372,14 +370,13 @@ static AZScreen *sharedInstance;
 
     /* show windows before hiding the rest to lessen the enter/leave events */
 
-    /* show windows from top to bottom */
+    /* show/hide  windows from top to bottom */
     count = [stacking count];
     for (i = 0; i < count; i++) {
 	id <AZWindow> temp = [stacking windowAtIndex: i];
 	if (WINDOW_IS_CLIENT(temp)) {
             AZClient *c = (AZClient *)temp;
-	    if ([c shouldShow])
-		[[c frame] show];
+	    [c show];
         }
     }
 
@@ -389,26 +386,41 @@ static AZScreen *sharedInstance;
 	id <AZWindow> temp = [stacking windowAtIndex: i];
         if (WINDOW_IS_CLIENT(temp)) {
             AZClient *c = (AZClient *) temp;
-            if ([[c frame] visible] && ![c shouldShow])
-		[[c frame] hide];
+	    [c hide];
         }
     }
 
-    [[AZEventHandler defaultHandler] ignoreQueuedEnters];
-
+    /* have to try focus here because when you leave an empty desktop
+       there is no focus out to watch for */
     AZFocusManager *fManager = [AZFocusManager defaultManager];
-    [fManager set_focus_hilite: [fManager fallbackTarget: OB_FOCUS_FALLBACK_NOFOCUS]];
+    AZClient *fc = [fManager focus_client];
+    if ((c = [fManager fallbackTarget: YES old: fc]))
+    {
+        /* reduce flicker by hiliting now rather than waiting for the server
+           FocusIn event */
+	[[c frame] adjustFocusWithHilite: YES];
+	[c focus];
+    }
+
+
+    [[AZEventHandler defaultHandler] ignoreQueuedEnters];
+#if 0
+    AZFocusManager *fManager = [AZFocusManager defaultManager];
+    [fManager set_focus_hilite: [fManager fallbackTarget: YES
+			                  old: [fManager focus_client]]];
     if ([fManager focus_hilite]) {
 	[[[fManager focus_hilite] frame] adjustFocusWithHilite: YES];
 
         /*!
-          When this focus_client check is not used, you can end up with races,
-          as demonstrated with gnome-panel, sometmies the window you click on
-          another desktop ends up losing focus cuz of the focus change here.
+          When this focus_client check is not used, you can end up with
+          races, as demonstrated with gnome-panel, sometimes the window
+          you click on another desktop ends up losing focus cuz of the
+          focus change here.
         */
         /*if (!focus_client)*/
 	[[fManager focus_hilite] focus];
     }
+#endif
 }
 
 - (unsigned int) desktop
@@ -600,8 +612,7 @@ done_cycle:
             id <AZWindow> temp = [stacking windowAtIndex: i];
             if (WINDOW_IS_CLIENT(temp)) {
                 AZClient *client = (AZClient *)temp;
-                if ([[client frame] visible] && ![client shouldShow])
-		    [[client frame] hide];
+		[client showhide];
             }
         }
     } else {
@@ -611,24 +622,35 @@ done_cycle:
 	    id <AZWindow> temp = [stacking windowAtIndex: i];
             if (WINDOW_IS_CLIENT(temp)) {
                 AZClient *client = (AZClient *)temp;
-                if (![[client frame] visible] && [client shouldShow])
-	            [[client frame] show];
+		[client showhide];
             }
         }
     }
 
     AZFocusManager *fManager = [AZFocusManager defaultManager];
 
-    if (show) {
+    if (show) 
+    {
         /* focus desktop */
-	int i, count = [fManager numberOfFocusOrderInScreen: screen_desktop];
-	for (i = 0; i < count; i++) {
-	  AZClient *c = [fManager focusOrder: i inScreen: screen_desktop];
-          if ([c type] == OB_CLIENT_TYPE_DESKTOP && [c focus])
-                break;
-	}
-    } else {
-        [fManager fallback: OB_FOCUS_FALLBACK_NOFOCUS];
+	int i;
+	for (i = 0; i < [[fManager focus_order] count]; i++)
+	{
+	    AZClient *c = [[fManager focus_order] objectAtIndex: i];
+	    if (([c type] == OB_CLIENT_TYPE_DESKTOP) &&
+	        ([c desktop] == screen_desktop ||
+		 [c desktop] == DESKTOP_ALL) && [c focus])
+	        break;
+        }
+    } 
+    else 
+    {
+//        [fManager fallback: YES];
+        AZClient *c;
+
+        /* use NULL for the "old" argument because the desktop was focused
+           and we don't want to fallback to the desktop by default */
+	if ((c = [fManager fallbackTarget: YES old: nil]))
+	    [c focus];
     }
 
     show = !!show; /* make it boolean */
@@ -802,7 +824,6 @@ done_cycle:
     for (i = 0; i < screen_num_desktops + 1; ++i) {
         Strut *struts;
         int l, r, t, b;
-	StrutPartial dock_strut = [[AZDock defaultDock] strut];
 
         struts = calloc(sizeof(Strut), screen_num_monitors);
 
@@ -843,10 +864,6 @@ done_cycle:
                                            &struts[x]);
 		[c set_strut: _strut];
             }
-            screen_area_add_strut_left(&dock_strut,
-                                       &monitor_area[x],
-                                       o + dock_strut.left - area[i][x].x,
-                                       &struts[x]);
 
             area[i][x].x += struts[x].left;
             area[i][x].width -= struts[x].left;
@@ -870,10 +887,6 @@ done_cycle:
                                            &struts[x]);
 		[c set_strut: _strut];
             }
-            screen_area_add_strut_top(&dock_strut,
-                                      &monitor_area[x],
-                                      o + dock_strut.top - area[i][x].y,
-                                      &struts[x]);
 
             area[i][x].y += struts[x].top;
             area[i][x].height -= struts[x].top;
@@ -899,12 +912,6 @@ done_cycle:
                                             &struts[x]);
 		[c set_strut: _strut];
             }
-            screen_area_add_strut_right(&dock_strut,
-                                        &monitor_area[x],
-                                        (area[i][x].x +
-                                         area[i][x].width - 1) -
-                                        (o - dock_strut.right),
-                                        &struts[x]);
 
             area[i][x].width -= struts[x].right;
         }
@@ -929,12 +936,6 @@ done_cycle:
                                              &struts[x]);
 		[c set_strut: _strut];
             }
-            screen_area_add_strut_bottom(&dock_strut,
-                                         &monitor_area[x],
-                                         (area[i][x].y +
-                                          area[i][x].height - 1) - \
-                                         (o - dock_strut.bottom),
-                                         &struts[x]);
 
             area[i][x].height -= struts[x].bottom;
         }
@@ -1013,6 +1014,33 @@ done_cycle:
         return NULL;
     }
     return &area[desktop][head];
+}
+
+- (unsigned int) findMonitor: (Rect *) search
+{
+    unsigned int i;
+    unsigned int most = 0;
+    unsigned int mostv = 0;
+
+    for (i = 0; i < [self numberOfMonitors]; ++i) 
+    {
+        Rect *a = [self physicalAreaOfMonitor: i];
+        if (RECT_INTERSECTS_RECT(*a, *search)) 
+        {
+            Rect r;
+            unsigned int v;
+
+            RECT_SET_INTERSECTION(r, *a, *search);
+            v = r.width * r.height;
+
+            if (v > mostv) 
+	    {
+                mostv = v;
+                most = i;
+            }
+        }
+    }
+    return most;
 }
 
 - (void) setRootCursor

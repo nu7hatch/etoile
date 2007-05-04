@@ -1,3 +1,82 @@
+2007-04-26  Yen-Ju Chen <yjchenx at gmail>
+
+	* Fix a show blocker in window stacking !!
+
+2007-04-25  Yen-Ju Chen <yjchenx at gmail>
+
+	* Spot an error, though no side-effect is observed before the fix.
+	* Update to r5751 except client placement and startup notification.
+	* Update to r5822 (skipping r5777:5778). 
+	  Hope there is not side effect.
+	* Update to r5830. 
+	* Update to r5836. 
+	* Update to r5842. 
+	* Update to r5844. 
+
+2007-04-24  Yen-Ju Chen <yjchenx at gmail>
+
+	* Fix a boundary bug, Phew...
+
+2007-04-18  Yen-Ju Chen <yjchenx at gmail>
+
+	* Fix crash when switching between a GNUstep modal window 
+	  and a regular window.
+
+2007-04-14  Yen-Ju Chen <yjchenx at gmail>
+
+	* Update to r5739.
+	* Make sure GNUstep stacking work with ConfigureRequest.
+
+2007-04-11  Yen-Ju Chen <yjchenx at gmail>
+
+	* Fix window level bug which crashes GNUstep application.
+
+2007-04-06  Yen-Ju Chen <yjchenx at gmail>
+
+	* Updating maximize and fullscreen.
+	* Remove pipe menu.
+	* Finish updating to r5731 except client placement 
+	  and startup notification which are less important.
+
+2007-04-05  Yen-Ju Chen <yjchenx at gmail>
+
+	* Partially update to HEAD of OpenBox3.
+	* Remove focus-follow-mouse.
+	* Finish up AZStacking.
+
+2007-04-04  Yen-Ju Chen <yjchenx at gmail>
+
+	* Update to r5512 of OpenBox3
+	* Update to r5534 of OpenBox3
+	* Update to r5544 of OpenBox3
+	* Update to r5555 of OpenBox3
+	* Skip r5555:5577 because they are just finer theme support:
+	  For example, padding becomes paddingx and paddingy,
+	  or different color for frame and menu.
+	  But in the future, we need to rewrite the theme with property list
+	  and probably use cairo for drawing.
+	* Update to r5599 of OpenBox3
+	* Update to r5601 of OpenBox3
+          It is not finished. AZStartup need to be ported again.
+	  A non-intrusive window adding in AZStacking need to be ported again.
+	  See FIXME in AZClientManager.m
+
+2007-04-03  Yen-Ju Chen <yjchenx at gmail>
+
+	* client_list_combined_menu.m:
+	* client_list_combined_menu.h:
+	Remove combined menu since it is not that useful.
+	* AZDock.m:
+	* AZDock.h:
+	* AZDockApp.m:
+	* AZDockApp.h:
+	Remove docklet support in favor of AZDock.
+
+2007-04-01  Yen-Ju Chen <yjchenx at gmail>
+
+	* AZClientManager.m: Post docklet notification to AZDock 
+	  in prepare to remove docklet support in Azalea.
+
 2007-03-21  Yen-Ju Chen <yjchenx at gmail>
 
 	* Draw indicator even the window is raise to improve visualization.

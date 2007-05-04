@@ -24,6 +24,7 @@
 #import "AZClient.h"
 #import "AZScreen.h"
 #import "AZStacking.h"
+#import "AZEventHandler.h"
 #import "openbox.h"
 
 @implementation AZPopUp
@@ -167,7 +168,7 @@
 
     if (!mapped) {
         XMapWindow(ob_display, bg);
-	[[AZStacking stacking] raiseWindow: self group: NO];
+	[[AZStacking stacking] raiseWindow: self];
         mapped = YES;
     }
 }
@@ -177,6 +178,9 @@
   if (mapped) {
     XUnmapWindow(ob_display, bg);
     mapped = NO;
+
+    /* kill enter events cause by this unmapping */
+    [[AZEventHandler defaultHandler] ignoreQueuedEnters];
   }
 }
 

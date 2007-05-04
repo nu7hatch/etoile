@@ -48,12 +48,14 @@ typedef struct Atoms {
     Atom wm_icon_name;
     Atom wm_class;
     Atom wm_window_role;
+    Atom wm_client_machine;
     Atom motif_wm_hints;
 
     /* SM atoms */
     Atom sm_client_id;
 
     /* NETWM atoms */
+    Atom net_wm_full_placement;
      
     /* root window properties */
     Atom net_supported;
@@ -90,6 +92,7 @@ typedef struct Atoms {
     Atom net_wm_icon;
 /*  Atom net_wm_pid; */
     Atom net_wm_allowed_actions;
+    Atom net_wm_user_time;
     Atom net_frame_extents;
     /* application protocols */
 /*  Atom   Atom net_wm_ping; */
@@ -114,6 +117,7 @@ typedef struct Atoms {
     Atom net_wm_moveresize_move;
     Atom net_wm_moveresize_size_keyboard;
     Atom net_wm_moveresize_move_keyboard;
+    Atom net_wm_moveresize_cancel;
 
     Atom net_wm_action_move;
     Atom net_wm_action_resize;
@@ -137,6 +141,7 @@ typedef struct Atoms {
     Atom net_wm_state_fullscreen;
     Atom net_wm_state_above;
     Atom net_wm_state_below;
+    Atom net_wm_state_demands_attention;
 
     Atom net_wm_state_add;
     Atom net_wm_state_remove;
@@ -150,12 +155,8 @@ typedef struct Atoms {
     Atom net_wm_bottomleft;
 
     /* Extra atoms */
-
-    Atom kde_net_wm_frame_strut;
     Atom kde_wm_change_state;
     Atom kde_net_wm_window_type_override;
-
-    Atom kwm_win_icon;
 
     Atom rootpmapid;
     Atom esetrootid;
@@ -164,6 +165,7 @@ typedef struct Atoms {
      
     Atom openbox_pid;
     Atom ob_wm_state_undecorated;
+    Atom ob_control;
 
     /* GNUstep specific atoms */
     Atom gnustep_wm_attr;
@@ -183,7 +185,7 @@ BOOL prop_get_strings_utf8(Window win, Atom prop, NSArray **ret);
 void prop_set32(Window win, Atom prop, Atom type, unsigned long val);
 void prop_set_array32(Window win, Atom prop, Atom type, unsigned long *val,
                       unsigned int num);
-void prop_set_string_utf8(Window win, Atom prop, char *val);
+void prop_set_string_utf8(Window win, Atom prop, const char *val);
 void prop_set_strings_utf8(Window win, Atom prop, NSArray *strs);
 
 void prop_erase(Window win, Atom prop);

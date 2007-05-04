@@ -26,29 +26,16 @@
 @class AZClient;
 @class AZIconPopUp;
 
-typedef enum {
-    OB_FOCUS_FALLBACK_UNFOCUSING, /*!< forcefully remove focus from the
-                                    current window */
-    OB_FOCUS_FALLBACK_CLOSED,     /*!< closed the window with focus */
-    OB_FOCUS_FALLBACK_NOFOCUS     /*!< nothing has focus for some reason */
-} ObFocusFallbackType;
-
 @interface AZFocusManager: NSObject
 {
   /*! The client which is currently focused */
   AZClient *focus_client;
 
-  /*! The client which is being decorated as focused, not always matching the
-    real focus, but this is used to track it so that it can be ersolved to match
-  */
-  AZClient *focus_hilite;
-
   /*! The client which appears focused during a focus cycle operation */
   AZClient *focus_cycle_target;
 
   /*! The recent focus order on each desktop */
-  NSMutableArray *focus_order; /* these lists are created when screen_startup
-                          sets the number of desktops */
+  NSMutableArray *focus_order;
 
   /* Private */
   AZAppearance *a_focus_indicator;
@@ -65,10 +52,14 @@ typedef enum {
   send focus anywhere, its called by the Focus event handlers */
 - (void) setClient: (AZClient *) client;
 
-- (AZClient *) fallbackTarget: (ObFocusFallbackType) type;
+/*! Focus nothing, but let keyboard events be caught. */
+- (void) focusNothing;
+
+- (AZClient *) fallbackTarget: (BOOL) allow_refocus
+			  old: (AZClient *) old;
 
 /*! Call this when you need to focus something! */
-- (void) fallback: (ObFocusFallbackType) type;
+- (void) fallback: (BOOL) allow_refocus;
 
 /*! Cycle focus amongst windows. */
 - (void) cycleForward: (BOOL) forward linear: (BOOL) linear
@@ -91,16 +82,14 @@ typedef enum {
   very bottom always though). */
 - (void) focusOrderToBottom: (AZClient *) c;
 
-- (void) setNumberOfScreens: (int) num old: (int) old;
-- (int) numberOfFocusOrderInScreen: (int) i;
-- (AZClient *) focusOrder: (int) index inScreen: (int) i;
+- (AZClient *) focusOrderFindFirst: (unsigned int) desktop;
 
 /* accessories */
 - (void) set_focus_client: (AZClient *) focus_client;
-- (void) set_focus_hilite: (AZClient *) focus_hilite;
 - (void) set_focus_cycle_target: (AZClient *) focus_cycle_target;
 - (AZClient *) focus_client;
-- (AZClient *) focus_hilite;
 - (AZClient *) focus_cycle_target;
+
+- (NSArray *) focus_order;
 
 @end
