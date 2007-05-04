@@ -3,6 +3,7 @@
 	* Frameworks/GNUmakefile:
 	  Make sure PaneKit is compiled before InspectorKit.
 	* Sync Services/Private with -trunk.
+	* Sync Services/User with -trunk.
 
 2007-05-03  Yen-Ju Chen <yjchenx gmail>
 

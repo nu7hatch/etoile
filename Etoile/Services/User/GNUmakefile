@@ -16,6 +16,9 @@ ifeq ($(user-base), yes)
     export hardware ?= yes
     export dictionary ?= yes
     export grr ?= yes
+    export outerspace ?= yes
+    export sketch ?= yes
+    export jabber ?= yes
     export typewriter ?= yes
     export vindaloo ?= yes
 
@@ -67,6 +70,18 @@ endif
 
 ifeq ($(grr), yes)
 	SUBPROJECTS += Grr
+endif
+
+ifeq ($(sketch), yes)
+	SUBPROJECTS += Sketch
+endif
+
+ifeq ($(jabber), yes)
+	SUBPROJECTS += Jabber
+endif
+
+ifeq ($(outerspace), yes)
+	SUBPROJECTS += OuterSpace
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make

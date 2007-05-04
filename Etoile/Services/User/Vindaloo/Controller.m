@@ -63,6 +63,7 @@
    [[NSNotificationCenter defaultCenter] removeObserver: self];
    [menuState release];
    [singlePageView release];
+   [tools release];
    [super dealloc];
 }
 
@@ -133,6 +134,11 @@
 - (void) windowWillClose: (NSNotification*)notification;
 {
    [searchController forceQuit];
+}
+
+- (SearchController*) searchController
+{
+   return searchController;
 }
 
 - (IBAction) nextPage: (id)aSender
@@ -384,17 +390,12 @@
 
 - (void) myAddDocumentTools
 {
-   tools = [[DocumentTools alloc] initWithFrame: NSMakeRect(0, 0, 0, 0) target: self];
-   
-   // we need to re-frame the scrollview such that the tools view
-   // fits underneath it
-   NSRect scrollViewF = [scrollView frame];
-   [scrollView setFrame: 
-      NSMakeRect(NSMinX(scrollViewF), NSMinY(scrollViewF) + NSHeight([tools frame]),
-                 NSWidth(scrollViewF), NSHeight(scrollViewF) - NSHeight([tools frame]))];
-                 
-   [[[self window] contentView] addSubview: tools];
-   [tools release];
+   NSToolbar* toolbar = [[[NSToolbar alloc] 
+      initWithIdentifier: @"PDFViewerDocument"] autorelease];
+
+   tools = [[DocumentTools alloc] initWithWindowController: self target: self];
+   [toolbar setDelegate: tools];
+   [[self window] setToolbar: toolbar];
 }
 
 - (void) myCreateSinglePageView
@@ -489,10 +490,9 @@
 - (NSSize) myCalcPDFContentSize: (NSSize)aSize add: (BOOL)addToSize
 {
    float factor = (addToSize ? 1 : -1);
-   
+
    NSSize newSize = aSize;
-   
-   newSize.height += NSHeight([tools frame]) * factor;
+
    newSize.height += NSHeight([[scrollView horizontalScroller] frame]) * factor;
    newSize.width += NSWidth([[scrollView verticalScroller] frame]) * factor;
 
