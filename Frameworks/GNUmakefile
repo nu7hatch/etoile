@@ -27,8 +27,8 @@ ifeq ($(desktop-base), yes)
     export collectionkit ?= yes
     export bookmarkkit ?= yes
     export iconkit ?= yes
-    export inspectorkit ?= yes
     export panekit ?= yes
+    export inspectorkit ?= yes
     export addresseskit ?= yes
 
 endif
@@ -145,12 +145,12 @@ ifeq ($(iconkit), yes)
    SUBPROJECTS += IconKit
 endif
 
-ifeq ($(inspectorkit), yes)
-   SUBPROJECTS += InspectorKit
-endif
-
 ifeq ($(panekit), yes)
    SUBPROJECTS += PaneKit
+endif
+
+ifeq ($(inspectorkit), yes)
+   SUBPROJECTS += InspectorKit
 endif
 
 ifeq ($(addresseskit), yes)
