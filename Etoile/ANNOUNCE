@@ -8,39 +8,166 @@ Environment based on GNUstep for Linux and other Unix operating systems.
 Étoilé 0.1.9 introduces Étoilé environment to public as a developer platform. 
 This release is mostly targeted at GNUstep/Cocoa developers.
 
-Key Features of Étoilé 0.1.9 for developers
------------------------------------------
+New Features since Étoilé 0.1 
+-----------------------------
 
-	* LuceneKit 0.1
+	* Camaelon
 	
-	Lucene is a high-performance, full-featured text search engine library in Java. 
-	LuceneKit is a class-to-class port of Lucene in GNUstep. It is a technology 
-	suitable for nearly any application that requires full-text search.
+	  Bug-fixing release.
 	
-	* OgreKit 1.0 (GNUstep version)
-	
-	OgreKit is an OniGuruma regular expression framework for Cocoa. OniGuruma 
-	supports different styles of regular expression (POSIX, Perl, Ruby, etc.). 
-	OgreKit (GNUstep) only port the non-GUI part of original OgreKit, which can do 
-	searching and replacing with regular expression.
-	
-	* PreferencesKit 0.1
-	
-	PreferencesKit is a framework which provides various features to build flexible 
-	Preferences-like window in any GNUstep or Cocoa applications.
+	* EtoileBehavior
+	  
+	  First release.
+	  Remind users unsaved document.
 
-	* SQLiteClient 0.1 (Cocoa only)
-    
-    SQLiteClient is a SQLClient/SQLite port from SQLClient library in GNUstep/devl-libs. 
-    It uses sqlite3 library and is supposed to work only on Mac OS X.
-    
+	* EtoileWildMenus
+
+	  First release.
+	  Provides horizontal menu for GNUstep applications.
+
+	* AddressesKit
+	
+	  Bug-fixing release.
+	  The frameworks of Addresses for GNUstep 0.4.6
+
+	* CollectionKit
+
+	  First release.
+	  Ported from Addresses for general use.
+
+	* BookmarkKit
+
+	  First release.
+	  A bookmark system based on CollectionKit.
+
+	* DistributedView
+
+	  First release.
+	  Provide icon view of file manager or other applications.
+
+	* EtoileFoundation
+
+	  First release.
+	  A collection of common classes for Etoile.
+
+	* EtoileUI
+
+	  First release.
+	  A collection of common classes for Etoile.
+
+	* IconKit
+	
+	  First release.
+	  Icon theme management for Etoile.
+
+	* OgreKit
+
+	  A find panel for any text view.
+
+	* OPMLKit
+
+	  First release.
+	  Read OPML bookmark xml.
+
+	* PaneKit
+	
+	  First release.
+	  A framework to provide general pane management.
+
+	* InspectorKit
+	  
+	  First release.
+	  Ported from OpenSpace Manager and based on PaneKit,
+	  InspectorKit provides common inspectors for files.
+
+	* PopplerKit
+
+	  Bug-fixing release.
+	  Work on both 0.4.x and 0.5.x poppler.
+
+	* RSSKit
+
+	  First release in Etoile.
+	  Read common RSS format.
+	
+	* SystemConfig
+
+	  First release.
+	  Support hardward-related functions.
+	
 	* UnitKit 1.1 (GNUstep version)
 	
-	UnitKit is a unit test framework for Objective-C. It is a port of latest Cocoa 
-	version with few new features.
+	  Bug-fixing release.
+	  Support unit test on class object.
 
-	* Developer Examples
-	
+	* XWindowServerKit
+
+	  Support common tasks of X window system and freedesktop standard.
+
+	* Io
+
+	  First release in Etoile.
+	  A Io virtual machine with built-in Objective-C support.
+
+	* Azalea
+
+	  First release.
+	  A window manager ported from OpenBox3
+
+	* AZBackground
+
+	  First release
+	  Draw image on X window background.
+
+	* AZDock
+
+	  First release.
+	  A dock to manage both X window and GNUstep applications.
+
+	* MenuServer
+
+	  First release.
+	  Horizontal menu bar with menulet support.
+
+	* System
+
+	  First release.
+	  A session manager with login and poweroff support.
+
+	* AddressManager
+
+	  Bug-fixing release.
+	  The application part of Addresses for GNUstep 0.4.6.
+
+	* Calc
+
+	  First release.
+	  A simple calcular using Io virtual machine.
+
+	* DictionaryReader
+
+	  First release
+	  Support both dictd and local dictionary.
+
+	* Grr
+
+	  First release in Etoile.
+	  A RSS Reader.
+
+	* Typewriter
+
+	  First release.
+	  A text editor.
+
+	* Vindallo
+
+	  Bug-fixing release.
+	  
+	* StepChat
+
+	  First release.
+	  A jabber client.
+
 More detailed Release Notes may be found here : 
 <http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Latest_Release_Notes>
 
