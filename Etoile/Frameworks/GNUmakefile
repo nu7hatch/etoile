@@ -84,22 +84,22 @@ endif
 # We need to build EtoileExtensionsKit first because other frameworks like 
 # ExtendedWorkspaceKit, PreferencesKit depends on it.
 ifeq ($(etoilefoundation), yes)
-    SUBPROJECTS += EtoileFoundation
+#    SUBPROJECTS += EtoileFoundation
 endif
 
 ifeq ($(etoileui), yes)
-    SUBPROJECTS += EtoileUI
+#    SUBPROJECTS += EtoileUI
 endif
 
 # Takes care to build EtoileUI before DistributedView, because DistributedView 
 # depends on it.
 ifeq ($(distributedview), yes)
-    SUBPROJECTS += DistributedView
+#    SUBPROJECTS += DistributedView
 endif
 
 # We need to build OgreKit before LuceneKit, because LuceneKit depends on it.
 ifeq ($(ogrekit), yes)
-   SUBPROJECTS += OgreKit
+#   SUBPROJECTS += OgreKit
 endif
 
 ifeq ($(lucenekit), yes)
@@ -114,19 +114,19 @@ ifeq ($(servicesbarkit), yes)
 endif
 
 ifeq ($(rsskit), yes)
-   SUBPROJECTS += RSSKit
+#   SUBPROJECTS += RSSKit
 endif
 
 ifeq ($(opmlkit), yes)
-   SUBPROJECTS += OPMLKit
+#   SUBPROJECTS += OPMLKit
 endif
 
 ifeq ($(xwindowserverkit), yes)
-   SUBPROJECTS += XWindowServerKit
+#   SUBPROJECTS += XWindowServerKit
 endif
 
 ifeq ($(popplerkit), yes)
-   SUBPROJECTS += PopplerKit
+#   SUBPROJECTS += PopplerKit
 endif
 
 #
@@ -134,23 +134,23 @@ endif
 #
 
 ifeq ($(collectionkit), yes)
-   SUBPROJECTS += CollectionKit
+#   SUBPROJECTS += CollectionKit
 endif
 
 ifeq ($(bookmarkkit), yes)
-   SUBPROJECTS += BookmarkKit
+#   SUBPROJECTS += BookmarkKit
 endif
 
 ifeq ($(iconkit), yes)
-   SUBPROJECTS += IconKit
+#   SUBPROJECTS += IconKit
 endif
 
 ifeq ($(panekit), yes)
-   SUBPROJECTS += PaneKit
+#   SUBPROJECTS += PaneKit
 endif
 
 ifeq ($(inspectorkit), yes)
-   SUBPROJECTS += InspectorKit
+#   SUBPROJECTS += InspectorKit
 endif
 
 ifeq ($(addresseskit), yes)
@@ -158,7 +158,7 @@ ifeq ($(addresseskit), yes)
 endif
 
 ifeq ($(systemconfig), yes)
-   SUBPROJECTS += SystemConfig
+#   SUBPROJECTS += SystemConfig
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
