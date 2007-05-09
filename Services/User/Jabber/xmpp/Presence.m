@@ -9,6 +9,17 @@
 #import "Presence.h"
 #import "PresenceStanzaFactory.h"
 
+int PRESENCE_ICONS[] = {
+	0x25C9,
+	0x25C9,
+	0x25C8,
+	0x25C8,
+	0x25B2,
+	0x25A2,
+	0x25A2
+};
+
+
 @implementation Presence
 + (NSString*) displayStringForPresence:(unsigned char)_presence
 {
