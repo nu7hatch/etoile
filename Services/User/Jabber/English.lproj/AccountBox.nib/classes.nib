@@ -1,0 +1,25 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {no = id; yes = id; }; 
+            CLASS = AccountWindowController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {jidBox = NSTextField; serverBox = NSTextField; }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            CLASS = PasswordWindowController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                no = NSButton; 
+                passwordBox = NSTextField; 
+                question = NSTextField; 
+                yes = NSButton; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = "java.lang.Object"; LANGUAGE = Java; }
+    ); 
+    IBVersion = 1; 
+}
