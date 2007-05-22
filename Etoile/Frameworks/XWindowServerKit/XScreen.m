@@ -29,6 +29,7 @@
 */
 
 #import "XScreen.h"
+#import "XFunctions.h"
 #import <X11/Xatom.h>
 
 NSString *XCurrentWorkspaceDidChangeNotification = @"XCurrentWorkspaceDidChangeNotification";
@@ -135,4 +136,13 @@ NSString *XCurrentWorkspaceDidChangeNotification = @"XCurrentWorkspaceDidChangeN
   }
 }
 
+- (BOOL) isShowingDesktop
+{
+	return XWindowIsShowingDesktop();
+}
+
+- (void) setShowingDesktop:(BOOL) flag
+{
+	XWindowSetShowingDesktop(flag);
+}
 @end
