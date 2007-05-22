@@ -1,6 +1,4 @@
-
 include $(GNUSTEP_MAKEFILES)/common.make
-#GNUSTEP_INSTALLATION_DIR = $(GNUSTEP_SYSTEM_ROOT)
 
 APP_NAME = Azalea
 
@@ -87,5 +85,5 @@ ADDITIONAL_LIB_DIRS += -L/usr/X11R6/lib -lX11 -lXft
 
 include $(GNUSTEP_MAKEFILES)/application.make
 include $(GNUSTEP_MAKEFILES)/aggregate.make
+-include ../../../etoile.make
 
--include GNUmakefile.postamble
