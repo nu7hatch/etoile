@@ -17,6 +17,7 @@ ifeq ($(user-base), yes)
     export dictionary ?= yes
     export grr ?= yes
     export outerspace ?= yes
+    export addressmanager ?= yes
     export sketch ?= yes
     export jabber ?= yes
     export typewriter ?= yes
