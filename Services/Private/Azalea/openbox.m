@@ -25,15 +25,16 @@
 #import "AZScreen.h"
 #import "AZStartupHandler.h"
 #import "AZEventHandler.h"
-#import "AZDebug.h"
 #import "AZGroup.h"
+#import "AZDebug.h"
 #import "AZClientManager.h"
 #import "AZMoveResizeHandler.h"
 #import "AZFocusManager.h"
 #import "AZKeyboardHandler.h"
 #import "AZMouseHandler.h"
+#ifdef USE_MENU
 #import "AZMenuManager.h"
-
+#endif
 #import "openbox.h"
 #import "session.h"
 #import "prop.h"
@@ -101,10 +102,6 @@ static Cursor load_cursor(const char *name, unsigned int fontval);
 
 int main(int argc, char **argv)
 {
-#ifdef DEBUG_AZALEA
-    AZDebug_show_output(YES);
-#endif
-
     CREATE_AUTORELEASE_POOL(x);
 
     state = OB_STATE_STARTING;
@@ -150,20 +147,22 @@ int main(int argc, char **argv)
     AZMoveResizeHandler *mrHandler = [AZMoveResizeHandler defaultHandler];
     AZFocusManager *focusManager = [AZFocusManager defaultManager];
     AZKeyboardHandler *keyboardHandler = [AZKeyboardHandler defaultHandler];
+#ifdef USE_MENU
     AZMenuManager *menuManager = [AZMenuManager defaultManager];
+#endif
     AZMouseHandler *mouseHandler = [AZMouseHandler defaultHandler];
 
     /* Initiate main loop */
     mainLoop = [AZMainLoop mainLoop];
 
     /* set up signal handler */
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGUSR1];
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGUSR2];
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGTERM];
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGINT];
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGHUP];
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGPIPE];
-    [mainLoop addSignalHandler: signal_handler forSignal: SIGCHLD];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGUSR1];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGUSR2];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGTERM];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGINT];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGHUP];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGPIPE];
+    [mainLoop setSignalHandler: signal_handler forSignal: SIGCHLD];
 
     ob_screen = DefaultScreen(ob_display);
 
@@ -274,7 +273,9 @@ int main(int argc, char **argv)
 	    [mrHandler startup: reconfigure];
 	    [keyboardHandler startup: reconfigure];
 	    [mouseHandler startup: reconfigure];
+#ifdef USE_MENU
 	    [menuManager startup: reconfigure];
+#endif
 
             if (!reconfigure) {
                 /* get all the existing windows */
@@ -323,13 +324,12 @@ int main(int argc, char **argv)
 #else
 		CREATE_AUTORELEASE_POOL(x);
 		NSRunLoop *loop = [NSRunLoop currentRunLoop];
-		NSDate *past = [NSDate distantPast];
 
 		while ([mainLoop run] == YES)
 		{
-		  [mainLoop mainLoopRun]; /* run once in case reconfigure */
-		  [loop acceptInputForMode: NSDefaultRunLoopMode
-			   beforeDate: past];
+		  [mainLoop mainLoopRun];
+	      /* We need this in order to get NSTimer working */
+		  [loop runUntilDate: [NSDate dateWithTimeIntervalSinceNow: 0.01]];
 		}
 		DESTROY(x);
 #endif
@@ -342,7 +342,9 @@ int main(int argc, char **argv)
 		[clientManager unmanageAll];
             }
 
+#ifdef USE_MENU
 	    [menuManager shutdown: reconfigure];
+#endif
 	    [mouseHandler shutdown: reconfigure];
 	    [keyboardHandler shutdown: reconfigure];
 	    [mrHandler shutdown: reconfigure];
@@ -408,11 +410,11 @@ static void signal_handler(int signal, void *data)
 {
     switch (signal) {
     case SIGUSR1:
-        AZDebug("Caught signal %d. Restarting.\n", signal);
+        NSDebugLLog(@"Signal", @"Caught signal %d. Restarting.", signal);
         ob_restart();
         break;
     case SIGUSR2:
-        AZDebug("Caught signal %d. Reconfiguring.\n", signal);
+        NSDebugLLog(@"Signal", @"Caught signal %d. Reconfiguring.", signal);
         ob_reconfigure(); 
         break;
     case SIGCHLD:
@@ -420,7 +422,7 @@ static void signal_handler(int signal, void *data)
         while (waitpid(-1, NULL, WNOHANG) > 0);
         break;
     default:
-        AZDebug("Caught signal %d. Exiting.\n", signal);
+        NSDebugLLog(@"Signal", @"Caught signal %d. Exiting.", signal);
         /* TERM and INT return a 0 code */
         ob_exit(!(signal == SIGTERM || signal == SIGINT));
     }
@@ -457,7 +459,6 @@ static void print_help()
     printf("  --sync              Run in synchronous mode (this is slow and "
             "meant for\n"
             "                      debugging X routines)\n");
-    printf("  --debug             Display debugging output\n");
     printf("\nPlease report bugs at %s\n\n", PACKAGE_BUGREPORT);
 }
 
@@ -476,8 +477,6 @@ static void parse_args(int argc, char **argv)
             ob_replace_wm = YES;
         } else if (!strcmp(argv[i], "--sync")) {
             xsync = YES;
-        } else if (!strcmp(argv[i], "--debug")) {
-            AZDebugShowOutput(YES);
         } else if (!strcmp(argv[i], "--reconfigure")) {
             remote_control = 1;
         } else if (!strcmp(argv[i], "--restart")) {

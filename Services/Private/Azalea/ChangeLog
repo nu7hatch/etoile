@@ -1,3 +1,35 @@
+2007-05-24  Yen-Ju Chen <yjchenx at gmail>
+
+	* Change window switching to "Ctrl-Tab" to leave room for AZExpose.
+
+2007-05-24  Quentin Mathé <qmathe@club-internet.fr>
+
+	* GNUmakefile: Added ETOILE_CORE_MODULE.
+
+2007-05-23  Yen-Ju Chen <yjchenx at gmail>
+
+	* Use NSDebugLLog for debug messages. 
+	  Current support 'X', 'Client', 'Focus' and 'Signal'.
+	  All options can be viewed through 'grep NSDebugLLog *.m'
+	* Use user defaults for most of settings.
+
+2007-05-22  Yen-Ju Chen <yjchenx at gmail>
+
+	* Use NSTimer and NSRunLoop for timeout, which simplify the code.
+	* Turn off Startup-notification and XCursor for now.
+	* Disable menu by default.
+
+2007-05-21  Yen-Ju Chen <yjchenx at gmail>
+
+	* Include etoile.make for clean build.
+	* Simplify AZMainLoop and signal handling.
+
+2007-05-20  Yen-Ju Chen <yjchenx at gmail>
+
+	* Add etoile.make patched by Frédéric Point (Bug #9164).
+	* Do not include GNUmakefile.postamble.
+	  It is supposed to be the right way for current design.
+
 2007-05-07  Yen-Ju Chen <yjchenx at gmail>
 
 	* GNUmakefile.preamble:

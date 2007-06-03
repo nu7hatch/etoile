@@ -1,3 +1,5 @@
+ETOILE_CORE_MODULE = YES
+
 include $(GNUSTEP_MAKEFILES)/common.make
 
 APP_NAME = Azalea
@@ -21,9 +23,6 @@ Azalea_OBJC_FILES = \
 	AZKeyboardHandler.m \
 	AZKeyTree.m \
 	AZMainLoop.m \
-	AZMenu.m \
-	AZMenuFrame.m \
-	AZMenuManager.m \
 	AZMouseHandler.m \
 	AZMoveResizeHandler.m \
 	AZPopUp.m \
@@ -31,8 +30,6 @@ Azalea_OBJC_FILES = \
 	AZStacking.m \
 	AZStartupHandler.m \
 	action.m \
-	client_list_menu.m \
-	client_menu.m \
 	config.m \
 	extensions.m \
 	grab.m \
@@ -86,4 +83,3 @@ ADDITIONAL_LIB_DIRS += -L/usr/X11R6/lib -lX11 -lXft
 include $(GNUSTEP_MAKEFILES)/application.make
 include $(GNUSTEP_MAKEFILES)/aggregate.make
 -include ../../../etoile.make
-
