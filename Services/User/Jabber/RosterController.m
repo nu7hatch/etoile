@@ -182,6 +182,12 @@ NSMutableArray * rosterControllers = nil;
 		[data authorise:[(Presence*)[_notification object] jid]];
 	}
 }
+- (void) presenceChanged:(NSNotification *)notification
+{
+	NSDictionary * dict = [notification userInfo];
+	[self setPresence:[[dict objectForKey:@"show"] unsignedCharValue]
+		  withMessage:[dict objectForKey:@"status"]];
+}
 
 - (id) initWithNibName:(NSString*)_nib forAccount:(id)_account withRoster:(id)_roster
 {
@@ -230,6 +236,12 @@ NSMutableArray * rosterControllers = nil;
 	[[self window] setFrameAutosaveName:@"Jabber Roster"];
 	data = _roster;
 	account = _account;
+	//Note: nil must be changed to account if permitting multiple accounts
+	NSNotificationCenter * localCenter = [NSNotificationCenter defaultCenter];
+	[localCenter addObserver:self
+					selector:@selector(presenceChanged:)
+						name:@"LocalPresenceChangedNotification"
+					  object:nil];	
 	return self;
 }
 - (void) updateIdentities:(NSNotification*)_notification
@@ -267,9 +279,6 @@ NSMutableArray * rosterControllers = nil;
 
 - (NSRect)optimalSize
 {
-#ifdef GNUSTEP
-	return [[self window] frame];
-#endif
 	NSRect windowFrameDimensions = [[self window] frame];
 	float oldHeight = windowFrameDimensions.size.height;
 	
@@ -303,7 +312,10 @@ NSMutableArray * rosterControllers = nil;
 
 - (void) update:(id)_object
 {
+#ifdef GNUSTEP
 	[view reloadData];
+	[[self window] setFrame:[self optimalSize] display:YES animate:NO];
+#else
 	if(_object == nil)
 	{
 		[view reloadData];
@@ -325,9 +337,6 @@ NSMutableArray * rosterControllers = nil;
 			}
 		}
 	}
-#ifdef GNUSTEP
-	[[self window] setFrame:[self optimalSize] display:YES animate:NO];
-#else
 	[[self window] setFrame:[self optimalSize] display:YES animate:YES];
 #endif
 	[view display];
@@ -547,39 +556,53 @@ inline Conversation * createChatWithPerson(id self, JabberPerson* person, XMPPAc
 
 - (IBAction) changePresence:(id)sender
 {
-	switch([sender indexOfSelectedItem])
+	NSString * status = [statusBox stringValue];
+	switch([presenceBox indexOfSelectedItem])
 	{
 		case 0:
-			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_CHAT withMessage:nil];
+			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_CHAT withMessage:status];
 			break;
 		case 1:
-			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_ONLINE withMessage:nil];
+			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_ONLINE withMessage:status];
 			break;
 		case 2:
-			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_AWAY withMessage:nil];
+			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_AWAY withMessage:status];
 			break;
 		case 3:
-			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_XA withMessage:nil];
+			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_XA withMessage:status];
 			break;
 		case 4:
-			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_DND withMessage:nil];
+			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_DND withMessage:status];
 			break;
 		case 6:
-			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_OFFLINE withMessage:nil];
+			[(JabberApp*)[NSApp delegate] setPresence:PRESENCE_OFFLINE withMessage:status];
 			break;
 		case 8:
-			[(JabberApp*)[NSApp delegate] setCustomPresence:self];
+			[(JabberApp*)[NSApp delegate] setCustomPresence:status];
 			break;
 	}
 }
 
 - (void) setPresence:(unsigned char)_status withMessage:(NSString*)_message
 {
+	if(_message == nil)
+	{
+		_message = [statusBox stringValue];
+	}
 	if(presence != _status)
 	{
 		presence = _status;
 		[presenceBox selectItemWithTitle:[Presence displayStringForPresence:_status]];		
 	}
+	if(_message == nil)
+	{
+		_message = @"";
+	}
+	if(![[statusBox stringValue] isEqualToString:_message])
+	{
+		[statusBox setStringValue:_message];
+	}	
+	[statusBox setTextColor:PRESENCE_COLOUR(_status)];
 }
 /*- (void) update
 {
@@ -588,6 +611,10 @@ inline Conversation * createChatWithPerson(id self, JabberPerson* person, XMPPAc
 		[[self window] setFrame:[self windowWillUseStandardFrame:[self window] defaultFrame:NSMakeRect(0,0,0,0)] display:YES];
 	}
 }*/
+- (NSString*) currentStatusMessage
+{
+	return [statusBox stringValue];
+}
 
 - (void) dealloc
 {

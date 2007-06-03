@@ -9,6 +9,7 @@
 #import "MessageWindowController.h"
 #import "Presence.h"
 #import "TRUserDefaults.h"
+#import "NSTextView+ClickableLinks.h"
 
 #ifdef NO_ATTRIBUTED_TITLES
 #define setAttributedTitle(x) setTitle:[x string]
@@ -183,6 +184,7 @@ NSMutableArray * messageWindowControllers = nil;
 		}
 	}
 	[[messageBox textStorage] appendAttributedString:[log logMessage:aMessage]];
+	[messageBox makeLinksClickable];
 	[messageBox display];
 	[messageBox scrollRangeToVisible:NSMakeRange([[messageBox textStorage] length],0)];
 }
@@ -234,6 +236,9 @@ NSMutableArray * messageWindowControllers = nil;
 	}
 	[presenceBox setTextColor:[[NSUserDefaults standardUserDefaults] colourForPresence:_status]];
 	[presenceBox setToolTip:_message];
+	
+	[presenceIconBox setTextColor:[[NSUserDefaults standardUserDefaults] colourForPresence:_status]];
+	[presenceIconBox setStringValue:[NSString stringWithFormat:@"%C", PRESENCE_ICONS[(_status / 10) - 1]]];
 	//Set the available identities
 	NSString * currentJID = [[recipientBox titleOfSelectedItem] retain];
 	[recipientBox removeAllItems];

@@ -189,7 +189,7 @@ static NSDictionary * STANZA_KEYS;
 	struct hostent * host;
 	struct sockaddr_in serverAddress;
 	
-	
+	NSLog(@"Looking up host %@,(%s)", serverHost, [serverHost UTF8String]);
 	host = gethostbyname([serverHost UTF8String]);
 	//host = gethostbyname("66.116.97.186");
 	if(host == NULL)
@@ -238,7 +238,15 @@ static NSDictionary * STANZA_KEYS;
 	user = [[aJID node] retain];
 	server = [[aJID domain] retain];
 	pass = [password retain];
-	serverHost = [jabberServer retain];
+	if(serverHost == nil)
+	{
+		serverHost = [server retain];
+	}
+	else
+	{
+		serverHost = [jabberServer retain];
+	}
+	NSLog(@"Connecting to %@ with username %@ and password %@", serverHost, user, pass);
 	[self reconnectToJabberServer];
 }
 
@@ -404,7 +412,7 @@ static NSDictionary * STANZA_KEYS;
 }
 
 //Digest non-SASL auth.
-- (void) logInWithId:(NSString*) sessionID
+- (void) legacyLogIn
 {
 	if(connectionState != connected)
 	{
@@ -432,11 +440,12 @@ static NSDictionary * STANZA_KEYS;
 	
 	if([aName isEqualToString:@"stream:stream"])
 	{
+		sessionID = [[_attributes objectForKey:@"id"] retain];
 		[server release];
 		server = [[_attributes objectForKey:@"from"] retain];
 		if(![[_attributes objectForKey:@"version"] isEqualToString:@"1.0"])
 		{
-			[self logInWithId:[_attributes objectForKey:@"id"]];
+			[self legacyLogIn];
 		}
 	}
 	else if ([aName isEqualToString:@"success"])
@@ -485,7 +494,7 @@ static NSDictionary * STANZA_KEYS;
 		[authNode addCData:authstring];
 		[self send:[[authNode stringValue] UTF8String]];
 		connectionState = loggingIn;
-	}	
+	}
 	else
 	{
 		NSLog(@"No supported authentication mechanisms found.  Aborting.");
@@ -494,18 +503,18 @@ static NSDictionary * STANZA_KEYS;
 
 - (void) startSession
 {
-	NSString * sessionID = [self newMessageID];
+	NSString * sessionIqID = [self newMessageID];
 	TRXMLNode * sessionNode = [TRXMLNode TRXMLNodeWithType:@"session"
 												attributes:[NSDictionary dictionaryWithObject:@"urn:ietf:params:xml:ns:xmpp-session"
 																					   forKey:@"xmlns"]];
 	TRXMLNode * iqNode = [TRXMLNode TRXMLNodeWithType:@"iq"
 										   attributes:[NSDictionary dictionaryWithObjectsAndKeys:
 											   @"set", @"type",
-											   sessionID, @"id",
+											   sessionIqID, @"id",
 											   nil]];
 	[iqNode addChild:sessionNode];
 	[self send:[[iqNode stringValue] UTF8String]];
-	[dispatcher addIqResultHandler:self forID:sessionID];
+	[dispatcher addIqResultHandler:self forID:sessionIqID];
 }
 
 - (void) bind
@@ -552,7 +561,15 @@ static NSDictionary * STANZA_KEYS;
 	//If we are connected, try logging in
 	if(connectionState == connected)
 	{
-		[self logInWithMechansisms:[aFeatureSet objectForKey:@"mechanisms"]];
+		//Hack for broken servers
+		if([[aFeatureSet objectForKey:@"auth"] isEqualToString:@"http://jabber.org/features/iq-auth"])
+		{
+			[self legacyLogIn];
+		}
+		else
+		{
+			[self logInWithMechansisms:[aFeatureSet objectForKey:@"mechanisms"]];
+		}
 	}
 	else if (connectionState == unbound)
 	{
@@ -720,14 +737,32 @@ static NSDictionary * STANZA_KEYS;
 		[showNode setCData:[Presence xmppStringForPresence:_status]];
 		[presenceNode addChild:showNode];
 	}
+	NSDictionary * presenceDictionary;
 	if(_message != nil)
 	{
 		TRXMLNode * statusNode = [TRXMLNode TRXMLNodeWithType:@"status"];
 		[statusNode setCData:_message];
 		[presenceNode addChild:statusNode];
+		presenceDictionary = 
+			[NSDictionary dictionaryWithObjectsAndKeys:
+				[NSNumber numberWithChar:_status],@"show",
+				_message,@"status",
+				nil];
 	}
-	//TODO: Do this using NSNotifications
-	[presenceDisplay setPresence:_status withMessage:_message];
+	else
+	{
+		presenceDictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithChar:_status] forKey:@"show"];
+	}
+	//Notify anyone who cares that our presence has changed
+	NSNotificationCenter * local = [NSNotificationCenter defaultCenter];
+	NSNotificationCenter * remote = [NSDistributedNotificationCenter defaultCenter];
+	[local postNotificationName:@"LocalPresenceChangedNotification"
+						 object:account
+					   userInfo:presenceDictionary];
+	[remote postNotificationName:@"LocalPresenceChangedNotification"
+						  object:[account name]
+						userInfo:presenceDictionary];
+	//[presenceDisplay setPresence:_status withMessage:_message];
 	[self XMPPSend:[presenceNode stringValue]];
 }
 
