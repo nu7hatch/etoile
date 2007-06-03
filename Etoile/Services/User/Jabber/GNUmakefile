@@ -14,23 +14,25 @@ StepChat_APPLICATION_ICON =
 #
 StepChat_LANGUAGES = English
 
-StepChat_RESOURCE_FILES = StepChatInfo.plist
+StepChat_RESOURCE_FILES = \
+	StepChatInfo.plist \
+	Resources/StepChat.tiff
 
-ifeq ($(FOUNDATION_LIB), apple)
+#ifeq ($(FOUNDATION_LIB), apple)
 StepChat_LOCALIZED_RESOURCE_FILES = \
 	  MainMenu.nib\
 	  MessageWindow.nib\
 	  AccountBox.nib\
 	  PasswordBox.nib\
 	  RosterWindow.nib
-else
-StepChat_LOCALIZED_RESOURCE_FILES = \
-	  MainMenu.nib\
-	  MessageWindow.gorm\
-	  AccountBox.gorm \
-	  PasswordBox.gorm \
-	  RosterWindow.gorm
-endif
+#else
+#StepChat_LOCALIZED_RESOURCE_FILES = \
+	  #MainMenu.nib\
+	  #MessageWindow.gorm\
+	  #AccountBox.gorm \
+	  #PasswordBox.gorm \
+	  #RosterWindow.nib
+#endif
 
 #
 # Header files
@@ -48,16 +50,18 @@ StepChat_OBJC_FILES = \
 	HideMenuController.m\
 	JabberApp.m\
 	MessageWindowController.m\
+	NSTextView+ClickableLinks.m\
 	AccountWindowController.m\
 	PasswordWindowController.m\
 	PreferenceWindowController.m\
 	PresenceMenuController.m\
+	PresenceLogController.m\
 	RosterController.m\
 	TRUserDefaults.m\
 	XMLLog.m\
 	main.m
 
-ADDITIONAL_LDFLAGS += -lTRXML -lXMPP -lssl -lcrypto -lAddresses
+ADDITIONAL_LDFLAGS += -lTRXML -lXMPP -lssl -lcrypto -lAddresses -g
 ADDITIONAL_OBJCFLAGS += -werror -g
 ADDITIONAL_LIB_DIRS += -LTRXML/$(GNUSTEP_OBJ_DIR) -Lxmpp/$(GNUSTEP_OBJ_DIR)
 ADDITIONAL_OBJCFLAGS = -DGNUSTEP -DNO_ATTRIBUTED_TITLES -std=c99 -Wno-import -Ixmpp -ITRXML

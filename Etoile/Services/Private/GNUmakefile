@@ -22,6 +22,8 @@ ifeq ($(etoile-extensions), yes)
     export background ?= yes
     export dock ?= yes
     export login ?= yes
+    export corner ?= yes
+    export idle ?= yes
 
     # Was servicesbar
     export menuserver ?= yes
@@ -61,6 +63,14 @@ endif
 
 ifeq ($(login),yes)
     SUBPROJECTS += Login
+endif
+
+ifeq ($(corner),yes)
+    SUBPROJECTS += Corner
+endif
+
+ifeq ($(idle),yes)
+    SUBPROJECTS += Idle
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
