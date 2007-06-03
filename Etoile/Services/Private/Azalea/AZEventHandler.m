@@ -23,15 +23,16 @@
 #import "AZEventHandler.h"
 #import "AZMainLoop.h"
 #import "AZScreen.h"
-#import "AZDebug.h"
 #import "AZGroup.h"
 #import "AZClientManager.h"
 #import "AZClient+GNUstep.h"
 #import "AZFrame+Render.h"
 #import "AZMoveResizeHandler.h"
 #import "AZFocusManager.h"
+#ifdef USE_MENU
 #import "AZMenuFrame.h"
 #import "AZMenu.h"
+#endif
 #import "AZMouseHandler.h"
 #import "openbox.h"
 #import "config.h"
@@ -126,12 +127,15 @@ static AZEventHandler *sharedInstance;
 
 @interface AZEventHandler (AZPrivate)
 - (void) handleRootEvent: (XEvent *) e;
+#ifdef USE_MENU
 - (void) handleMenuEvent: (XEvent *) e;
+#endif
 - (void) handleClient: (AZClient *) c event: (XEvent *) e;
 - (void) handleGroup: (AZGroup *) g event: (XEvent *) e;
-
+#ifdef USE_MENU
 - (AZMenuFrame *) findActiveMenu;
 - (AZMenuFrame *) findActiveOrLastMenu;
+#endif
 - (Window) getWindow: (XEvent *) e;
 - (void) hackMods: (XEvent *) e;
 - (BOOL) wantedFocusEvent: (XEvent *) e;
@@ -142,7 +146,9 @@ static AZEventHandler *sharedInstance;
 #if 0 // Not used in OpenBox3
 - (void) clientDestroy: (NSNotification *) not;
 #endif
-- (BOOL) menuHideDelayFunc: (id) data;
+#ifdef USE_MENU
+- (void) menuTimerAction: (id) sender;
+#endif
 @end
 
 @implementation AZEventHandler
@@ -438,25 +444,34 @@ static AZEventHandler *sharedInstance;
         e->type == MotionNotify || e->type == KeyPress ||
         e->type == KeyRelease)
     {
+#ifdef USE_MENU
         if ([[AZMenuFrame visibleFrames] count])
+		{
             [self handleMenuEvent: e];
-        else {
-	    AZKeyboardHandler *kHandler = [AZKeyboardHandler defaultHandler];
-	    if (![kHandler processInteractiveGrab: e forClient: &client]) {
-		AZMoveResizeHandler *mrHandler = [AZMoveResizeHandler defaultHandler];
-		if ([mrHandler moveresize_in_progress]) {
- 		   [mrHandler event: e];
+		}
+        else 
+#endif
+		{
+			AZKeyboardHandler *kHandler = [AZKeyboardHandler defaultHandler];
+			if (![kHandler processInteractiveGrab: e forClient: &client]) 
+			{
+				AZMoveResizeHandler *mrHandler = [AZMoveResizeHandler defaultHandler];
+			if ([mrHandler moveresize_in_progress]) 
+			{
+				[mrHandler event: e];
 
-                    /* make further actions work on the client being
-                       moved/resized */
-		    client = [mrHandler moveresize_client];
-                }
-
-                menu_can_hide = NO;
-		[[AZMainLoop mainLoop] addTimeout: self 
-			     handler: @selector(menuHideDelayFunc:)
-	                     microseconds: config_menu_hide_delay * 1000
-			     data: nil notify: NULL];
+				/* make further actions work on the client being 
+				   moved/resized */
+				client = [mrHandler moveresize_client];
+			}
+#ifdef USE_MENU
+			menu_can_hide = NO;
+			ASSIGN(menuTimer, [NSTimer scheduledTimerWithTimeInterval: config_menu_hide_delay
+			                           target: self
+			                           selector: @selector(menuTimerAction:)
+			                           userInfo: nil
+			                           repeats: NO]);
+#endif
 
                 if (e->type == ButtonPress || e->type == ButtonRelease ||
                     e->type == MotionNotify) {
@@ -482,7 +497,8 @@ static AZEventHandler *sharedInstance;
      
     switch(e->type) {
     case SelectionClear:
-        AZDebug("Another WM has requested to replace us. Exiting.\n");
+        NSDebugLLog(@"Event", 
+		            @"Another WM has requested to replace us. Exiting.");
         ob_exit_replace();
         break;
 
@@ -708,12 +724,11 @@ static AZEventHandler *sharedInstance;
             if (e->xcrossing.mode == NotifyGrab ||
                 e->xcrossing.mode == NotifyUngrab)
             {
-#ifdef DEBUG_FOCUS
-                AZDebug("%sNotify mode %d detail %d on %lx IGNORED\n",
+                NSDebugLLog(@"Focus", 
+				         @"%sNotify mode %d detail %d on %lx IGNORED",
                          (e->type == EnterNotify ? "Enter" : "Leave"),
                          e->xcrossing.mode,
-                         e->xcrossing.detail, client?client->window:0);
-#endif
+                         e->xcrossing.detail, client? [client window]:0);
             } else {
 	       /* Only reach here for focus follow mouse */
             }
@@ -860,7 +875,7 @@ static AZEventHandler *sharedInstance;
 	[[AZClientManager defaultManager] unmanageClient: client];
         break;
     case MapRequest:
-        AZDebug("MapRequest for 0x%lx\n", [client window]);
+        NSDebugLLog(@"Event", @"MapRequest for 0x%lx\n", [client window]);
         if (![client iconic]) break; /* this normally doesn't happen, but if it
                                        does, we don't want it!
                                        it can happen now when the window is on
@@ -908,7 +923,7 @@ static AZEventHandler *sharedInstance;
 			             hide: NO];
         } else if (msgtype == prop_atoms.net_wm_state) {
             /* can't compress these */
-            AZDebug("net_wm_state %s %ld %ld for 0x%lx\n",
+            NSDebugLLog(@"Event", @"net_wm_state %s %ld %ld for 0x%lx",
                      (e->xclient.data.l[0] == 0 ? "Remove" :
                       e->xclient.data.l[0] == 1 ? "Add" :
                       e->xclient.data.l[0] == 2 ? "Toggle" : "INVALID"),
@@ -918,7 +933,8 @@ static AZEventHandler *sharedInstance;
 		           data1: e->xclient.data.l[1]
 			   data2: e->xclient.data.l[2]];
         } else if (msgtype == prop_atoms.net_close_window) {
-            AZDebug("net_close_window for 0x%lx\n", [client window]);
+            NSDebugLLog(@"Event", 
+			            @"net_close_window for 0x%lx", [client window]);
 	    [client close];
         } else if (msgtype == prop_atoms.net_active_window) {
             /* XXX make use of data.l[2] ! */
@@ -1093,7 +1109,7 @@ static AZEventHandler *sharedInstance;
 #endif
     }
 }
-
+#ifdef USE_MENU
 - (AZMenuFrame *) findActiveMenu
 {
     AZMenuFrame *ret = nil;
@@ -1184,12 +1200,11 @@ static AZEventHandler *sharedInstance;
     }
 }
 
-- (BOOL) menuHideDelayFunc: (id) data
+- (void) menuTimerAction: (id) sender
 {
-    menu_can_hide = YES;
-    return NO; /* no repeat */
+	menu_can_hide = YES;
 }
-
+#endif
 #if 0 // Not used in OpenBox3
 - (void) clientDestroy: (NSNotification *) not
 {
