@@ -29,6 +29,7 @@ ifeq ($(desktop-base), yes)
     export camaelon ?= yes
     export etoilewildmenus ?= yes
     export etoilebehavior ?= yes
+    export servicemenulet ?= yes
 
 endif
 
@@ -48,6 +49,10 @@ endif
 
 ifeq ($(etoilebehavior), yes)
     SUBPROJECTS += EtoileBehavior
+endif
+
+ifeq ($(servicemenulet), yes)
+    SUBPROJECTS += ServiceMenulet
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
