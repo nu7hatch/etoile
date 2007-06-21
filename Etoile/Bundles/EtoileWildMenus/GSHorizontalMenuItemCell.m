@@ -25,6 +25,7 @@
 #import <AppKit/NSGraphics.h>
 #import <AppKit/NSImage.h>
 #import <AppKit/NSParagraphStyle.h>
+#import <AppKit/NSAttributedString.h>
 #import <AppKit/NSMenuView.h>
 #import <AppKit/PSOperators.h>
 #import <AppKit/NSColor.h>

@@ -1,3 +1,7 @@
+2007-06-20  Yen-Ju Chen <yjchenx gmail>
+
+	* Include <AppKit/NSAttributedString.h> for latest GNUstep.
+
 2007-04-13  Yen-Ju Chen <yjchenx gmail>
 
 	* NSMenu+Hackery.m: Make sure the origin is correct.
