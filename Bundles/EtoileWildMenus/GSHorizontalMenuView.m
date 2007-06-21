@@ -27,6 +27,7 @@
 #import <AppKit/NSImage.h>
 #import <AppKit/NSColor.h>
 #import <AppKit/PSOperators.h>
+#import <AppKit/NSAttributedString.h>
 
 #import "GSHorizontalMenuItemCell.h"
 #import "EtoileMenuUtilities.h"
