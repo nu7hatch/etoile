@@ -22,6 +22,7 @@ ifeq ($(user-base), yes)
     export jabber ?= yes
     export typewriter ?= yes
     export vindaloo ?= yes
+    export fontmanager ?= yes
 
 endif
 
@@ -83,6 +84,10 @@ endif
 
 ifeq ($(outerspace), yes)
 	SUBPROJECTS += OuterSpace
+endif
+
+ifeq ($(fontmanager), yes)
+	SUBPROJECTS += FontManager
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make

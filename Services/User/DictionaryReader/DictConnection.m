@@ -43,7 +43,7 @@
 -(id)initWithHost: (NSHost*) aHost
 	     port: (int) aPort
 {
-  if (self = [super init]) {
+  if ((self = [super init]) != nil) {
     if (aHost == nil) {
         [self release];
         return nil;
@@ -84,13 +84,35 @@
   // first close connection, if open
   [self close];
   
-  [reader release];
-  [writer release];
-  [inputStream release];
-  [outputStream release];
-  [host release];
+  // NOTE: inputStream, outputStream, reader and writer are released in -close
+  DESTROY(defWriter);
+  DESTROY(host);
   
   [super dealloc];
+}
+
+/** To know whether two remote dictionaries are equal we check if they have the
+	the same host. */
+-(BOOL) isEqual: (id)object
+{
+  // TODO: Refactor this into DictionaryHandle by checking -fullName for 
+  // equality rather than -host. DICT protocol seems to support 
+  // requesting dictionary name then it shouldn't be a problem to add -fullName 
+  // method. Equality test based on host could be kept as a fallback here 
+  // (useful when connection is unavailable). Don't forget to update 
+  // -[LocalDictionary isEqual:].
+  if ([object isKindOfClass: [DictionaryHandle class]]
+   && [object respondsToSelector: @selector(host)]) {
+    if ([[self host] isEqual: [object host]])
+      return YES;
+  }
+
+  return NO;
+}
+
+-(NSHost*) host
+{
+	return host;
 }
 
 -(void) sendClientString: (NSString*) clientName
@@ -121,7 +143,7 @@
 -(void) definitionFor: (NSString*) aWord
          inDictionary: (NSString*) aDict
 {
-  NSMutableString* result = [NSMutableString stringWithCapacity: 100];
+  //NSMutableString* result = [NSMutableString stringWithCapacity: 100];
   
   [writer writeLine:
 	    [NSString stringWithFormat: @"define %@ \"%@\"\r\n",
@@ -180,6 +202,10 @@
 	    port: port
 	    inputStream: &inputStream
 	    outputStream: &outputStream];
+
+  // Streams are returned autoreleased
+  RETAIN(inputStream);
+  RETAIN(outputStream);
   
   if (inputStream == nil || outputStream == nil) {
     [self log: @"open failed: cannot create input and output stream"];
@@ -217,17 +243,26 @@
   } 
 }
 
+// Probably not true anymore now we check the connection status...
 #warning FIXME: Crashes sometimes?
 -(void)close
 {
-  [inputStream close];
-  RELEASE(inputStream); inputStream = nil;
+  if ([inputStream streamStatus] != NSStreamStatusNotOpen
+   && [inputStream streamStatus] != NSStreamStatusClosed)
+  {
+    [inputStream close];
+  }
+  DESTROY(inputStream);
+
+  if ([outputStream streamStatus] != NSStreamStatusNotOpen
+   && [outputStream streamStatus] != NSStreamStatusClosed)
+  {
+    [outputStream close];
+  }
+  DESTROY(outputStream);
   
-  [outputStream close];
-  RELEASE(outputStream); outputStream = nil;
-  
-  RELEASE(reader); reader = nil;
-  RELEASE(writer); writer = nil;
+  DESTROY(reader);
+  DESTROY(writer);
 }
 
 -(void) log: (NSString*) aLogMsg
@@ -243,6 +278,8 @@
 
 -(void) setDefinitionWriter: (id<DefinitionWriter>) aDefinitionWriter
 {
+  NSAssert1(aDefinitionWriter != nil,
+	    @"-setDefinitionWriter: parameter must not be nil in %@", self);
   ASSIGN(defWriter, aDefinitionWriter);
 }
 
