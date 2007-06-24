@@ -95,7 +95,7 @@ static NSDictionary * STANZA_KEYS;
 	connectionState = offline;
 	unsentBuffer = [[NSMutableString alloc] init];
 	//TODO: Make this more sensible
-	res = @"TRJabberTest2";
+	res = @"StepChat";
 	keepalive = 0;
 	connectionMutex = [[NSLock alloc] init];
 	messageIDMutex = [[NSLock alloc] init];
@@ -238,7 +238,7 @@ static NSDictionary * STANZA_KEYS;
 	user = [[aJID node] retain];
 	server = [[aJID domain] retain];
 	pass = [password retain];
-	if(serverHost == nil)
+	if(jabberServer == nil)
 	{
 		serverHost = [server retain];
 	}

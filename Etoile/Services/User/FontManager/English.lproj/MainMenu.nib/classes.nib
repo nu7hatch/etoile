@@ -1,0 +1,38 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {CLASS = NSObject; LANGUAGE = ObjC; }, 
+        {
+            CLASS = PQController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                fontList = NSOutlineView; 
+                fontsInfoField = NSTextField; 
+                groupList = NSTableView; 
+                sampleController = PQSampleController; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            CLASS = PQFontSampleView; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {dataSource = id; }; 
+            SUPERCLASS = NSView; 
+        }, 
+        {
+            ACTIONS = {changeColor = id; changeSampleText = id; changeSize = id; }; 
+            CLASS = PQSampleController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                backgroundColorWell = NSColorWell; 
+                foregroundColorWell = NSColorWell; 
+                sampleField = NSComboBox; 
+                sampleView = PQFontSampleView; 
+                sizeField = NSComboBox; 
+                sizeSlider = NSSlider; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}
