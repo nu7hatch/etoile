@@ -258,9 +258,11 @@ NSMutableArray * rosterControllers = nil;
 					  object:nil];	
 	return self;
 }
-- (void) updateIdentities:(NSNotification*)_notification
+- (void) updateIdentities:(NSNotification*)aNotification
 {
-	[self update:[_notification object]];
+	//TODO: It might be possible to optimise this,
+	//but the overhead of testing might be self-defeating
+	[self update:nil];
 }
 
 - (void) updatePresence:(NSNotification*)_notification
@@ -321,6 +323,13 @@ NSMutableArray * rosterControllers = nil;
 	{
 		windowFrameDimensions.size.height = [[[self window] screen] visibleFrame].size.height;
 	}
+#ifdef GNUSTEP
+	//GNUstep doesn't respect minimum window size for some reason
+	if(windowFrameDimensions.size.width < 137)
+	{
+		windowFrameDimensions.size.width = 137;
+	}
+#endif
 	return windowFrameDimensions;
 }
 
