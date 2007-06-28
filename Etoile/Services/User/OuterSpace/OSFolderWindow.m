@@ -524,7 +524,7 @@ static NSMutableArray *windowList;
     {
       if ([(NSObject *)o doLaunching] == NO)
       {
-        NSRunAlertPanel(_(@"Object Fails to Open"),
+        NSRunAlertPanel(_(@"Object failed to Open"),
 	    _(@""), _(@"OK"), nil, nil, nil);
       }
     }
