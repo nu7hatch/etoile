@@ -30,6 +30,7 @@ ifeq ($(desktop-base), yes)
     export etoilewildmenus ?= yes
     export etoilebehavior ?= yes
     export servicemenulet ?= yes
+    export volumecontrolmenulet ?= yes
 
 endif
 
@@ -53,6 +54,10 @@ endif
 
 ifeq ($(servicemenulet), yes)
     SUBPROJECTS += ServiceMenulet
+endif
+
+ifeq ($(volumecontrolmenulet), yes)
+    SUBPROJECTS += VolumeControlMenulet
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
