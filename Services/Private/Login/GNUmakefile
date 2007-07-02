@@ -14,12 +14,15 @@ Login_OBJC_FILES = \
 Login_LANGUAGES = English
 
 Login_RESOURCE_FILES = \
-	login-images/*.png \
+	login-images/Toolbar-*.png \
+	login-images/Loader*.tif \
 	login-images/*.jpg
 
 Login_LOCALIZED_RESOURCE_FILES = login.gorm
 
 Login_MAIN_MODEL_FILE = login.gorm
+
+ADDITIONAL_LDFLAGS = -lX11
 
 include $(GNUSTEP_MAKEFILES)/application.make
 include ../../../etoile.make

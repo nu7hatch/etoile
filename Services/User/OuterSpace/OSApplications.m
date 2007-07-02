@@ -1,8 +1,9 @@
 #import "OSApplications.h"
 #import "OSObjectFactory.h"
 #import "OSBundleNode.h"
+#import <IconKit/IconKit.h>
 
-static NSString *identifier = @"/VIRTUAL_OBJECT/Applications";
+static NSString *identifier = @"Applications"; //@"/VIRTUAL_OBJECT/Applications"
 static NSArray *prefix;
 
 @implementation OSApplications
@@ -13,14 +14,23 @@ static NSArray *prefix;
   OSObjectFactory *factory = [OSObjectFactory defaultFactory];
   NSArray *paths = NSStandardApplicationPaths();
   NSMutableArray *all = [[NSMutableArray alloc] init];
+  NSArray *systemVisibleApps = [NSArray arrayWithObjects: @"Gorm", 
+    @"SystemPreferences", @"GWorkspace", nil];
   int i, j;
   for (i = 0; i < [paths count]; i++)
   {
     NSString *path = [paths objectAtIndex: i];
+    NSString *domain = [[path stringByDeletingLastPathComponent] lastPathComponent];
     NSArray *array = [fm directoryContentsAtPath: path];
     for (j = 0; j < [array count]; j++)
     {
       NSString *p = [path stringByAppendingPathComponent: [array objectAtIndex: j]];
+      NSString *name = [[p lastPathComponent] stringByDeletingPathExtension];
+      if ([domain isEqual: @"System"] 
+       && [systemVisibleApps containsObject: name] == NO)
+      {
+        continue;
+      }
       id <OSObject> o = [factory objectAtPath: p];
       if (o)
       {
@@ -65,7 +75,12 @@ static NSArray *prefix;
 
 - (NSImage *) icon
 {
-  return [NSImage imageNamed: @"common_UnknownApplication"];
+  return [[IKIcon iconWithIdentifier: @"application-x-executable"] image];
+}
+
+- (NSString *) name
+{
+  return @"Applications";
 }
 
 - (NSImage *) preview
