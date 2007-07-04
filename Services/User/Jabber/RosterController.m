@@ -162,16 +162,35 @@ NSMutableArray * rosterControllers = nil;
 {
 	NSAttributedString * attributedText= [self displayStringForObject:anObject];
 	float myWidth = [attributedText size].width;
-	for(int i=0 ; i<[self outlineView:view numberOfChildrenOfItem:anObject] ; i++)
+	if([view isItemExpanded:anObject])
 	{
-		attributedText = [self displayStringForObject:[self outlineView:view child:i ofItem:anObject]];
-		float width = [attributedText size].width + anIndent;
-		if(width > myWidth)
+		for(int i=0 ; i<[self outlineView:view numberOfChildrenOfItem:anObject] ; i++)
 		{
-			myWidth = width;
+			float width = [self widthOfItemAndChildren:[self outlineView:view
+																   child:i
+																  ofItem:anObject] 
+											withIndent:anIndent] + anIndent;
+			if(width > myWidth)
+			{
+				myWidth = width;
+			}
 		}
 	}
 	return myWidth;
+}
+
+- (int) rowsUnder:(id)anObject
+{
+	int rows = 0;
+	if([view isItemExpanded:anObject])
+	{
+   		rows = [self outlineView:view numberOfChildrenOfItem:anObject];
+		for(int i=0 ; i<[self outlineView:view numberOfChildrenOfItem:anObject] ; i++)
+		{
+			rows += [self rowsUnder:[self outlineView:view child:i ofItem:anObject]];
+		}
+	}
+	return rows;
 }
 
 - (NSSize) calculateRosterSize;
@@ -186,7 +205,13 @@ NSMutableArray * rosterControllers = nil;
 	size.width += interCellHorizontalSpacing;
 
 	//Calculate height
+#ifdef GNUSTEP
+	//numberOfRows doesn't seem to work correctly on GNUstep.
+	size.height = [self rowsUnder:nil] *  ([view rowHeight] + [view intercellSpacing].height);
+#else
 	size.height = [view numberOfRows] * ([view rowHeight] + [view intercellSpacing].height);
+#endif
+	NSLog(@"Roster is %d rows high", [self rowsUnder:nil]);
 	return size;
 }
 
@@ -367,8 +392,8 @@ NSMutableArray * rosterControllers = nil;
 	/* These exception handlers were a work around for a now-fixed bug.
 	 * They can probably be removed.
 	 */
-	RESIZE_ROSTER;
 	NS_DURING
+	RESIZE_ROSTER;
 	[view display];
 	NS_HANDLER
 		NSLog(@"Exception while displaying roster: %@", [localException reason]);
