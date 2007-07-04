@@ -8,13 +8,17 @@ Required software
 You need to have the GNUstep core libraries installed in order to
 compile and use Etoile. The core packages are, at a minimum:
 
-    * gnustep-make 2.0 or higher
+    * gnustep-make 2.00 or higher
 
     * gnustep-base 1.14 or higher
 
     * gnustep-gui 0.12 or higher
 
     * gnustep-back 0.12 or higher
+
+    * gnustep-back 0.10 or higher
+
+    * StepTalk 0.10 or higher
 
 See <http://www.gnustep.org/> for further information.
    
@@ -24,6 +28,8 @@ environment or the whole repository:
     
     * libpng (IconKit)
 
+    * zlib (LuceneKit)
+    
     See <http://www.zlib.net/> for further information.
     
     * OniGuruma 5.0 or higher (OgreKit)
@@ -32,17 +38,31 @@ environment or the whole repository:
     This dependency is also available in trunk/Dependencies/oniguruma (within 
     Etoile repository).
 
-    For PopplerKit
-
-    * Poppler <http://poppler.freedesktop.org/>
-
-    For System
-
-    * DBus <http://www.freedesktop.org/wiki/Software/dbus>
-    * HAL <http://www.freedesktop.org/wiki/Software_2fhal>
-
-
+    * D-Bus 1.0 or higher (System)
     
+    See <http://www.freedesktop.org/wiki/Software_2fdbus> for further 
+    information.
+
+    * HAL (System)
+    
+    See <http://www.freedesktop.org/wiki/Software_2fhal> for further 
+    information.
+
+    * startup-notification (Azalea)
+    
+    See <http://www.freedesktop.org/wiki/Software_2fstartup_2dnotification> for
+    further information.
+
+    * Xcursor (Azalea)
+    
+    See <http://www.freedesktop.org/wiki/Software_2fxlibs> for further 
+    information.
+
+    * XScreenSaver (Idle)
+    
+    See <http://www.jwz.org/xscreensaver/> for further information.
+
+
 Notation
 --------
 
@@ -54,10 +74,12 @@ Notation
 Build and Install
 -----------------
 
-Warning! At this time, the install process is broken when run with 'sudo', then
-you probably have to use 'su root'. Moreover if you encounter path related 
-error, you can source GNUstep.sh or GNUstep.csh in your shell, read the GNUstep 
-documentation to know more about this topic.
+WARNING: If you don't run setup.sh script, Etoile environment won't be fully 
+installed and will simply fail to start.
+
+Note: If you encounter path related error, you can source GNUstep.sh or 
+GNUstep.csh in your shell, read the GNUstep documentation to know more about 
+this topic.
 
 Steps to build:
 
