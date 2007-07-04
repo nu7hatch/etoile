@@ -2,6 +2,9 @@
 
 	Partial sync with -trunk.
 	* Services/User/OuterSpace: Sync with -trunk
+	* Services/User/Vindaloo: Sync with -trunk
+	* Bundles/VolumeControlMenulet: Sync with -trunk
+	* Frameworks/IconKit: Sync with -trunk
 	* ChangeLog, README, ANNOUNCE, INSTALL, INSTALL.Ubuntu, etoile.make, 
 	setup.sh, setdown.sh: Sync with -trunk (root GNUmakefile ommitted). 
 	Most of them weren't brought up-to-date by previous sync.
