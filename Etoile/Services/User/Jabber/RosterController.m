@@ -37,6 +37,20 @@
 #define RESIZE_ROSTER
 #endif
 
+#ifdef GNUSTEP
+/* Ugly hack to fix a GNUstep bug */
+@implementation NSOutlineView (UglyHack)
+- (id)itemAtRow: (int)row
+{
+	if (row >= [_items count])
+	{
+		return [NSNull null];
+	}
+	return [_items objectAtIndex: row];
+}
+@end
+#endif
+
 NSMutableArray * rosterControllers = nil;
 
 @implementation RosterController
@@ -198,7 +212,7 @@ NSMutableArray * rosterControllers = nil;
 	NSSize size;
 	//Calculate width
 	float interCellHorizontalSpacing = [view intercellSpacing].width;
-	float indent = [view indentationPerLevel] + (4*interCellHorizontalSpacing);
+	float indent = [view indentationPerLevel] + (interCellHorizontalSpacing);
 	size.width = [self widthOfItemAndChildren:nil withIndent:indent];
 	size.width += interCellHorizontalSpacing + indent;
 	[[[view tableColumns] objectAtIndex:0] setWidth:size.width];
