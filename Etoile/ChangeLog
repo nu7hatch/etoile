@@ -7,6 +7,7 @@
 	* Services/Private/Login: 
 	* Frameworks/SystemConfig: 
 	* Bundles/VolumeControlMenulet: 
+	* Services/Private/Azalea: 
 	Sync with -trunk
 
 2007-07-04  Quentin Mathe <qmathe@club-internet.fr>
