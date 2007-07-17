@@ -2,6 +2,7 @@
 
 	Partial sync with -trunk.
 	* Services/User/FontManager: Sync with -trunk
+	* Services/User/Sketch: Sync with -trunk
 
 2007-07-04  Quentin Mathe <qmathe@club-internet.fr>
 
