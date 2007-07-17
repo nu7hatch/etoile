@@ -1,6 +1,7 @@
 2007-07-17  Quentin Mathe <qmathe@club-internet.fr>
 
-	Partial sync with -trunk.
+	Full sync with -trunk except OgreKit. Also omitted DictionaryReader 
+	that has entered into a new development cycle.
 	* Services/User/FontManager:
 	* Services/User/Sketch:
 	* Services/Private/Corner: 
@@ -8,6 +9,7 @@
 	* Frameworks/SystemConfig: 
 	* Bundles/VolumeControlMenulet: 
 	* Services/Private/Azalea: 
+	* Services/Private/System: 
 	Sync with -trunk
 
 2007-07-04  Quentin Mathe <qmathe@club-internet.fr>
