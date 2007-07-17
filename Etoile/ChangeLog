@@ -5,6 +5,7 @@
 	* Services/User/Sketch:
 	* Services/Private/Corner: 
 	* Services/Private/Login: 
+	* Frameworks/SystemConfig: 
 	Sync with -trunk
 
 2007-07-04  Quentin Mathe <qmathe@club-internet.fr>
