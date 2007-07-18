@@ -1,7 +1,12 @@
+2007-07-18  Quentin Mathe <qmathe@club-internet.fr>
+
+	Forgotten MenuServer in yesterday full sync.
+	* Services/Private/MenuServer: Sync with -trunk.
+ 
 2007-07-17  Quentin Mathe <qmathe@club-internet.fr>
 
-	Full sync with -trunk except OgreKit. Also omitted DictionaryReader 
-	that has entered into a new development cycle.
+	Full sync with -trunk except OgreKit and MenuServer. Also omitted 
+	DictionaryReader that has entered into a new development cycle.
 	* Services/User/FontManager:
 	* Services/User/Sketch:
 	* Services/Private/Corner: 
