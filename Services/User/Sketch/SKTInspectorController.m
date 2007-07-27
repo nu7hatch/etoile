@@ -75,7 +75,11 @@
         if ([[_inspectingGraphicView selectedGraphics] containsObject:[notification object]]) {
             needsUpdate = YES;
 #ifdef GNUSTEP
-			[self updateUI];
+/* When multiple objects is selected, fields in inspector 
+ * will change to mixed status, which lead chaning of graphics,
+ * which then changing the fields in inspector again.
+ * So we don't updateUI here */
+//			[self updateUI];
 #endif
         }
     }
@@ -245,7 +249,7 @@
             [fillColorWell setEnabled:NO];
             [lineCheckbox setState:NSMixedState];
             [lineCheckbox setEnabled:NO];
-            [lineColorWell setColor:[NSColor whiteColor]];
+            [lineColorWell setColor:[NSColor blackColor]];
             [lineColorWell setEnabled:NO];
             [lineWidthSlider setFloatValue:0.0];
             [lineWidthSlider setEnabled:NO];
