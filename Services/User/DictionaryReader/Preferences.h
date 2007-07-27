@@ -5,16 +5,14 @@
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the MIT license. See COPYING.
  */
-#import <Foundation/Foundation.h>
-#import <AppKit/AppKit.h>
 
+#import <AppKit/AppKit.h>
 
 #ifdef ETOILE
 #import <EtoileUI/UKNibOwner.h>
 #else
 #import "UKNibOwner.h"
 #endif
-
 
 /**
  * This notification is sent through the default notification center whenever the
@@ -36,13 +34,12 @@ static NSString* DRActiveDictsChangedNotification = @"DRActiveDictsChangedNotifi
 }
 
 // Singleton
-+(id)shared;
++ (id) shared;
 
--(void)setDictionaries: (NSMutableArray*) dicts;
--(void)rescanDictionaries: (id)sender;
+- (void) setDictionaries: (NSMutableArray*) dicts;
+- (void) rescanDictionaries: (id)sender;
 
--(void)show;
--(void)hide;
+- (void) show;
 @end
 
 

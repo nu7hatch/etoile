@@ -9,78 +9,51 @@
 
 #import <AppKit/AppKit.h>
 #import "DictConnection.h"
-#import "DefinitionWriter.h"
 #import "HistoryManager.h"
 
 @interface AppController : NSObject
 {
 	@private
-	IBOutlet NSTextField* searchStringControl;
-	IBOutlet NSTextView* searchResultView;
-	IBOutlet NSButton* browseBackButton;
-	IBOutlet NSButton* browseForwardButton;
-	IBOutlet NSWindow* dictionaryContentWindow;
+	IBOutlet NSTextView *searchResultView;
+	IBOutlet NSWindow *dictionaryContentWindow;
+	IBOutlet NSSearchField *searchField;
+	IBOutlet NSButton *backButton;
+	IBOutlet NSButton *forwardButton;
 	
 	NSMutableArray* dictionaries;
 	HistoryManager* historyManager;
-	
+	NSArray *definitions; /* Currently displayed definitions */
+#if 0	
 	NSToolbarItem* backItem;
 	NSToolbarItem* forwardItem;
 	NSToolbarItem* searchItem;
-	NSSearchField* searchField;
+#endif
 }
 
--(id)init;
-
+- (id)init;
 
 // Some methods called by the GUI
--(void) browseBackClicked: (id)sender;
--(void) browseForwardClicked: (id)sender;
--(void) orderFrontPreferencesPanel: (id)sender;
-
+- (void) browseBackClicked: (id) sender;
+- (void) browseForwardClicked: (id) sender;
+- (void) orderFrontPreferencesPanel: (id) sender;
+- (void) searchAction: (id) sender;
+- (void) increaseFontSize: (id) sender;
+- (void) decreaseFontSize: (id) sender;
 
 // TextView delegate stuff
--(BOOL) textView: (NSTextView*) textView
-   clickedOnLink: (id) link
-	 atIndex: (unsigned) charIndex;
+- (BOOL) textView: (NSTextView*) textView clickedOnLink: (id) link
+          atIndex: (unsigned) charIndex;
 
--(void)updateGUI;
-
-
-// Listen for actions...
-
-// ...from the GUI
--(void) searchAction: (id)sender;
+- (void) updateGUI;
 
 // ...from the Links in the text field
--(void) clickSearchNotification: (NSNotification*)aNotification;
+- (void) clickSearchNotification: (NSNotification*)aNotification;
 
-// ..from the system
--(void) applicationWillTerminate: (NSNotification*) theNotification;
--(void) applicationDidFinishLaunching: (NSNotification*) theNotification;
-
-
--(void) defineWord: (NSString*)aWord;
+- (void) defineWord: (NSString*) aWord;
 
 @end
 
-
-@interface AppController (DefinitionWriter) <DefinitionWriter> 
-
--(void) clearResults;
--(void) writeBigHeadline: (NSString*) aString;
--(void) writeHeadline: (NSString*) aString;
--(void) writeLine: (NSString*) aString;
--(void) writeString: (NSString*) aString
-	       link: (id) aClickable;
-
-// not part of the protocol
--(void) writeString: (NSString*) aString
-	 attributes: (NSDictionary*) attributes;
-
-@end
-
-@interface AppController (HistoryManagerDelegate) <HistoryManagerDelegate>
--(BOOL) historyManager: (HistoryManager*) aHistoryManager
-	 needsBrowseTo: (id) aLocation;
+@interface AppController (HistoryManagerDelegate)
+- (BOOL) historyManager: (HistoryManager*) aHistoryManager
+          needsBrowseTo: (id) aLocation;
 @end
