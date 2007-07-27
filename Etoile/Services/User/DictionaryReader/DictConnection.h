@@ -10,11 +10,9 @@
 #ifndef _DICTCONNECTION_H_
 #define _DICTCONNECTION_H_
 
-#import <Foundation/Foundation.h>
 #import "StreamLineReader.h"
 #import "StreamLineWriter.h"
 #import "NSString+Convenience.h"
-#import "DefinitionWriter.h"
 #import "DictionaryHandle.h"
 
 /**
@@ -23,46 +21,21 @@
  */
 @interface DictConnection : DictionaryHandle
 {
-  NSInputStream* inputStream;
-  NSOutputStream* outputStream;
-  StreamLineReader* reader;
-  StreamLineWriter* writer;
-  NSHost* host;
-  int port;
-  
-  id<DefinitionWriter> defWriter;
+	NSInputStream* inputStream;
+	NSOutputStream* outputStream;
+	StreamLineReader* reader;
+	StreamLineWriter* writer;
+	NSHost* host;
+	int port;
 }
 
-// Class methods
-
-
 // Instance methods
--(id)initWithHost: (NSHost*) aHost
-	     port: (int) aPort;
+- (id) initWithHost: (NSHost *) aHost port: (int) aPort;
+- (id) initWithHost: (NSHost *) aHost;
+- (id) initWithDefaultHost; // dict.org
 
--(id)initWithHost: (NSHost*) aHost;
-
--(NSHost*) host;
-
--(void) sendClientString: (NSString*) clientName;
--(void) handleDescription;
--(void) descriptionForDatabase: (NSString*) aDatabase;
--(void) definitionFor: (NSString*) aWord;
--(void) definitionFor: (NSString*) aWord
-	 inDictionary: (NSString*) aDict;
-
--(void)open;
--(void)close;
-
--(void) setDefinitionWriter: (id<DefinitionWriter>) aDefinitionWriter;
-
-@end
-
-
-@interface DictConnection (Private)
-
--(void) log: (NSString*) aLogMsg;
--(void) showError: (NSString*) aString;
+- (NSHost *) host;
+- (int) port;
 
 @end
 

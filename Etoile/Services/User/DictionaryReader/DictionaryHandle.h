@@ -11,45 +11,45 @@
 #define _DICTIONARY_H_
 
 #import <Foundation/Foundation.h>
-#import "DefinitionWriter.h"
+#import "Definition.h"
 
 /**
- * The Dictionary handle protocol.
+ * The dictionary handle class
  */
-@interface NSObject (DictionaryHandle)
+@interface DictionaryHandle: NSObject
+{
+	BOOL _active;
+}
 
-
-// MAIN FUNCTIONALITY
++ (id) dictionaryFromPropertyList: (NSDictionary *) aPropertyList;
 
 /**
- * Gives away the client identification string to the dictionary handle.
+ * Initialises the DictionaryHandle from the property list aPropertyList.
  */
--(void) sendClientString: (NSString*) clientName;
+- (id) initFromPropertyList: (NSDictionary *) aPropertyList;
 
 /**
  * Lets the dictionary handle show handle information in the main window.
  */
--(void) handleDescription;
+- (void) handleDescription;
 
 /**
  * Lets the dictionary handle describe a specific database.
  */
--(void) descriptionForDatabase: (NSString*) aDatabase;
+- (void) descriptionForDatabase: (NSString *) aDatabase;
 
 /**
- * Lets the dictionary handle print all available definitions
- * for aWord in the main window.
+ * Get definition (synchronized) or error
  */
--(void) definitionFor: (NSString*) aWord;
+- (NSArray *) definitionsFor: (NSString *) aWord error: (NSString **) error;
 
 /**
- * Lets the dictionary handle print the defintion for aWord
- * in a specific dictionary. (Note: The dictionary handle may
- * represent multiple dictionaries.)
+ * Get definition (synchronized) or error
+ * (Note: The dictionary handle may represent multiple dictionaries.)
  */
--(void) definitionFor: (NSString*) aWord
-	 inDictionary: (NSString*) aDict;
-
+- (NSArray *) definitionsFor: (NSString *) aWord 
+                inDictionary: (NSString *) aDict
+                       error: (NSString **) error;
 
 // SETTING UP THE CONNECTION
 
@@ -58,20 +58,13 @@
  * definitions. Implementing classes may open network connections
  * here.
  */
--(void)open;
+- (void)open;
 
 /**
  * Closes the dictionary handle. Implementing classes may close
  * network connections here.
  */
--(void)close;
-
-/**
- * Provides the dictionary handle with a definition writer to write
- * its word definitions to.
- */
--(void) setDefinitionWriter: (id<DefinitionWriter>) aDefinitionWriter;
-
+- (void)close;
 
 /**
  * Returns a NSDictionary instance that shortly describes the dictionary so
@@ -79,40 +72,27 @@
  * key @"class" must be present and the corresponding object must be the class
  * name of the DictionaryHandle class.
  */
--(NSDictionary*) shortPropertyList;
-
-/**
- * Initialises the DictionaryHandle from the property list aPropertyList.
- */
--(id) initFromPropertyList: (NSDictionary*) aPropertyList;
+- (NSDictionary *) shortPropertyList;
 
 /**
  * Returns YES if and only if the dictionary is active
  */
--(BOOL) isActive;
+- (BOOL) isActive;
 
 /**
  * Sets if the dictionary is active
  */
--(void) setActive: (BOOL) isActive;
-@end
-
-
-
+- (void) setActive: (BOOL) isActive;
 
 /**
- * The dictionary handle class
+ * Show error on defition writer.
  */
-@interface DictionaryHandle : NSObject
-{
-    BOOL _active;
-}
+- (void) showError: (NSString *) aString;
 
-+(id) dictionaryFromPropertyList: (NSDictionary*) aPropertyList;
--(id) initFromPropertyList: (NSDictionary*) aPropertyList;
--(NSDictionary*) shortPropertyList;
--(BOOL) isActive;
--(void) setActive: (BOOL) isActive;
+/**
+ * Debug purpose.
+ */
+- (void) log: (NSString *) aString;
 @end
 
 #endif // _DICTIONARY_H_
