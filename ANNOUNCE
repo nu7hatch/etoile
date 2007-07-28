@@ -13,7 +13,8 @@ developers interested in a GNUstep-based environment.
 This release includes improvements to the Camaelon theme engine, providing a
 clean and modern appearance to GNUstep-based applications.  This is combined
 with the Étoilé Menu Server, providing a horizontal menu bar similar to that
-found in Mac OS.  
+found in Mac OS, and making this the first Étoilé release with enough features
+in place to be usable on a daily basis.
 
 The 0.2 release includes a number of new frameworks, including support for
 OPML, RSS, and a number of enhancements to the core OpenStep APIs for better
@@ -33,6 +34,12 @@ de-emphasis on applications.
 Étoilé 0.2 requires the latest stable release of GNUstep.  If your operating
 system or distribution packages an older version, you may need to upgrade.
 
+Screen Shots
+------------
+
+A number of screen shots of the release are available from:
+
+http://www.etoile-project.org/etoile/mediawiki/index.php?title=Etoile_02_Release_Screenshots
 	
 Availability
 ------------
