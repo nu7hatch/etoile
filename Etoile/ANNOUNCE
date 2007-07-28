@@ -1,211 +1,49 @@
 =====================
-Étoilé 0.1.9 Released
+Étoilé 0.2.0 Released
 =====================
 
-May 02, 2007 (From Internet). The Étoilé project today released the first 
-preview release of Étoilé User Environment 0.2, the next generation Desktop 
-Environment based on GNUstep for Linux and other Unix operating systems. 
-Étoilé 0.1.9 introduces Étoilé environment to public as a developer platform. 
-This release is mostly targeted at GNUstep/Cocoa developers.
+July 28, 2007:
 
-New Features since Étoilé 0.1 
------------------------------
+The Étoilé project is pleased to announce the release of version 0.2 of the
+Étoilé User Environment for UNIX-like systems.  The Étoilé project aims to
+produce a user environment for desktop and small form-factor devices, with
+tight integration between components.  The 0.2 release is primarily targeted at
+developers interested in a GNUstep-based environment.  
 
-	* Camaelon
-	
-	  Bug-fixing release.
-	
-	* EtoileBehavior
-	  
-	  First release.
-	  Remind users unsaved document.
+This release includes improvements to the Camaelon theme engine, providing a
+clean and modern appearance to GNUstep-based applications.  This is combined
+with the Étoilé Menu Server, providing a horizontal menu bar similar to that
+found in Mac OS.  
 
-	* EtoileWildMenus
+The 0.2 release includes a number of new frameworks, including support for
+OPML, RSS, and a number of enhancements to the core OpenStep APIs for better
+integration with the Étoilé environment.
 
-	  First release.
-	  Provides horizontal menu for GNUstep applications.
+Usability improvements include the addition of hot corners, allowing arbitrary
+scripts to be run when the pointer enters a screen corner, and numerous
+improvements to the window manager (Azalea) and dock.  This release includes a
+set of core services (applications), including a rich text editor, drawing
+tool, RSS reader and IM client.
 
-	* AddressesKit
-	
-	  Bug-fixing release.
-	  The frameworks of Addresses for GNUstep 0.4.6
+The next release is intended to focus on improving the user experience and
+integrating some of the core components needed for a full Étoilé environment,
+including a greater focus on component and project orientation, and a
+de-emphasis on applications.
 
-	* CollectionKit
-
-	  First release.
-	  Ported from Addresses for general use.
-
-	* BookmarkKit
-
-	  First release.
-	  A bookmark system based on CollectionKit.
-
-	* DistributedView
-
-	  First release.
-	  Provide icon view of file manager or other applications.
-
-	* EtoileFoundation
-
-	  First release.
-	  A collection of common classes for Etoile.
-
-	* EtoileUI
-
-	  First release.
-	  A collection of common classes for Etoile.
-
-	* IconKit
-	
-	  First release.
-	  Icon theme management for Etoile.
-
-	* OgreKit
-
-	  A find panel for any text view.
-
-	* OPMLKit
-
-	  First release.
-	  Read OPML bookmark xml.
-
-	* PaneKit
-	
-	  First release.
-	  A framework to provide general pane management.
-
-	* InspectorKit
-	  
-	  First release.
-	  Ported from OpenSpace Manager and based on PaneKit,
-	  InspectorKit provides common inspectors for files.
-
-	* PopplerKit
-
-	  Bug-fixing release.
-	  Work on both 0.4.x and 0.5.x poppler.
-
-	* RSSKit
-
-	  First release in Etoile.
-	  Read common RSS format.
-	
-	* SystemConfig
-
-	  First release.
-	  Support hardward-related functions.
-	
-	* UnitKit 1.1 (GNUstep version)
-	
-	  Bug-fixing release.
-	  Support unit test on class object.
-
-	* XWindowServerKit
-
-	  Support common tasks of X window system and freedesktop standard.
-
-	* Io
-
-	  First release in Etoile.
-	  A Io virtual machine with built-in Objective-C support.
-
-	* Azalea
-
-	  First release.
-	  A window manager ported from OpenBox3
-
-	* AZBackground
-
-	  First release
-	  Draw image on X window background.
-
-	* AZDock
-
-	  First release.
-	  A dock to manage both X window and GNUstep applications.
-
-	* MenuServer
-
-	  First release.
-	  Horizontal menu bar with menulet support.
-
-	* System
-
-	  First release.
-	  A session manager with login and poweroff support.
-
-	* AddressManager
-
-	  Bug-fixing release.
-	  The application part of Addresses for GNUstep 0.4.6.
-
-	* Calc
-
-	  First release.
-	  A simple calcular using Io virtual machine.
-
-	* DictionaryReader
-
-	  First release
-	  Support both dictd and local dictionary.
-
-	* Grr
-
-	  First release in Etoile.
-	  A RSS Reader.
-
-	* Typewriter
-
-	  First release.
-	  A text editor.
-
-	* Vindallo
-
-	  Bug-fixing release.
-
-	* Login
-	
-	  First release.
-	  A greeter for GDM.
-
-	* OuterSpace
-
-	  First release.
-	  A simple file manager.
-	  
-	* StepChat
-
-	  First release.
-	  A jabber client.
-
-More detailed Release Notes may be found here : 
-<http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Latest_Release_Notes>
+Étoilé 0.2 requires the latest stable release of GNUstep.  If your operating
+system or distribution packages an older version, you may need to upgrade.
 
 	
 Availability
 ------------
 
-Étoilé 0.1.9 is currently available in code source form only 
-and may be downloaded at <http://download.gna.org/etoile/> 
-Instructions to compile and install it are located at 
-<http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Install>
-For developer related documentation, visit 
-<http://www.dromasoftware.com/etoile/mediawiki/index.php?title=Frameworks_Suite>
+Étoilé 0.2.0 is currently available in code source form only 
+and may be downloaded at <http://download.gna.org/etoile/etoile-0.2.tar.gz> 
+It may also be obtained from Subversion with the following command:
 
+svn co svn://svn.gna.org/svn/etoile/releases/0.2
 
-About Étoilé
-------------
-
-Étoilé is an independent project of various people like developers, artists and 
-other wanderers to create an open source and innovative GNUstep based Desktop 
-Environment. 
-More precisely, it intends to be a user environment built from the ground up 
-on highly modular and light components with project and document orientation in 
-mind, in order to allow users to create their own workflow by reshaping or 
-recombining provided Services (aka Applications), Components etc. Flexibility 
-and modularity on both User Interface and code level should allow it to scale 
-from PDA to computer environment.
-
+A LiveCD based on this release will be made available shortly.
 
 More Information
 ----------------

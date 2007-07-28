@@ -959,12 +959,13 @@ void action_run_list(NSArray *acts, AZClient *c, ObFrameContext context,
 
     if ((acts == nil) || ([acts count] == 0))
         return;
-
+	NSLog(@"x: %d, y: %d", x, y);
     if (x < 0 && y < 0)
     {
 	[[AZScreen defaultScreen] pointerPosAtX: &x y: &y];
     }
 
+	NSLog(@"(x: %d, y: %d)", x, y);
     if (grab_on_keyboard()) {
         inter = YES;
     } else {
