@@ -41,7 +41,7 @@ Availability
 and may be downloaded at <http://download.gna.org/etoile/etoile-0.2.tar.gz> 
 It may also be obtained from Subversion with the following command:
 
-svn co svn://svn.gna.org/svn/etoile/releases/0.2
+svn co svn://svn.gna.org/svn/etoile/tags/Etoile-0.2
 
 A LiveCD based on this release will be made available shortly.
 
