@@ -104,7 +104,7 @@ userLevelSetup()
 
 	if [ $AS_ROOT = yes -o $HAVE_SUDO = yes ]; then
 		# FIXME: Seek bundles in both Local and System domains
-		bundledir="$GNUSTEP_LOCAL_ROOT/Library/Bundles"
+		bundledir="$GNUSTEP_SYSTEM_ROOT/Library/Bundles"
 	else
 		# When the script is run without sudo or root permissions, we 
 		# can suppose the bundles have been installed in the user 
@@ -328,7 +328,7 @@ fi
 
 if [ -f $PWD/$fontarchive ]; then
 	echo "Copying Fonts in $setupdir/Fonts";
-	tar -xzf $PWD/$fontarchive
+	tar -xf $PWD/$fontarchive
 	$SUDO cp -R $PWD/etoile-default-fonts/* $setupdir/Fonts
 else
 	if [ $wgetavailable = yes ]; then
