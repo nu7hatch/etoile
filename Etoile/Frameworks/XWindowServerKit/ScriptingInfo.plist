@@ -1,8 +1,0 @@
-{
-	ScriptingInfoClass = StepTalkScriptingInfo;
-
-	Classes = (
-		NSScreen,
-		NSWindow
-	);
-}
