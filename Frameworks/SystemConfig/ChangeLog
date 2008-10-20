@@ -1,0 +1,117 @@
+2008-03-23  Quentin Mathe <qmathe@club-internet.fr>
+
+	Necessary changes to compile and link with ACPI support. ACPI is still 
+	turned off by default. Made this choice, mostly because libacpi package 
+	isn't yet available on Ubuntu (next Ubuntu release Hardy Heron will include 
+	it though).
+	* GNUmakefile: Modified to link libacpi if ACPI support is enabled.
+	* Source/GNUmakefile.preamble: Modified to pass the flag -DLIBACPI if 
+	ACPI support is turned on.
+	* INSTALL: Updated.
+	* README: Listed all authors.
+
+2008-03-23  Lennart Melzer <l.melzer at tu-bs dot de>
+
+	Applied a patch by Lennart Melzer that implements ACPI support by relying 
+	on libacpi. The formatting and the code organization of the patch have been 
+	reworked a bit. ACPI support is turned off by default.
+	* Source/SCPower_Linux.m 
+	(-checkACPIStatus, -ACPIStatus, -APMStatus, -statusFromPercentage): New 
+	private methods.
+	(-status): Modularized to support both ACPI and APM, mostly done by moving 
+	APM code into new method -APMStatus.
+
+2008-02-23  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/SCPower_Linux.m: Fixed a compiler warning by replacing 
+	multiple return points with a single one and using the unused variable 
+	status to store the returned value. Also tidied the formatting a bit. 
+
+2008-02-23  N.H. Koh <nyaphong at gmail dot com>
+
+	Initial support for keyboard in X11 environment.
+	* Headers/SCConfig+Private.h: Modified to import Foundation.h.
+	* Headers/SCConfig.h: Declared enum values for keyboard failures.
+	* Headers/X11Keyboard.h:
+	* Sources/X11Keyboard.m:
+	Added.
+	* GNUmakefile:
+	* Source/GNUmakefile
+	Updated.
+
+2007-12-07  Quentin Mathe <qmathe@club-internet.fr>
+
+	Note: Patch submitted by Eric Wasylishen, related to bug #10463 initially 
+	reported on etoile-dev.
+	* Source/GNUmakefile: Fixed header search path to be /usr/include instead
+	of /usr/include/sys which contain architecture dependent headers.
+	* Source/SCSound.m: Modified to take in account the makefile modification.
+
+2007-07-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* GNUmakefile:
+	* Source/GNUmakefile:
+	Fixed linking to link X11 as expected (was broken by library to 
+	framework conversion). Normally that should eliminate repository
+	compilation error in Hardware which links SystemConfig.
+
+2007-05-03  Yen-Ju Chen <yjchenx at gmail>
+
+        * Toplevel GNUmakefile make the frameworks
+          while Source/GNUmakefile make the subproject
+
+2007-04-14  Yen-Ju Chen <yjchenx at gmail>
+
+	* Initial sound support.
+	* Keep volume between 0 and 100.
+
+2007-02-18  Yen-Ju Chen <yjchenx at gmail>
+
+	* Format README in reStructuredText
+
+2007-02-16  Guenther Noack <guenther@unix-ag.uni-kl.de>
+
+	* Source/X11Mouse.m:
+	Fixed error checking. (Does not apply to these functions.)
+
+2007-02-12  Guenther Noack <guenther@unix-ag.uni-kl.de>
+
+	* Headers/X11Mouse.h:
+	* Source/X11Mouse.m:
+	X11 mouse configuration code (untested)
+	
+	* Headers/SCConfig.h:
+	* Headers/SCConfig+Private.h:
+	* Source/SCConfig.m:
+	Added helper method for implementing classes
+	
+	* Headers/SCMonitor.h:
+	* Headers/SCMouse.h:
+	* Source/SCMonitor.m:
+	* Source/SCMouse.m:
+	Documented methods and implemented default methods
+
+2006-11-10  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/SCConfig.h:
+	* Source/SCConfig.m:
+	Modified to have a delegate object for error reporting.
+
+2006-11-08  Quentin Mathe <qmathe@club-internet.fr>
+
+	* COPYING:
+	* INSTALL:
+	* README:
+	* GNUmakefile:
+	* Headers/SCConfig.h:
+	* Headers/SCKeyboard.h:
+	* Headers/SCMonitor.h:
+	* Headers/SCMouse.h:
+	* Headers/SCSound.h:
+	* Source/SCConfig.m:
+	* Source/SCKeyboard.m:
+	* Source/SCMonitor.m:
+	* Source/SCMouse.m:
+	* Source/SCSound.m:
+	* Source/GNUmakefile:
+	Initial import (API draft without implementation code).

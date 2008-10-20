@@ -1,0 +1,146 @@
+2007-05-01  Yen-Ju Chen <yjchenx gmail>
+
+	* Turn into framework.
+
+2007-02-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Update README
+
+2006-09-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* GNUmakefile: Updated to include etoile.make.
+
+2006-07-30  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/SBServicesBar.h: 
+	* Headers/SBServicesBarItem.h:
+	* Source/SBServicesBar.h: 
+	* Source/SBServicesBarItem.h:
+	Moved framework headers and source files in two new directories in 
+	order to workaround gnustep-make limitation. ServicesBarMenulet depends
+	on the framework itself, but we cannot specify subprojects to be built 
+	after the project itself (only before). By moving the framework source
+	in a subproject we can control its build order among other subprojects.
+	* Source/GNUmakefile: Copied, then updated to reference the moved 
+	headers as needed.
+	* GNUmakefile: 
+	* ServicesBarMenulet/GNUmakefile.preamble: 
+	Updated.
+
+2006-06-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* GNUmakefile: Fixed compilation by disabling currently non existent 
+	StatusItemExample subproject.
+
+2006-06-04  Quentin Mathe <qmathe@club-internet.fr>
+
+	ServicesBarKit should now be partially usable, but it's still uncomplete and
+	any remote use outside of the MenuServer is untested. Take note that 
+	ServicesBarMenulet bundle has to be copied in MenuServer.app/Resources.
+	Major and second part of the MenuServer related update.
+	* ServicesBarMenulet/GNUmakefile: Updated.
+	* ServicesBarMenulet/ServicesBarMenulet.m: Fixed license to be LGPL and not
+	GPL.
+	(-init): Updated to handle the whole set up.
+	(-publishServerInstance:): Removed.
+	(-test): Added a test method the MenuServer will try to call.
+	(-displayClickMePanel:): New action method to show a dummy dialog.
+	* SBServicesBar.h: Reorganized ivars more clearly, by the way renamed
+	properly ivar _itemsToobar to _itemToolbar. Renamed the method
+	+sharedServicesBar to +systemServicesBar.
+	* SBServicesBar.m: Added a SBServicesBar protocol to be used when the 
+	instance is manipulated through a proxy.
+	(+serverInstance):
+	(+setUpServerInstance:):
+	(-toolbar):
+	New non public methods. The server instance is now the default shared 
+	instance exported by -systemServicesBar: which returns a proxy when called 
+	outside of the MenuServer.
+	(-insertServicesBarItem:atIndex:): Improved to be more cautious about new 
+	items to be inserted, by checking item instance is in the bar instance 
+	process and ensuring the item hasn't been already inserted. 
+	Updated tests.
+	* SBServicesBarItem.h: Reorganized ivars more clearly and replaced 
+	-initWithTitle: by +systemServicesBarItemWithTitle:. Added ivar _ownerBar
+	referencing the bar instance, therefore the related process where the bar 
+	instance is located.
+	* SBServicesBarItem.m:  Added a SBServicesBarItem protocol to be used when the 
+	instance is manipulated through a proxy.
+	(+setUpServicesBarItemWithTitle:):
+	(-owner):
+	New non public methods.
+	(-initWithTitle:): Updated.
+	(-description): Added.
+	(-setTitle:): Fixed to properly set the related toolbar item label.
+	Updated tests.
+	* GNUmakefile: Updated.
+
+	Test result (on Linux ppc): 2 classes, 4 methods, 12 tests, 1 failed
+
+2006-05-24  Quentin Mathe <qmathe@club-internet.fr>
+    
+    Warning! Not yet usable.
+    First part of the MenuServer support related update.
+    Export the services bar in a menulet loaded by the MenuServer.
+    * ServicesBarMenulet/GNUmakefile:
+    * ServicesBarMenulet/GNUmakefile.preamble:
+    * ServicesBarMenulet/ServicesBarMenulet.h:
+    * ServicesBarMenulet/ServicesBarMenulet.m:
+    * ServicesBarMenulet/ServicesBarMenuletInfo.plist:
+    Added.
+
+2006-01-23  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * SBServicesBarItem.m:
+    * SBServicesBar.m:
+    * GNUmakefile.preamble:
+    Fixed test bundle run by adding UnitKit related import directives. Wrapped 
+    test methods (or UnitKit related code) into conditional directives, thus this 
+    test code is stripped off on normal build.
+    Test result (on Linux x86): 2 classes, 4 methods, 10 tests, 0 failed
+
+2006-01-19  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * COPYING: Added.
+    * SBServicesBarItem.h:
+    * SBServicesBarItem.m:
+    * SBServicesBar.h:
+    * SBServicesBar.m:
+    Updated LGPL license notice to 2.1 from 2.
+    * GNUmakefile:
+    * GNUmakefile.preamble:
+    * GNUmakefile.postamble:
+    Removed superfluous license notice.
+
+2005-06-14  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * GNUmakefile.postamble: Inserted missing white space.
+    * SBServicesBar.h:
+    * SBServicesBarItem.h:
+    Replaced UnitKit import directive with '@protocol UKTest' declaration in 
+    order to avoid UnitKit dependency when we are making a standard build.
+
+2005-06-14  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * GNUmakefile.postamble:
+    * GNUmakefile.preamble: 
+    Updated to match changes in IconKit and LuceneKit.
+
+2005-06-07  Quentin Mathe <qmathe@club-internet.fr>
+    
+	* GNUmakefile.postamble:
+	* GNUmakefile.preamble: 
+	Added to allow framework build when UnitKit isn't already installed 
+	(or other Etoile frameworks).
+	* GNUmakefile: Updated to take in account new files.
+
+2005-03-13  Quentin Mathe <qmathe@club-internet.fr>
+    
+	* SBServicesBarItem.h:
+	* SBServicesBarItem.m:
+	* SBServicesBar.h:
+	* SBServicesBar.m:
+	* INSTALL:
+	* README:
+	* GNUmakefile:
+	Initial import.

@@ -1,0 +1,30 @@
+2007-05-04  Yen-Ju Chen <yjchenx at gmail>
+
+	* Export Addresses as AddressBook for building (not installation).
+
+2007-04-29  Yen-Ju Chen <yjchenx at gmail>
+
+	* Fix most of compilational warnings.
+
+2007-04-10  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Frameworks/Addresses/GNUmakefile:
+	* Frameworks/AddressView/GNUmakefile:
+	Fixed bug #8806 by moving etoile.make include.
+
+2007-02-19  Yen-Ju Chen <yjchenx at gmail>
+
+	* Format README in reStructuredText.
+	* Use GNUSTEP_HEADERS to target installed headers
+          and GNUSTEP_USER_DIR for user root.
+
+2006-09-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Frameworks/Addresses/GNUmakefile:
+	* Frameworks/AddressView/GNUmakefile:
+	Updated to include etoile.make in order to export both frameworks as dependencies.
+
+2006-09-16  Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* Initial import from Addresses 0.4.6.
+
