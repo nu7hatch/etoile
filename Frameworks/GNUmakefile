@@ -25,7 +25,7 @@ endif
 ifeq ($(desktop-base), yes)
     
     export iconkit ?= yes
-    export panekit ?= yes
+    export panekit ?= no
     export addresseskit ?= yes
 
 endif
