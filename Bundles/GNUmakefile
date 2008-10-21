@@ -29,7 +29,6 @@ ifeq ($(desktop-base), yes)
     export camaelon ?= yes
     export etoilewildmenus ?= yes
     export workspaceswitcher ?= yes
-    export etoilebehavior ?= yes
 
 endif
 
@@ -65,10 +64,6 @@ endif
 ifeq ($(workspaceswitcher), yes)
     # In prepare to be removed in favor of using AZDock for workspace switching.
     #SUBPROJECTS += WorkspaceSwitcher
-endif
-
-ifeq ($(etoilebehavior), yes)
-    SUBPROJECTS += EtoileBehavior
 endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
