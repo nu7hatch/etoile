@@ -1,0 +1,188 @@
+==========================
+DictionaryReader Changelog
+==========================
+
+June 05 2008  Quentin Mathe
+	Inspired of a patch by cygal (from silc).
+	* DictionaryHandle.m
+	* DictionaryConnection.m
+	* LocalDictionary.m
+	(-shortPropertyList): Modified the code not to assume this method will 
+	return a mutable dictionary. It also removes compilation warnings for the 
+	type mismatch between NSDictionary and NSMutableDictionary.
+	* TODO: Added a note about the initialization of DictionaryHandle class and 
+	subclasses.
+
+Nov 21 2007  Quentin Mathe
+	* GNUmakefile: Forced to link EtoileFoundation to eliminate potential 
+	linking problems now that EtoileUI depends EtoileFoundation.
+
+Jul 6 2007  Yen-Ju Chen
+	* Update nib file and clean up code.
+
+Jun 11 2007  Quentin Mathe
+	* DictConnection.m:
+	* LocalDictionary.m:
+	(-isEqual:): Implemented equality test to avoid adding again a dictionary
+	already listed in Preferences window. -[AppController foundDictionary:] 
+	checks for identical dictionaries but until now never finds identical ones.
+	* DictConnection.h, DictConnection.m (-host): New method.
+	* LocalDictionary.h, LocalDictionary.m (-fullName): New method.
+
+Jun 11 2007  Quentin Mathe
+	Important update to make DictionaryReader works in a reliable and friendly 
+	way. We now look for dictionaries on launching, that means a default 
+	dictionary is set by looking for local or remote dictionaries. You don't 
+	need anymore to go to Preferences and rescan for dictionaries if no 
+	dictionaries.plist file is installed. Fixed crash which occurs when you 
+	click two times on Rescan, DictConnection is now properly closed and 
+	deallocated. Similar fix for LocalDictionary.
+	* AppController.h:
+	* AppController.m: 
+	(-init): Removed dictionary list loading related code.
+	(-awakeFromNib): Added code delagating dictionary list loading to 
+	Preferences.
+	(-dictionaryStoreFile): Moved to Preferences.
+	(-applicationWillTerminate:): Minor update to match previous changes.
+	* Preferences.h:
+	* Preferences.m:
+	(-rescanDictionaries): Extended to call -searchWithDictionaryStoreFile.
+	(-dictionaryStoreFile): Added method from AppController.
+	(-searchWithDictionaryStoreFile): New method based on code previously
+	located in -[AppController init].
+	* LocalDictionary.m: Fixed memory management by adding missing -dealloc 
+	method.
+	(-setDefinitionWriter:): Added assertion to avoid nil argument.
+	* DictConnection.m: Fixed memory management.
+	(-setDefinitionWriter:): Added assertion to avoid nil argument.
+	(-close): Modified to close only if necessary (may help to avoid crash).
+	* StreamDefinitionWriter.m:
+	* StreamDefinitionReader.m:
+	(-dealloc): Replaced RELEASE by DESTROY (not really necessary but extra 
+	safety).
+	
+
+May 07 2007  Yen-Ju Chen
+	* Change license to MIT as agreed by Günther Noack.
+	  Attach email in the end of COPYING.
+
+Mar 18 2007  Yen-Ju Chen
+	* Add missing README
+
+Mar 11 2007  Yen-Ju Chen
+	* Use EtoileUI for UKNibOwner instead of EtoileFoundation.
+          Patched by Frédéric Point (Bug #8712).
+
+Feb 19 2007  Yen-Ju Chen
+	* Create ~/GNUstep/Library/DictionaryReader/ if it does not exist.
+	* Use host name for property list since NSHost is not a property list.
+	* Remove all dictionaries before rescanning.
+
+Feb 12 2007  Guenther Noack
+	* AppController.[mh]:
+	* */DictionaryReader.gorm, */DictionaryReader.nib:
+	* Resources/etoile_[forward|back].tiff:
+	Finished Quentin's toolbar code.
+	
+Feb 11 2007  Guenther Noack
+	* AppController.m: Made service method non-blocking
+	* DictionaryReaderInfo.plist: "=" keyboard shortcut for service
+	* AppController.[mh]: Auto-show the window when the application
+	  icon is clicked.
+
+Feb 08 2007  Quentin Mathe
+	* AppController.m: Added toolbar code (not yet enabled) to replace the 
+	actual top bar. This represents early work to streamline UI in relation 
+	to other Etoile applications.
+
+Nov 26 2006  Guenther Noack
+	* everywhere: Better assertions, wrote awakeFromNib in preferences
+	  controller.
+	* UKNibOwner.[mh]: Copied UKNibOwner over to DictionaryReader to make
+	  a compilation without Etoile possible. When compiling on Etoile,
+	  the application will still be linked to EtoileFoundation instead.
+
+Nov 24 2006  Guenther Noack
+	* GNUmakefile: Made the inclusion of etoile.make 'weak' (it doesn't
+	  fail any more when it's not present)
+
+Nov 15 2006  Quentin Mathe
+	* GNUmakefile: Updated to include etoile.make, this allows the project
+	  to compile without installing EtoileFoundation first.
+
+Nov 07 2006  Yen-Ju Chen
+	* GNUmakefile, Preferences.h: Use EtoileFoundation instead deprecated 
+	  EtoileExtension.
+	* HistoryManager.m: return self in -init to avoid memory leak.
+
+Oct 15 2006  Guenther Noack
+	* Bug #7379 hopefully fixed. Forgot to "svn add" some files... :-/
+	* Thanks for the bugreport to YunSong Hwang :-)
+	* Commented out the [dict close] line in AppController (that slowed
+	  down the lookup times and it's still consistent now)
+
+Oct 9 2006  Guenther Noack
+	* Preference panel works now
+	* Support for GZipped (.dz extension) dictionaries (GNUstep only!)
+
+Oct ? 2006  Guenther Noack
+	* Preference panel for choosing dictionaries
+	* Removed my NSString startsWith: helper method in favor of hasPrefix:
+	  which already existed. :->
+
+Aug 8 2006 Guenther Noack
+	* Local dictionary support written (currently, the jargon file
+	  is bundled with the application). Still needs to be made
+	  configurable.
+	* GUI width increased so avoid automatic line breaks.
+	* Edit menu added to GUI (has a 'copy' and a 'select all' entry)
+
+Jun 18 2006 Guenther Noack
+	* Fixed the 'bad dictionary names' bug. The dictionary name
+	  display in the text view looks much better now. :-)
+	  
+Jun 18 2006 Guenther Noack
+	* Added code which is intended to fix the 'bad dictionary names'
+	  bug listed in the TODO list.
+	
+May 22 2006 Guenther Noack
+	* Fixed the bug that made the window stay hidden even when a new
+	  lookup was invoked.
+	
+May 21 2006 Yen-Ju
+	* Fix a typo.
+
+May 10 2006 Guenther Noack
+	* Applied patch by Chris B. Vetter that provides a Service
+	  to look up words with DictionaryReader
+ 
+Mar 30 2006 Yen-Ju
+	* Use GNUstep-make to compile on Cocoa.
+	* Make link work.
+
+Apr 2 2006 Guenther Noack
+	* More patches by Chris B. Vetter:
+	* Results scroll to top after each query
+	* Dictionary name extraction improved (numbers are cut)
+
+Apr 2 2006 Guenther Noack
+	* Defaults now used for Dict server finding:
+	  Use the "Dict Server" default for it.
+	  Applied the patch by Chris B. Vetter
+	
+Apr 2 2006 Guenther Noack
+	* Link ability added
+	
+Apr 1 2006 Guenther Noack
+	* Convenience methods added to NSString
+	* Notifications are now used for the coordination of
+	  search invocations from different 'sources' (GUI, links)
+	* Prepared for Links
+
+Mar 30 2006 Yen-Ju
+    * Work on Cocoa.
+
+Mar 30 2006 Guenther Noack
+    * Initial commit to Etoile SVN
+    
+	

@@ -1,0 +1,94 @@
+#
+# Dictionary Reader Makefile
+#
+
+include $(GNUSTEP_MAKEFILES)/common.make
+
+ifeq ($(warnings), yes)
+	ADDITIONAL_OBJCFLAGS += -W
+	ADDITIONAL_OBJCPPFLAGS += -W
+	ADDITIONAL_CFLAGS += -W
+	ADDITIONAL_CPPFLAGS += -W
+endif
+
+ifeq ($(allwarnings), yes)
+	ADDITIONAL_OBJCFLAGS += -Wall
+	ADDITIONAL_OBJCPPFLAGS += -Wall
+	ADDITIONAL_CFLAGS += -Wall
+	ADDITIONAL_CPPFLAGS += -Wall
+endif
+
+APP_NAME = DictionaryReader
+
+DictionaryReader_OBJC_FILES = \
+	AppController.m \
+	StreamLineWriter.m \
+	StreamLineReader.m \
+	DictConnection.m \
+	HistoryManager.m \
+	NSString+Convenience.m \
+	NSString+Clickable.m \
+	NSString+DictLineParsing.m \
+	DictionaryHandle.m \
+	NSScanner+Base64Encoding.m \
+	LocalDictionary.m \
+	Definition.m \
+	Preferences.m \
+	main.m \
+
+DictionaryReader_HEADER_FILES = \
+	AppController.h \
+	StreamLineWriter.h \
+	StreamLineReader.h \
+	DictConnection.h \
+	HistoryManager.h \
+	NSString+Convenience.h \
+	NSString+Clickable.h \
+	NSString+DictLineParsing.h \
+	DictionaryHandle.h \
+	NSScanner+Base64Encoding.h \
+	LocalDictionary.h \
+	Definition.h \
+	Preferences.h \
+
+DictionaryReader_OBJCC_FILES = 
+DictionaryReader_C_FILES = 
+DictionaryReader_RESOURCE_FILES = \
+	Resources/DictionaryReader.tif \
+	Resources/dict.png \
+	Resources/etoile_back.tiff \
+	Resources/etoile_forward.tiff \
+
+DictionaryReader_LANGUAGES = English
+
+DictionaryReader_LOCALIZED_RESOURCE_FILES = \
+	DictionaryReader.gorm \
+	Preferences.gorm \
+	DictionaryReader.nib \
+	Preferences.nib
+
+DictionaryReader_MAIN_MODEL_FILE = DictionaryReader.gorm
+
+DictionaryReader_PRINCIPAL_CLASS = 
+
+# If we're compiling on Etoile, we'll link to EtoileUI
+# to not duplicate UKNibOwner in the code.
+ifeq ($(etoile), yes)
+	ADDITIONAL_GUI_LIBS += -lEtoileFoundation -lEtoileUI
+	ADDITIONAL_OBJCFLAGS += -DETOILE
+else
+	DictionaryReader_OBJC_FILES += UKNibOwner.m
+	DictionaryReader_HEADER_FILES += UKNibOwner.h
+endif
+
+#ifeq ($(debug), yes)
+#	ADDITIONAL_FLAGS += -fprofile-arcs -ftest-coverage
+#	ADDITIONAL_OBJC_LIBS += -lgcov
+#endif
+
+-include GNUmakefile.preamble
+include $(GNUSTEP_MAKEFILES)/application.make
+include $(GNUSTEP_MAKEFILES)/aggregate.make
+-include ../../../etoile.make
+-include GNUmakefile.postamble
+
