@@ -39,7 +39,7 @@ ifeq ($(etoile-extensions), yes)
     #export distributedview ?= yes
     export ogrekit ?= yes
     export lucenekit ?= yes
-    export servicesbarkit ?= yes
+    export servicesbarkit ?= no
     #export rsskit ?= yes
     export xwindowserverkit ?= yes
     export popplerkit ?= yes
