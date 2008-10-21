@@ -27,6 +27,7 @@
 {
 	SELFINIT;
 	state = [[NSMutableDictionary alloc] init];
+	return self;
 }
 - (void) enterTopLeft
 {
