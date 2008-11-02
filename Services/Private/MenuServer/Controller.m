@@ -39,8 +39,6 @@
 #import <AppKit/NSWindow.h>
 #import <AppKit/NSWorkspace.h>
 
-#import <WorkspaceCommKit/NSWorkspace+Communication.h>
-
 #import "MenuBarHeight.h"
 #import "MenuBarView.h"
 #import "MenuBarWindow.h"
