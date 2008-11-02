@@ -21,6 +21,9 @@ facility based on similar interface.
 It also includes a subset of Blocks framework[1] to build applications
 in plugin architecture.
 
+Before writing code that uses CoreObject, be sure to read Known Limitations 
+section.
+
 Note: CoreObject is written from scratch. 
 It only try to mimic the API of AddressBook.
 CoreObject was initially called OrganizeKit. This framework was supposedly to 
@@ -56,3 +59,53 @@ Developer
 
 * Each unit provide property list to be stored.
   
+
+Known Limitations
+-----------------
+
+- The Filesystem backend (COFile and CODirectory) is work-in-progress, don't 
+  play with it if you prefer to be sure you won't lost any data on your 
+  filesystem. Well, in theory it isn't designed to erase your data, but who 
+  knows, that's a developer preview release... ;-)
+- Multiple object contexts per process are supported but mostly untested.
+- Switching to another metadata DB isn't yet supported, only the default one 
+  bound to the current user can be used.
+- Messages sent to multivalues aren't recorded, so you must reset a multivalue 
+  on the object that uses it each time you alter a COMultiValue instance.
+- No support for the recording of messages sent within an object cluster, only 
+  the persistent roots COObject, COGroup or COProxy can trigger persistency, 
+  the objects that belongs to the object graph/cluster behind those class 
+  instances cannot. This multivalue limitation previously described is in fact a 
+  subcase of this one.
+  For now, if you want to record changes within an object cluster, the 
+  problem can be worked around for COProxy. You can do it by adding a special 
+  method to which you pass an object ref of your own, and implements this method 
+  so that it records then forwards the message to the desired object in the 
+  cluster.
+- No deletion model, so you cannot remove an object from an object context once 
+  it has been inserted and there is also no way to handle in-store deletion 
+  (deleting an object bundle on disk and removing the entry from the metadata 
+  DB).
+- Backwards pointers between persistent roots aren't well supported. They are 
+  returned by -parentGroups for COObject class or subclass instances, so for 
+  now it is advised to avoid using this method.
+- No history cleaning.
+- No indexing of object properties or metadatas
+- No fine-grained concurrency control, hence the loading of an object in memory 
+  and the access to an object context must be limited to a single procress. 
+  Different processes can read/write different objects at the same time if they 
+  belong to different object contexts.
+- Object bundles on disk that are moved or renamed must have their entries in 
+  the metadata DB updated by hand. There is no way that the metadata server can 
+  detect such moves for now. See COMetadataServer.h if you are interested in 
+  doing that.
+- Property list export should mostly work but currently depends on having all
+  the core objects to export in-memory. Property list import works more or less, 
+  but isn't truly usable because the metadata DB isn't updated at import time. 
+  So it's a bit of no use, unless you decide to update the metadata DB by 
+  yourself once the property list has been read and the object graph recreated 
+  in-memory. Property list export/import hasn't been recently tested and was 
+  written before COObjectContext and COObjectServer existed, so an imported 
+  object graph is recreated without any care for the new persistency 
+  architecture. This means imported core objects won't be correctly registered 
+  into the current context and cached in the object server.

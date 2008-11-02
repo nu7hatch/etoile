@@ -9,8 +9,10 @@ FRAMEWORK_NAME = CoreObject
 endif
 
 CoreObject_OBJCFLAGS += -std=c99 
-CoreObject_LDFLAGS += -lEtoileFoundation -lEtoileSerialize
-CoreObject_LIBRARIES_DEPEND_UPON += -lEtoileFoundation -lEtoileSerialize -lpq
+CoreObject_INCLUDE_DIRS += -I`pg_config --includedir`
+CoreObject_LIB_DIRS += -L`pg_config --libdir`
+CoreObject_LIBRARIES_DEPEND_UPON += -lEtoileFoundation -lEtoileSerialize -lpq \
+	$(FND_LIBS) $(OBJC_LIBS) $(SYSTEM_LIBS)
 
 
 CoreObject_OBJC_FILES = \
@@ -19,6 +21,7 @@ CoreObject_OBJC_FILES = \
 	COGroup.m \
 	COFileObject.m \
 	COObject.m \
+	COPersistentPool.m \
 	COObjectContext.m \
 	COObjectContext+GraphRollback.m \
 	COMultiValue.m \
@@ -29,7 +32,8 @@ CoreObject_OBJC_FILES = \
 	COSerializer.m \
 	CODeserializer.m \
 	COMetadataServer.m \
-	COObjectServer.m
+	COObjectServer.m \
+	COProxy.m
 
 ifeq ($(test), yes)
 CoreObject_CPPFLAGS += -DUKTEST=1
@@ -57,6 +61,7 @@ CoreObject_HEADER_FILES = \
 	COGroup.h \
 	COFileObject.h \
 	COObject.h \
+	COPersistentPool.h \
 	COObjectContext.h \
 	COMultiValue.h \
 	COPropertyType.h \
@@ -68,20 +73,14 @@ CoreObject_HEADER_FILES = \
 	COSerializer.h \
 	CODeserializer.h \
 	COMetadataServer.h \
-	COObjectServer.h
+	COObjectServer.h \
+	COProxy.h
 
-ifeq ($(FOUNDATION_LIB), apple)
-ifeq ($(test), yes)
-	# TODO: Apple target broken currently, we may support compiling CoreObject 
-	# without EtoileSerialize later to restore Cocoa compatibility
-	CoreObject_OBJC_LIBS += -framework UnitKit -framework EtoileFoundation
-endif
-else
 ifeq ($(test), yes)
 	CoreObject_LDFLAGS += -lUnitKit -lEtoileFoundation -lEtoileSerialize -lpq
 endif
-endif
 
+# TODO: Remove
 ADDITIONAL_OBJCFLAGS += -IHeaders/
 
 ifeq ($(test), yes)

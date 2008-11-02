@@ -196,12 +196,10 @@ static COMetadataServer *metadataServer = nil;
 
 	[self openDBConnectionWithURL: theDBURL];
 
-	 // FIXME: UUID should of type UUID instead of text, but the format of
-	// -[ETUUID stringValue] isn't understood by pgsql. -stringValue should 
-	// return a canonical form or we should add -canonicalStringValue?
 	[self executeDBRequest: @"CREATE TABLE UUID ( \
-		UUID text PRIMARY KEY, \
+		UUID uuid PRIMARY KEY, \
 		URL text, \
+		contextUUID uuid, \
 		inode integer, \
 		volumeID integer, \
 		lastURLModifDate timestamp, \
@@ -212,9 +210,9 @@ static COMetadataServer *metadataServer = nil;
 	/* contextVersion is stored for conveniency, it could be easily found by 
 	   selecting all rows for a given contextUUID and sorting them by globalVersion */
 	[self executeDBRequest: @"CREATE TABLE History ( \
-		objectUUID text, \
+		objectUUID uuid, \
 		objectVersion integer, \
-		contextUUID text, \
+		contextUUID uuid, \
 		contextVersion integer, \
 		date timestamp, \
 		globalVersion serial PRIMARY KEY);"]; 
@@ -467,7 +465,8 @@ static COMetadataServer *metadataServer = nil;
 	[self setURL: url forUUID: uuid withObjectVersion: -1
 	                                             type: nil
 	                                          isGroup: NO
-	                                        timestamp: [NSDate date]];
+	                                        timestamp: [NSDate date]
+	                                    inContextUUID: nil];
 }
 
 /** Binds uuid to url by inserting the UUID/URL pair and eventually additional 
@@ -475,12 +474,12 @@ static COMetadataServer *metadataServer = nil;
     If an UUID/URL pair already exists, it is deleted then the new one is 
     inserted. For a quick update rather a raw delete/insert, see 
     -updateUUID:toObjectVersion:timestamp:. */
-//- (void) setURL: (NSURL *)url forUUID: (ETUUID *)uuid withNewVersion: ofObject:
 - (void) setURL: (NSURL *)url forUUID: (ETUUID *)uuid
 	withObjectVersion: (int)objectVersion 
 	             type: (NSString *)objectType 
 	          isGroup: (BOOL)isGroup
 	        timestamp: (NSDate *)recordTimestamp
+	    inContextUUID: (ETUUID *)contextUUID
 {
 #ifdef DICT_METADATASERVER
 	[_URLsByUUIDs setObject: url forKey: uuid];
@@ -504,14 +503,26 @@ static COMetadataServer *metadataServer = nil;
 	unsigned long inode = [fileAttributes fileSystemFileNumber];
 	// FIXME: Should be volumeID and may be removed at later point.
 	unsigned long deviceID = [fileAttributes fileSystemNumber];
+	NSString *contextUUIDString = [contextUUID stringValue];
+
+	// TODO: Make this formatting more transparent...
+	if (contextUUIDString != nil)
+	{
+		contextUUIDString = [NSString stringWithFormat: @"'%@'", [contextUUID stringValue]];
+	}
+	else
+	{
+		contextUUIDString = @"NULL";
+	}
 
 	[self executeDBRequest: [NSString stringWithFormat: 
-		@"%@ INSERT INTO UUID (UUID, URL, inode, volumeID, "
+		@"%@ INSERT INTO UUID (UUID, URL, contextUUID, inode, volumeID, "
 		"lastURLModifDate, objectVersion, objectType) " // TODO: Add groupCache
-		"VALUES ('%@', '%@', %i, %i, '%@', %i, '%@'); %@", 
+		"VALUES ('%@', '%@', %@, %i, %i, '%@', %i, '%@'); %@", 
 			prevSQLRequest,
 			[uuid stringValue], 
 			[url absoluteString], 
+			contextUUIDString,
 			(unsigned int)inode, /* POSIX defines ino_t as a unsigned int */
 			(unsigned int)deviceID, /* POSIX doesn't define dev_t, but probably safe? */
 			recordTimestamp, // NOTE: May need to format the output with -descriptionWithLocale:

@@ -9,6 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <EtoileFoundation/EtoileFoundation.h>
 #import <EtoileSerialize/EtoileSerialize.h>
+#import <CoreObject/COPersistentPool.h>
 
 @class COMetadataServer, COObjectServer;
 
@@ -50,7 +51,7 @@ typedef enum _COChildrenMergePolicy
 } COChildrenMergePolicy;
 
 
-@interface COObjectContext : NSObject
+@interface COObjectContext : COPersistentPool
 {
 	// TODO: To be able to use shared serializers in the managed object context, 
 	// the related classes must become reusable, otherwise the cost of 
@@ -62,8 +63,6 @@ typedef enum _COChildrenMergePolicy
 	int _fullSaveTimeInterval;
 	/* Managed Objects belonging to the context */
 	NSMutableSet *_registeredObjects;
-	/* Successive senders inside a record session (invocation sequence) */
-	NSMutableArray *_recordedObjectStack;
 	id _objectUnderRestoration;
 	BOOL _restoringContext;
 	id _delegate;
@@ -71,6 +70,12 @@ typedef enum _COChildrenMergePolicy
 	ETUUID *_uuid;
 	NSArray *_lastMergeErrors;
 	COChildrenMergePolicy _mergePolicy;
+
+	/* Low-level Undo/Redo */
+	int _firstUndoVersion;
+	int _restoredVersionUndoCursor;
+	BOOL _isUndoing;
+	BOOL _isRedoing;
 }
 
 + (COObjectContext *) currentContext;
@@ -89,6 +94,7 @@ typedef enum _COChildrenMergePolicy
 
 - (id) objectForUUID: (ETUUID *)anUUID;
 
+- (void) insertObject: (id)anObject;
 - (void) registerObject: (id)object;
 - (void) unregisterObject: (id)object;
 - (NSSet *) registeredObjects;
@@ -110,18 +116,6 @@ typedef enum _COChildrenMergePolicy
                collectAllErrors: (BOOL)tryAll;
 - (NSArray *) lastMergeErrors;
 
-/* Controlling Record Session */
-
-- (BOOL) isRecording;
-- (id) currentRecordSessionObject;
-- (id) currentRecordedObject;
-- (void) beginRecordSessionWithObject: (id)object;
-- (void) endRecordSession;
-- (void) beginRecordObject: (id)object;
-- (void) endRecord;
-/*- (void) pushObjectInRecordSessionStack: 
-- (void) popObjectFromRecordSessionStack:*/
-
 /* Retrieving Serializers */
 
 - (ETSerializer *) deltaSerializer;
@@ -135,7 +129,10 @@ typedef enum _COChildrenMergePolicy
 - (int) version;
 - (void) restoreToVersion: (int)aVersion;
 - (void) undo;
+- (BOOL) canRedo;
 - (void) redo;
+- (BOOL) isUndoing;
+- (BOOL) isRedoing;
 - (BOOL) isRestoringContext;
 //- (void) snapshot;
 
@@ -176,10 +173,6 @@ typedef enum _COChildrenMergePolicy
 - (int) snapshotTimeInterval;
 - (void) setSnapshotTimeInterval: (int)anInterval;
 - (void) snapshotObject: (id)object;
-
-/* COProxy Compatibility */
-
-- (int) setVersion: (int)aVersion forObject: (id)object;
 
 @end
 

@@ -10,6 +10,7 @@
 #import "COObjectContext.h"
 #import "COObject.h"
 #import "COGroup.h"
+#import "COProxy.h"
 #import "COSerializer.h"
 #import "CODeserializer.h"
 #import "COMetadataServer.h"
@@ -17,7 +18,6 @@
 #import "NSObject+CoreObject.h"
 
 #define AVERAGE_MANAGED_OBJECTS_COUNT 1000
-#define RECORD_STACK_SIZE 10
 
 NSString *COObjectContextDidMergeObjectsNotification = @"COObjectContextDidMergeObjectsNotification";
 NSString *COMergedObjectsKey = @"COMergedObjectsKey";
@@ -27,9 +27,21 @@ NSString *COMergedObjectsKey = @"COMergedObjectsKey";
 - (void) _setObjectVersion: (int)version;
 @end
 
+@interface COProxy (FrameworkPrivate)
+- (id) _realObject;
+- (void) _setRealObject: (id)anObject;
+- (void) _setObjectVersion: (int)aVersion;
+- (void) setObjectContext: (COObjectContext *)ctxt;
+@end
+
 @interface COObjectContext (Private)
 - (int) latestVersion;
+- (BOOL) isInvalidObject: (id)newObject forReplacingObject: (id)anObject;
+- (void) tryMergeRelationshipsOfObject: (id)anObject intoInstance: (id)targetInstance;
 - (void) commitMergeOfInstance: (id)temporalInstance forObject:  (id)anObject;
+- (void) beginUndoSequenceIfNeeded;
+- (void) endUndoSequenceIfNeeded;
+- (void) endUndoSequence;
 - (void) snapshotObject: (id)object shouldIncrementObjectVersion: (BOOL)updateVersion;
 @end
 
@@ -89,11 +101,14 @@ static COObjectContext *currentObjectContext = nil;
 	_version = [self latestVersion];
 
 	_registeredObjects = [[NSMutableSet alloc] initWithCapacity: AVERAGE_MANAGED_OBJECTS_COUNT];
-	_recordedObjectStack = [[NSMutableArray alloc] initWithCapacity: RECORD_STACK_SIZE];
 	_objectUnderRestoration = nil;
 	[self setSnapshotTimeInterval: 100];
 	[self setDelegate: nil];
 	[self setMergePolicy: COOldChildrenMergePolicy];
+	_firstUndoVersion = -1;
+	_restoredVersionUndoCursor = -1;
+	_isUndoing = NO;
+	_isRedoing = NO;
 
 	return self;
 }
@@ -102,7 +117,6 @@ static COObjectContext *currentObjectContext = nil;
 {
 	// NOTE: Delegate is a weak reference.
 	DESTROY(_objectUnderRestoration);
-	DESTROY(_recordedObjectStack);
 	DESTROY(_registeredObjects);
 	DESTROY(_uuid);
 
@@ -219,12 +233,23 @@ static COObjectContext *currentObjectContext = nil;
 	return object;
 }
 
+/** Registers an object to belong to the receiver, then takes a base version 
+    snapshot to make it immediately persistent. This inserts the object into 
+    the metadata DB.
+    See also -registerObject:. */
+- (void) insertObject: (id)anObject
+{
+	[self registerObject: anObject];
+	[self snapshotObject: anObject];
+}
+
 /** Registers an object to belong to the receiver.
     A managed core object can belong to a single object context at a time. Hence 
     you must unregister it before being able to move it from one context to 
     another one. 
     If you try to register an object that is already registered, an 
-    NSInvalidArgumentException exception will be raised. */
+    NSInvalidArgumentException exception will be raised.
+    You shouldn't usually called this method but rather -insertObject:. */
 - (void) registerObject: (id)object
 {
 	if ([object objectContext] != nil)
@@ -267,8 +292,7 @@ static COObjectContext *currentObjectContext = nil;
 
 /* Retrieves the URL where an object is presently serialized, or if it hasn't 
    been serializerd yet, builds the URL by taking the library to which the 
-   object belongs to.
-   If object isn't registered, returns nil. */
+   object belongs to. */
 - (NSURL *) serializationURLForObject: (id)object
 {
 	// NOTE: Don't check if object is registered because it might be a temporal 
@@ -339,7 +363,7 @@ static COObjectContext *currentObjectContext = nil;
 	return [[self findAllObjectVersionsMatchingContextVersion: aVersion] allKeys];
 }
 
-/** Loads and register all the objects that belongs to the receiver but are not
+/** Loads and registers all the objects that belongs to the receiver but are not
     yet loaded.
     These objects may exist as faults in the object graph by being referenced 
     by other objects. Take note this method won't resolve existing faults 
@@ -381,16 +405,14 @@ static COObjectContext *currentObjectContext = nil;
     and update the relationships of the first object to reference the new one. 
     Because the relationships are carried over, a replacement involves a merge.
     which adjusts the parent groups of the replaced object, so they now refer.
-    Merging only occurs if you roll back one or several registered objects, if 
-    the whole object context is reverted to a past version, the resulting object 
+    Merging only occurs if you restore one or several registered objects, if 
+    the whole object context is restored to a past version, the resulting object 
     graph will be in a coherent state and this method won't be called. */
 - (COMergeResult) replaceObject: (id)anObject 
                        byObject: (id)temporalInstance 
                collectAllErrors: (BOOL)tryAll
 {
-	// TODO: This XOR is a bit verbose...
-	if (([anObject isKindOfClass: [COGroup class]] == NO && [temporalInstance isKindOfClass: [COGroup class]])
-	 || ([anObject isKindOfClass: [COGroup class]] && [temporalInstance isKindOfClass: [COGroup class]] == NO))
+	if ([self isInvalidObject: temporalInstance forReplacingObject: anObject])
 	{
 		[NSException raise: NSInvalidArgumentException 
 		            format: @"Replaced Object %@ and replacement object %@ "
@@ -399,10 +421,8 @@ static COObjectContext *currentObjectContext = nil;
 		return COMergeResultFailed;
 	}
 
-	NSMutableArray *objectsRefusingReplacement = [NSMutableArray array];
-	COMergeResult mergeResult = COMergeResultFailed;
 	BOOL isTemporal = [temporalInstance isTemporalInstance: anObject];
-	NSError *mergeError = NULL;
+	COMergeResult mergeResult = COMergeResultFailed;
 
 	/* We disable the persistency, especially the recording of the invocations 
 	   when a temporal instance is merged. The identity of the object to be 
@@ -416,51 +436,12 @@ static COObjectContext *currentObjectContext = nil;
 	if (isTemporal)
 		[self beginRestoreObject: anObject];
 
-	// TODO: All the following code will have to be modified to support multiple 
-	/// object contexts per process.
+	mergeResult = [[self objectServer] updateRelationshipsToObject: anObject 
+	                                                  withInstance: temporalInstance];
 
-	/* Merge Parent References */
-	FOREACHI([self registeredObjects], managedObject) // NOTE: iterating through kCOParentsProperty of anObject could work probably
-	{
-
-		// TODO: Asks each managed object if the merge is possible before 
-		// attempting to apply it. If the merge fails, we are in an invalid 
-		// state with both object and temporalInstance being referenced in 
-		// relationships
-		if ([managedObject isKindOfClass: [COGroup class]])
-		{
-			mergeResult = [managedObject replaceObject: anObject 
-			                                  byObject: temporalInstance 
-			                           isTemporalMerge: isTemporal
-			                                     error: &mergeError];
-			if (mergeResult == COMergeResultFailed)
-				[objectsRefusingReplacement addObject: managedObject];
-		}
-	}
-
-	/* Report which objects haven't handled the merge */
-	if ([objectsRefusingReplacement count] > 0)
-	{
-		// TODO: Rather return an NSError which can be used for UI feedback 
-		// rather than logging or raising an exception.
-		NSLog(@"WARNING: Failed to merge temporal instance %@ of %@ into the "
-			@"following %@ whose faulty classes implement "
-			@"-anObjectject:byObject: in a partial or incorrect way.", 
-			temporalInstance, anObject, objectsRefusingReplacement);
-	}
-
-	/* Merge Children References
-
-	   Now that parent references or backward pointers are fixed, if the 
-	   two objects are groups we need to merge their children references. */
-	if ([temporalInstance isKindOfClass: [COGroup class]])
-	{
-		[temporalInstance mergeObjectsWithObjectsOfGroup: anObject policy: [self mergePolicy]];
-		// TODO: If the temporal instance is a group, we need to fix the 
-		// kCOParentsProperty of all objects owned by this group.
-		// We could handle this on COObject, but the best is probably in
-		// -mergeObjectsWithObjectsOfGroup:policy: of COGroup.
-	}
+	 /* Now that parent references or backward pointers are fixed, if the two 
+	    objects are groups we need to merge their member/children references. */
+	[self tryMergeRelationshipsOfObject: anObject intoInstance: temporalInstance];
 
 	/* Swap the instances in the context */
 	[self unregisterObject: anObject];
@@ -472,6 +453,30 @@ static COObjectContext *currentObjectContext = nil;
 		[self endRestore];
 
 	return mergeResult;
+}
+
+- (BOOL) isInvalidObject: (id)newObject forReplacingObject: (id)anObject
+{
+	return (([anObject isKindOfClass: [COGroup class]] == NO && [newObject isKindOfClass: [COGroup class]])
+	 || ([anObject isKindOfClass: [COGroup class]] && [newObject isKindOfClass: [COGroup class]] == NO));
+}
+
+/* Merges the members of anObject into the members of temporalInstance, if both 
+   are COGroup or subclass instances.
+   TODO: Eventually extends the merge facility to COObject, so that COObject 
+   subclasses can create their own core objects relationships and handle the 
+   merge in their own way, rather restricting this feature to COGroup. */
+- (void) tryMergeRelationshipsOfObject: (id)anObject intoInstance: (id)targetInstance
+{
+	if ([targetInstance isKindOfClass: [COGroup class]] == NO)
+		return;
+	
+	[targetInstance mergeObjectsWithObjectsOfGroup: anObject policy: [self mergePolicy]];
+	// TODO: If the temporal instance is a group, we need to fix the 
+	// kCOParentsProperty of all objects owned by this group.
+	// We could handle this on COObject, but the best is probably in
+	// -mergeObjectsWithObjectsOfGroup:policy: of COGroup.
+
 }
 
 /** Commits an object merge by syncing the object version and taking a snaphot 
@@ -506,71 +511,6 @@ static COObjectContext *currentObjectContext = nil;
 	return _lastMergeErrors;
 }
 
-/* Controlling Record Session */
-
-/** Returns whether the receiver is currently in the middle of a record 
-	session. */
-- (BOOL) isRecording
-{
-	return ([self currentRecordSessionObject] != nil);
-}
-
-/** Returns the bottom object in the record session stack. */
-- (id) currentRecordSessionObject
-{
-	return [_recordedObjectStack firstObject];
-}
-
-/** Returns the top object in the record session stack. */
-- (id) currentRecordedObject
-{
-	return [_recordedObjectStack lastObject];
-}
-
-/** Begins a record group for a given managed core object.
-	The behavior bound to the record session stack is the responsability of the 
-	receiver and may be overriden in subclasses. 
-	By default, the receiver only records the messages sent to the objects that 
-	initiated the record session, the first one in the stack. All other objects 
-	pushed onto the stack gets ignored by -recordInvocation:. */
-- (void) beginRecordSessionWithObject: (id)object
-{
-	NSAssert1([_recordedObjectStack isEmpty], @"The record session stack must "
-		@"be empty when a new record session is initiated in %@", self);
-
-	[self beginRecordObject: object];
-}
-
-/** Ends a record group for a given managed core object. */
-- (void) endRecordSession
-{
-	NSAssert1([[_recordedObjectStack lastObject] isEqual: 
-		[self currentRecordSessionObject]], @"The record session stack must "
-		@"contain only the object that initiated the session when the session "
-		@"ends in %@", self);
-
-	[self endRecord];
-
-	NSAssert1([_recordedObjectStack isEmpty], @"The record session stack must "
-		@"be empty when a record session has been terminated in %@", self);
-}
-
-/** Pushes the given object on the record session stack. 
-	The behavior bound to the record session stack is the responsability of the 
-	receiver and may be overriden in subclasses. */
-- (void) beginRecordObject: (id)object
-{
-	ETDebugLog(@"---> Push on record stack: %@", object);
-	[_recordedObjectStack addObject: object];
-}
-
-/** Pops the last recorded and pushed object from the record session stack. */
-- (void) endRecord
-{
-	ETDebugLog(@"---> Pop from record stack: %@", [_recordedObjectStack lastObject]);
-	[_recordedObjectStack removeLastObject];
-}
-
 - (ETSerializer *) deltaSerializer
 {
 	return _deltaSerializer;
@@ -581,7 +521,7 @@ static COObjectContext *currentObjectContext = nil;
 	return _fullSaveSerializer;
 }
 
-/** Retrieve the delta serializer for a given object. */
+/** Retrieves the delta serializer for a given object. */
 - (ETSerializer *) deltaSerializerForObject: (id)object
 {
 	if ([object respondsToSelector: @selector(deltaSerializer)])
@@ -598,7 +538,7 @@ static COObjectContext *currentObjectContext = nil;
 	}
 }
 
-/** Retrieve the snapshot serializer for a given object. */
+/** Retrieves the snapshot serializer for a given object. */
 - (ETSerializer *) snapshotSerializerForObject: (id)object
 {
 	if ([object respondsToSelector: @selector(snapshotSerializer)])
@@ -626,35 +566,100 @@ static COObjectContext *currentObjectContext = nil;
 
 /** Returns the last version of the receiver that can be used to identify 
     the current state of the all the registered objects and eventually 
-    reverts to it a later point. The state of all registered objects remain 
+    restores to it a later point. The state of all registered objects remain 
     untouched until the next time this version value gets incremented. 
     An object context version is a timemark in the interleaved history of all 
     the registered objects. Each object context version is associated with a 
     unique set of object versions. If at a later point, you set the context 
-    version to a past version, the context will revert back to the unique set of 
+    version to a past version, the context will restore back to the unique set of 
     temporal instances bound to this version. */
 - (int) version
 {
 	return _version;
 }
 
+/** Restores the receiver to the given version.
+    See also -version.*/
 - (void) restoreToVersion: (int)aVersion
 {
 	[self _restoreToVersion: aVersion];
 }
 
-/** Reverts the receiver to the last version right before the one currently 
-    returned by -version.
+- (void) beginUndoSequence
+{
+	_firstUndoVersion = [self version] + 1;
+	_restoredVersionUndoCursor = [self version];
+}
+
+- (void) endUndoSequence
+{
+	_firstUndoVersion = -1;
+}
+
+/** Restores the receiver to the last version right before the one currently 
+    returned by -version, if no undo/redo sequence is underway. Then a new 
+    undo/redo sequence is started.
+    If an undo/redo sequence has already been started by calling -undo, restores
+    the receiver to the last version right before the version restored by the 
+    previous undo/redo action.
+    An undo/redo sequence is cleared, when the context version is incremented 
+    by another method than -undo or -redo.
+    Be aware that undo/redo actions are logged into the history, then once 
+    you exit an undo/redo sequence and you want to revert to a version and state 
+    anterior to this undo/redo sequence, it's necessary to undo all undo/redo
+    operations that belongs to the sequence and recorded by the context.
     This method calls -restoreToVersion:. */
 - (void) undo
 {
-	// TODO: Implement a real undo model.
-	[self restoreToVersion: ([self version] - 1)];
+	BOOL noCurrentUndoSequence = (_firstUndoVersion == -1);
+
+	if (noCurrentUndoSequence)
+		[self beginUndoSequence];
+
+	_isUndoing = YES;
+	// TODO: Implement more useful undo models on top of this low-level model.
+	[self restoreToVersion: --_restoredVersionUndoCursor];
+	_isUndoing = NO;
 }
 
+/** Returns whether we are in an undo sequence or not. If YES, -redo will 
+    restore the receiver to a past version. */
+- (BOOL) canRedo
+{
+	return (_firstUndoVersion != -1);	
+}
+
+/** Restores the receiver to the first version right after the version restored 
+    by the previous undo/redo action.
+    If -canRedo returns NO, does nothing.
+    See also -undo. */
 - (void) redo
 {
-	// TODO: Implement redo based on the undo model.
+	if ([self canRedo] == NO)
+		return;
+
+	_isRedoing = YES;
+	[self restoreToVersion: ++_restoredVersionUndoCursor];
+	_isRedoing = NO;
+
+	BOOL hasRevertedAllUndoActions = (_firstUndoVersion == _restoredVersionUndoCursor);
+
+	if (hasRevertedAllUndoActions)
+		[self endUndoSequence];
+}
+
+/** Returns whether an undo action triggered by -undo is currently underway for 
+    the receiver. */
+- (BOOL) isUndoing
+{
+	return _isUndoing;
+}
+
+/** Returns whether a redo action triggered by -redo is currently underway for 
+    the receiver. */
+- (BOOL) isRedoing
+{
+	return _isRedoing;
 }
 
 /** Returns YES when the whole context is currently getting restored to another 
@@ -669,7 +674,7 @@ static COObjectContext *currentObjectContext = nil;
     a delta. If no such version can be found (no snapshot or delta available 
     unless an error occured), returns -1.
     If object hasn't been made persistent yet or isn't registered in the 
-    receiver also returns -1. Hence this method returns -1 for rolledback 
+    receiver also returns -1. Hence this method returns -1 for restored 
     objects not yet inserted in an object context. */
 - (int) lastVersionOfObject: (id)object
 {
@@ -690,7 +695,9 @@ static COObjectContext *currentObjectContext = nil;
 /** Restores the full-save version closest to the requested one.
     snpashotVersion is the object version of the returned snapshot object. If 
     you pass a non-NULL pointer, snapshotVersion is updated by the method 
-    so you can get back the version number by reference. */
+    so you can get back the version number by reference.
+    If object is a CoreObject proxy, then the returned object is this same proxy
+    with its wrapped object set to the requested snapshot. */
 - (id) lastSnapshotOfObject: (id)object 
                  forVersion: (int)aVersion 
             snapshotVersion: (int *)snapshotVersion;
@@ -709,8 +716,18 @@ static COObjectContext *currentObjectContext = nil;
 
 	[snapshotDeserializer setVersion: fullSaveVersion];
 	id snapshotObject = [snapshotDeserializer restoreObjectGraph];
-	[snapshotObject deserializerDidFinish: snapshotDeserializer forVersion: fullSaveVersion];
-	return snapshotObject;
+
+	if ([object isCoreObjectProxy])
+	{
+		[object _setRealObject: snapshotObject];
+		[object _setObjectVersion: fullSaveVersion];
+		return object;
+	}
+	else
+	{
+		[snapshotObject _setObjectVersion: fullSaveVersion];
+		return snapshotObject;
+	}
 }
 
 /** Returns a temporal instance of the given object, by finding the last 
@@ -718,17 +735,17 @@ static COObjectContext *currentObjectContext = nil;
     invocations between this snapshot version and aVersion.
     The returned instance has no object context and isn't equal to anObject, 
     but returns YES to -isTemporalInstance:, because both anObject and the 
-    rolled back object share the same UUID 
+    restored object share the same UUID 
     even if they differ by their object version. 
-    You cannot use a rolled back object as a persistent object until it 
+    You cannot use a restored object as a persistent object until it 
     gets inserted in an object context. No invocations will ever be recorded 
     until it is inserted. It can either replace anObject in the receiver, or 
     anObject can be unregistered from the receiver to allow the insertion of the 
-    rolled back object into another object context. This is necessary because a 
+    restored object into another object context. This is necessary because a 
     given object identity (all temporal instances included) must belong to a 
     single object context per process.
     A managed core object identity is defined by its UUID. 
-    The state of a rolled back object can be altered before inserting it in an 
+    The state of a restored object can be altered before inserting it in an 
     object context, but this is strongly discouraged.
     anObject can be a temporal instance of an object registered in the receiver.
     If aVersions is equal to the version of anObject, returns anObject and logs 
@@ -766,41 +783,43 @@ static COObjectContext *currentObjectContext = nil;
 
 	if (aVersion > lastObjectVersion)
 	{
-		ETLog(@"WARNING: Failed to roll back, the version %i is beyond the object history %i",
+		ETLog(@"WARNING: Failed to restore, the version %i is beyond the object history %i",
 			aVersion, lastObjectVersion);
 		return nil;
 	}
 	else if (aVersion == [anObject objectVersion])
 	{
-		ETLog(@"WARNING: Failed to roll back, the version matches the object passed in parameter");
+		ETLog(@"WARNING: Failed to restore, the version matches the object passed in parameter");
 		return anObject;
 	}
 
 	int baseVersion = -1;
-	id rolledbackObject = [self lastSnapshotOfObject: anObject 
-	                                      forVersion: aVersion
-	                                 snapshotVersion: &baseVersion];
-	ETDebugLog(@"Roll back object %@ with snapshot %@ at version %d", anObject,
-		rolledbackObject, baseVersion);
+	id restoredObject = [self lastSnapshotOfObject: anObject 
+	                                    forVersion: aVersion
+	                               snapshotVersion: &baseVersion];
+	ETDebugLog(@"Restore object %@ with snapshot %@ at version %d", anObject,
+		restoredObject, baseVersion);
 
-	[self playbackInvocationsWithObject: rolledbackObject 
+	[self playbackInvocationsWithObject: restoredObject 
 	                        fromVersion: baseVersion
 	                          toVersion: aVersion];
 	
-	if ([rolledbackObject isKindOfClass: [COGroup class]])
-		[rolledbackObject setHasFaults: YES];
+	if ([restoredObject isKindOfClass: [COGroup class]])
+		[restoredObject setHasFaults: YES];
 
 	if (mergeNow)
-		[self replaceObject: anObject byObject: rolledbackObject collectAllErrors: YES];
+		[self replaceObject: anObject byObject: restoredObject collectAllErrors: YES];
 
-	return rolledbackObject;
+	return restoredObject;
 }
 
-/** Play back each of the subsequent invocations on object.
+/** Plays back each of the subsequent invocations on object.
     The invocations that will be invoked on the object as target will be the 
     all invocation serialized between baseVersion and finalVersion. The first 
     replayed invocation will be 'baseVersion + 1' and the last one 
-    'finalVersion'.  */
+    'finalVersion'. 
+    If you pass a CoreObject proxy, the invocations are transparently replayed 
+    on the wrapped object. */
 - (void) playbackInvocationsWithObject: (id)object 
                            fromVersion: (int)baseVersion 
                              toVersion: (int)finalVersion 
@@ -809,7 +828,7 @@ static COObjectContext *currentObjectContext = nil;
 	{
 		[NSException raise: NSInternalInconsistencyException format: 
 			@"Invocations cannot be played back on %@ when the context %@ is "
-			@"already reverting another object %@", object, self, 
+			@"already restoring another object %@", object, self, 
 			[self currentObjectUnderRestoration]];
 	}
 	
@@ -836,8 +855,8 @@ static COObjectContext *currentObjectContext = nil;
 	return ([self currentObjectUnderRestoration] != nil);
 }
 
-/** Returns the registered object for which -objectByRestoringObject:toVersion: 
-    is currently executed. */
+/** Returns the registered object for which 
+    -objectByRestoringObject:toVersion:mergeImmediately: is currently executed. */
 - (id) currentObjectUnderRestoration
 {
 	return _objectUnderRestoration;
@@ -845,10 +864,10 @@ static COObjectContext *currentObjectContext = nil;
 
 /** Returns whether object is a temporal instance of a given object owned by
 	the context. 
-	The latter object is called a reverted object in such situation.
-	The rolled back object doesn't belong to the receiver because it is a 
+	The latter object is called a current object in such situation.
+	The restored object doesn't belong to the receiver, because it is a 
 	temporal instance that can be retrieved only by requesting it to the 
-	receiver for a given object with the same UUID (the reverted object already 
+	receiver for a current object with the same UUID (the object already 
 	inserted/owned by the receiver context). */
 - (BOOL) isRestoredObject: (id)object
 {
@@ -856,8 +875,8 @@ static COObjectContext *currentObjectContext = nil;
 		&& ([[self registeredObjects] containsObject: object] == NO));
 }
 
-/** Marks the start of a revert operation.
-    A revert operations typically involves exchanges of messages among the 
+/** Marks the start of a restore operation.
+    A restore operation might involve exchanges of messages among the 
     registered objects or state alteration, that must not be recorded.
     By calling this method, you ensure -shouldIgnoreChangesToObject: will 
     behave correctly. */
@@ -866,7 +885,7 @@ static COObjectContext *currentObjectContext = nil;
 	ASSIGN(_objectUnderRestoration, object);
 }
 
-/** Marks the end of a revert operation, thereby enables the recording of 
+/** Marks the end of a restore operation, thereby enables the recording of 
     invocations. */
 - (void) endRestore
 {
@@ -874,16 +893,16 @@ static COObjectContext *currentObjectContext = nil;
 }
 
 /** Returns YES if anObject is a temporal instance of an object registered in 
-    the receiver and a revert operation is underway, otherwise returns NO.
+    the receiver and a restore operation is underway, otherwise returns NO.
     This method is mainly useful to decide whether a managed method should 
     return immediately or execute and mutate the state of the model object its 
     belongs to. 
     The rule is to ignore all side-effects triggered by a managed method during 
-    a revert. If a revert is underway, all changes must be applied only to the 
-    rolled back object (not belonging to the object context) and any other 
-    messages sent by the rolled back object to other objects must be ignored. 
+    a restore. If a restore is underway, all changes must be applied only to the 
+    restored object (not belonging to the object context) and any other 
+    messages sent by the restored object to other objects must be ignored. 
     The fact these objects belongs to the object context or not doesn't matter: 
-    temporal instances when they got just rolled back are in a state that can be
+    temporal instances when they got just restored are in a state that can be
     incoherent with other objects in memory. 
     See also -isRestoredObject:. */
 - (BOOL) shouldIgnoreChangesToObject: (id)anObject
@@ -904,10 +923,12 @@ static COObjectContext *currentObjectContext = nil;
     identical to the current object version of the invocation target. 
     The invocation is recorded in three steps:
     - the invocation is serialized (eventually a snapshot is taken too)
-    - the basic object infos stored in the metadata DB are updated for the invocation target
+    - the basic object infos stored in the metadata DB are updated for the 
+      invocation target
     - the record operation is logged in the receiver history.
     For more details on each step, see respectively -serializeInvocation;,
-    -updateMetadatasForObject:, logInvocation:recordVersion:timestamp:.
+    -updateMetadatasForObject:recordVersion:, 
+    -logRecord:objectVersion:timestamp:shouldIncrementContextVersion:.
     Finally this method returns the new object version to the invocation target 
     that is in charge of updating the value it returns for -objectVersion.
     See also -shouldRecordChangesToObject: and RECORD macro in COUtility.h */
@@ -1029,16 +1050,21 @@ static COObjectContext *currentObjectContext = nil;
 
 	ETDebugLog(@"Log %@ objectUUID %@ objectVersion %i contextVersion %i", 
 		aRecord, [object UUID], aVersion, _version);
+
+	BOOL exitingUndoSequence = ([self isUndoing] == NO || [self isRedoing] == NO);
+
+	if (exitingUndoSequence)
+		[self endUndoSequence];
 }
 
 /** Commonly used to forward the invocation to the real object if the 
-	initial receiver (the target of the invocation) was a CoreObject proxy.
+	initial receiver (the target of the invocation) is a CoreObject proxy.
 	By default, this method checks the type of the target of the invocation and 
 	forwards it only if it is a COProxy instance. */
 - (void) forwardInvocationIfNeeded: (NSInvocation *)inv
 {
 	if ([[inv target] isCoreObjectProxy])
-		[inv invoke];
+		[inv invokeWithTarget: [[inv target] _realObject]];
 }
 
 /** Sets the time interval that has to be elapsed between two snapshots, before 
@@ -1087,29 +1113,31 @@ static COObjectContext *currentObjectContext = nil;
 	if (updateVersion)
 	{
 		int newObjectVersion = [object objectVersion] + 1;
-		[object serializerDidFinish: snapshotSerializer 
-		                 forVersion: newObjectVersion];
+		[object _setObjectVersion: newObjectVersion];
 		[self updateMetadatasForObject: object recordVersion: newObjectVersion];
 	}
 }
 
-/** Updates the metadatas of object in the current metadata server. */
+/** Updates the metadatas of object in the current metadata server.
+    The update is timestamped by getting the current date inside this method,  
+    right before asking the metadata server to apply the update. */
 - (void) updateMetadatasForObject: (id)object recordVersion: (int)aVersion
 {
 	NSURL *url = [self serializationURLForObject: object];
 
 	ETDebugLog(@"Update %@ %@ metadatas with new version %d", object, [object UUID], aVersion);
 
-	/* This first recorded invocation results in a snapshot with version 0, 
-       immediately followed by an invocation record with version 1. */
-	if (aVersion == 0 || aVersion == 1) /* Insert UUID/URL pair (on first serialization) */
+	/* This first recorded invocation is always preceded by a snapshot with 
+	   version 0. */
+	if (aVersion == 0) /* Insert UUID/URL pair (on first serialization) */
 	{
 		/* Register the object in the metadata server */
 		[[self metadataServer] setURL: url forUUID: [object UUID]
 			withObjectVersion: aVersion 
 			             type: [object className] 
 			          isGroup: [object isGroup]
-			        timestamp: [NSDate date]];
+			        timestamp: [NSDate date]
+			    inContextUUID: [self UUID]];
 	}
 	else /* Update UUID/URL pair */
 	{
@@ -1119,22 +1147,6 @@ static COObjectContext *currentObjectContext = nil;
 		                  toObjectVersion: aVersion
 		                        timestamp: [NSDate date]];
 	}
-}
-
-/** COProxy compatibility method. Probably to be removed. */
-- (int) setVersion: (int)aVersion forObject: (id)object
-{
-	int foundVersion = -1;
-	int rolledbackVersion = -1;
-	id rolledbackObject = [self lastSnapshotOfObject: object 
-	                                      forVersion: aVersion
-	                                 snapshotVersion: &foundVersion];
-
-	//[self objectByRestoringObject: rolledbackObject toVersion:
-
-	[object release];
-	object = rolledbackObject;
-	return rolledbackVersion;
 }
 
 @end

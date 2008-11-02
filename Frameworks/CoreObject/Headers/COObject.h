@@ -12,6 +12,7 @@
 #import "COCoreObjectProtocol.h"
 #import "COPropertyType.h"
 #import "COUtility.h"
+#import <CoreObject/NSObject+CoreObject.h>
 
 @class COObjectContext;
 
@@ -36,7 +37,7 @@ extern NSString *pCOValuesKey;
 extern NSString *pCOVersionKey;
 extern NSString *pCOVersion1Value;
 
-@interface COObject: NSObject <COObject>
+@interface COObject: NSObject <COObject, COManagedObject>
 {
 	/** Persistent properties (except kCOParentsProperty) */
 	NSMutableDictionary *_properties;
@@ -131,12 +132,7 @@ extern NSString *pCOVersion1Value;
                version: (int)aVersion;
 - (void) finishedDeserializing;
 
-/* Private (Object Versioning callbacks) */
-
-- (void) deserializerDidFinish: (ETDeserializer *)deserializer forVersion: (int)objectVersion;
-- (void) serializerDidFinish: (ETSerializer *)serializer forVersion: (int)objectVersion;
-
-/* Deprecated (DO NOT USE, WILL BE REMOVED LATER) */
+/* Deprecated (DO NOT USE, MAY BE REMOVED LATER) */
 
 - (NSString *) uniqueID;
 

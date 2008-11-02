@@ -31,7 +31,6 @@
 
 @implementation COObjectContext (GraphRollback)
 
-// TODO: Break -restoreVersion: in several small methods.
 // TODO: Handle trimmed history...
 // This done by querying contextVersion superior to aVersion rather than 
 // inferior as we do in the first query.
@@ -157,6 +156,8 @@ SELECT objectUUID, objectVersion, contextVersion FROM (SELECT objectUUID, object
 		foundVersion = [self lookUpVersionIfRestorePointAtVersion: restoredVersion];
 	}
 
+	PQclear(result);
+
 	return foundVersion;
 }
 
@@ -214,10 +215,9 @@ SELECT objectUUID, objectVersion, contextVersion FROM (SELECT objectUUID, object
 		//if ([restoredObjectVersions count] == nbOfRegisteredObjects)
 		//	break;
 	}
-	
-	/* Free the query result now the object versions are extracted */
+
 	PQclear(result);
-	
+
 	return restoredObjectVersions;
 }
 
