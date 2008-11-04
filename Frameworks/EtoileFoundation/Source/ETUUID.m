@@ -211,7 +211,7 @@ static void ETSRandomDev()
 - (NSString *) stringValue
 {
 	return [NSString stringWithFormat:
-		@"%0.2x-%0.2hx-%0.2hx-%0.2hhx%0.2hhx-%0.2hhx%0.2hhx%0.2hhx%0.2hhx%0.2hhx%0.2hhx", 
+		@"%0.8x-%0.4hx-%0.4hx-%0.2hhx%0.2hhx-%0.2hhx%0.2hhx%0.2hhx%0.2hhx%0.2hhx%0.2hhx", 
 		   TIME_LOW(uuid), 
 		   TIME_MID(uuid),
 		   TIME_HI_AND_VERSION(uuid),
@@ -246,6 +246,28 @@ static void ETSRandomDev()
 
 	RELEASE(uuid);
 	return str;
+}
+
+@end
+
+
+@implementation NSUserDefaults (ETUUID)
+
+- (ETUUID *) UUIDForKey: (NSString *)aKey
+{
+	NSString *uuidString = [self stringForKey: aKey];
+
+	if (uuidString == nil)
+	{
+		return nil;
+	}
+
+	return [ETUUID UUIDWithString: uuidString];
+}
+
+- (void) setUUID: (ETUUID *)aUUID forKey: (NSString *)aKey
+{
+	[self setObject: [aUUID stringValue] forKey: aKey];
 }
 
 @end
