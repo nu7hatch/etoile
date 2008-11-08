@@ -71,23 +71,35 @@ NSObject subclass: MelodieController
 		^ self.
 	]
 
-	addPath: path [
+	addFile: path [
 		(self KnownExtensions containsObject: (path pathExtension))
 		    ifTrue: [ mainModel addMember: (ETMusicFile alloc initWithPath: path). ]
 	]
 
+	" The following two methods can be moved to blocks in addFiles: once Smalltalk supports
+	  nested blocks accessing variables "
+
+	addDirectory: path [
+		(NSFileManager defaultManager enumeratorAtPath: path) allObjects foreach:
+		    [ :file | self addFile: (path stringByAppendingPathComponent: file) ].
+	]
+
+	addPath: path [
+		(NSFileManager defaultManager directoryExistsAtPath: path)
+		    ifTrue: [ self addDirectory: path ]
+		    ifFalse: [ self addFile: path ].
+	]
+	
+	" Called when the user selects Add Files from the menu "
 	addFiles: sender [
-		| openPanel filename fm |
+		| openPanel |
 
 		openPanel := NSOpenPanel openPanel.
-		openPanel setAllowsMultipleSelection: 0.
+		openPanel setAllowsMultipleSelection: 1.
 		openPanel setCanChooseDirectories: 1.
 		openPanel runModalForTypes: (self KnownExtensions).
 
-		filename := openPanel filenames lastObject.
-		fm := NSFileManager defaultManager.
-		(fm enumeratorAtPath: filename) allObjects foreach:
-		    [ :subFile | self addPath: (filename stringByAppendingPathComponent: subFile). ].
+		openPanel filenames foreach: [ :path | self addPath: path ].
 		mainContainer reloadAndUpdateLayout.
 	]
 
