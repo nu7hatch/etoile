@@ -71,16 +71,9 @@ NSObject subclass: MelodieController
 		^ self.
 	]
 
-	addToMainModel: obj [
-		'Adding song: ' log.
-		obj log.
-		mainModel addMember: obj.
-	]
-
 	addPath: path [
 		(self KnownExtensions containsObject: (path pathExtension))
-		    ifTrue: [ self addToMainModel: (ETMusicFile alloc initWithPath: path). ]
-		    ifFalse: [ 'File has unknown extension: ' log. path log. ].
+		    ifTrue: [ mainModel addMember: (ETMusicFile alloc initWithPath: path). ]
 	]
 
 	addFiles: sender [
@@ -168,7 +161,6 @@ NSObject subclass: MelodieController
 	]
 
 	controlTextDidChange: notif [
-		('searched for: ' stringByAppendingString: (search stringValue)) log.
 		smartGroup == nil ifTrue: [ self smartGroupOn. ].
 		(search stringValue length = 0)
 		    ifTrue: [ 
@@ -183,7 +175,6 @@ NSObject subclass: MelodieController
 	]
 
 	smartGroupOn [
-		'Turning on smart group.' log.
 		smartGroup := COSmartGroup alloc init.
 		smartGroup setTarget: mainModel.
 		mainContainer layoutItem setRepresentedObject: smartGroup.
@@ -195,11 +186,6 @@ NSObject subclass: MelodieController
 	]
 
 	doubleClickInContainer: sender [
-		'Got double-click on ' log.
-		sender doubleClickedItem log.
-		'in container: ' log.
-		sender log.
-
 		musicPlayerController playLayoutItem: (sender doubleClickedItem) start: 1.
 	]
 ]

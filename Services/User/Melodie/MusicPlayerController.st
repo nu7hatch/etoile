@@ -83,8 +83,7 @@ NSObject subclass: MusicPlayerController
 	" Private "
 
 	timerEvent: sender [
-		player isPlaying ifTrue: [ 'playing' log.
-		                           playPauseButton setImage:
+		player isPlaying ifTrue: [ playPauseButton setImage:
 		                               ((IKIcon iconWithIdentifier: 'media-playback-pause') image). ]
 		                ifFalse: [ playPauseButton setImage:
 		                               ((IKIcon iconWithIdentifier: 'media-playback-start') image). ].
