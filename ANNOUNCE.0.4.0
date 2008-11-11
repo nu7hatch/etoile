@@ -1,21 +1,80 @@
-Étoilé 0.4.0 Release Announcement
-=================================
+Étoilé 0.4.0 Release Announcement =================================
 
-Étoilé intends to be an innovative GNUstep based user environment built from the ground up on highly modular and light components with project and document orientation in mind, in order to allow users to create their own workflow by reshaping or recombining provided Services (aka Applications), Components etc. Flexibility and modularity on both User Interface and code level should allow us to scale from PDA to computer environment.
+Étoilé intends to be an innovative GNUstep based user environment built from
+the ground up on highly modular and light components with project and document
+orientation in mind, in order to allow users to create their own workflow by
+reshaping or recombining provided Services (aka Applications), Components etc.
+Flexibility and modularity on both User Interface and code level should allow
+us to scale from PDA to computer environment.
 
-0.4 is a developer-targeted release on its way towards this goal.  As a developer-focussed release, this predominantly consists of frameworks.  A few demonstration applications are also included.  More will be added during the 0.4.x release series, leading to a user-focussed 0.5 release next year.
+0.4 is a developer-targeted release on its way towards this goal.  As a
+developer-focussed release, this predominantly consists of frameworks.  A few
+demonstration applications are also included.  More will be added during the
+0.4.x release series, leading to a user-focussed 0.5 release next year.
 
-Highlights
-----------
+Highlights ----------
 
-*EtoileFoundation* is the core framework for all Étoilé projects, providing numerous convenience methods on top of the OpenStep foundation and significantly better support for reflection.  This includes *EtoileThread* which allows objects to transparently be run in a separate thread.
+*EtoileFoundation* is the core framework for all Étoilé projects, providing
+numerous convenience methods on top of the OpenStep foundation and
+significantly better support for reflection.  This includes *EtoileThread*
+which allows objects to transparently be run in a separate thread.  It also
+includes a number of extensions to the Objective-C object model, allowing
+traits and mixins.  This framework is used by most of the rest of Étoilé and
+provides a number of core functions, such as UUID and XML handling.
 
-*CoreObject* is a framework for describing model objects, complete with metadata and automatic versioning and persistence.  It uses the EtoileSerialize framework which, in many cases, allows objects to be automatically serialized with no extra code being written.
+*CoreObject* is a framework for describing and organizing model objects.  It
+supports automatic persistence and versioning by recording messages sent to
+objects. It offers a flexible versioning scheme where both individual objects
+and their entire object graph can be versioned  separately. The built-in object
+model is a generalization of the  property model used by the AddressBook
+framework.  Foreign model objects can be also integrated by wrapping them with
+a special proxy.  CoreObject uses the *EtoileSerialize* framework which, in many
+cases, allows objects and messages to be automatically serialized with no
+extra code being written.
 
-*EtoileUI* allows data-centric user interfaces to be easily created by applying styles to models from CoreObject.  It exposes the same interfaces as other CoreObject systems, allowing the user interface to be introspected and modified just like any other model.
+*EtoileUI* allows data-centric user interfaces to be easily created by applying
+styles to models from CoreObject.  It exposes the same interfaces as other
+CoreObject systems, allowing the user interface to be introspected and modified
+just like any other model.  This is a preview release and should not be
+considered stable.  
 
-*LanguageKit* is a compiler kit built on top of LLVM for creating dynamic language implementations using an Objective-C runtime for the object model.  This is used by *SmalltalkKit*, implementing Étoilé's Pragmatic Smalltalk, a Smalltalk JIT compiler which generates code binary-compatible with Objective-C, allowing classes to be written in a mixture of Smalltalk and Objective-C.
+*LanguageKit* is a compiler kit built on top of LLVM for creating dynamic
+language implementations using an Objective-C runtime for the object model.
+This is used by *SmalltalkKit*, implementing Étoilé's Pragmatic Smalltalk, a
+Smalltalk JIT compiler which generates code binary-compatible with Objective-C,
+allowing classes to be written in a mixture of Smalltalk and Objective-C.
 
-Other frameworks, such as *LuceneKit*, providing full-text indexing and searching, and *OgreKit*, a powerful regular expression framework are also included.  
+Other frameworks, such as *LuceneKit*, providing full-text indexing and
+searching, and *OgreKit*, a powerful regular expression framework are also
+included.  *UnitKit* is a simple and flexible unit testing framework used by much of Étoilé.  A new addition is *MediaKit*, a framework used to provide support for sound playback and recording and, in future, video.  *SystemConfig* has received a number of improvements since our last release, including support for modifying X11 keyboard layouts and monitoring the battery level.
 
-Several applications are part of this release, such as *Mélodie*, a music jukebox using CoreObject for the music library and *MediaKit* for playback.  Étoilé applications which use *ScriptKit* are scriptable from outside using Objective-C or Smalltalk.  This is used by the hit corners and gesture recognition tool to run arbitrary commands in response to corner activations or mouse gestures, and by *ScriptServices* which allows arbitrary shell or Smalltalk scripts to be invoked on the current selection from any GNUstep or Étoilé application.
+Several applications are part of this release, such as *Mélodie*, a music
+jukebox using CoreObject for the music library and *MediaKit* for playback.
+Étoilé applications which use *ScriptKit* are scriptable from outside using
+Objective-C or Smalltalk.  This is used by the hit corners and gesture
+recognition tool to run arbitrary commands in response to corner activations or
+mouse gestures, and by *ScriptServices* which allows arbitrary shell or
+Smalltalk scripts to be invoked on the current selection from any GNUstep or
+Étoilé application.
+
+
+Availability
+------------
+
+Étoilé 0.4.0 is currently available in code source form only 
+and may be downloaded at <http://download.gna.org/etoile/etoile-0.4.0.tar.gz> 
+It may also be obtained from Subversion with the following command:
+
+svn co svn://svn.gna.org/svn/etoile/tags/Etoile-0.4.0
+
+If you wish to use the latest stable release, then you can download
+<http://download.gna.org/etoile/etoile-0.4.0.tar.gz> before running `svn up` to seed your source tree.
+
+More Information
+----------------
+
+Visit our website: <http://www.etoileos.com/>
+and blog: <http://etoileos.com/news/>
+Or subscribe to our mailing lists: <https://gna.org/mail/?group=etoile>
+Or join our SILC channel: <silc://silc.etoile-project.org/Etoile>
+
