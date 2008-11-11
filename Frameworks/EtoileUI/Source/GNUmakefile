@@ -5,6 +5,7 @@ SUBPROJECT_NAME = libEtoileUI
 libEtoileUI_OBJCFLAGS += -std=c99
 
 libEtoileUI_OBJC_FILES = \
+	Controls+Etoile.m \
 	ETApplication.m \
 	ETBrowserLayout.m \
 	ETComputedLayout.m \
@@ -32,6 +33,7 @@ libEtoileUI_OBJC_FILES = \
 	ETOutlineLayout.m \
 	ETPaneLayout.m \
 	ETPaneSwitcherLayout.m \
+	ETPersistencyController.m \
 	ETPickboard.m \
 	ETStackLayout.m \
 	ETStyle.m \

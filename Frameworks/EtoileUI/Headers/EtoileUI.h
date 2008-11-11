@@ -40,6 +40,7 @@
 #import <EtoileUI/NSView+Etoile.h>
 #import <EtoileUI/NSWindow+Etoile.h>
 #import <EtoileUI/NSImage+Etoile.h>
+#import <EtoileUI/Controls+Etoile.h>
 #import <EtoileUI/ETObjectRegistry+EtoileUI.h>
 #import <EtoileUI/ETInspecting.h>
 
@@ -82,3 +83,7 @@
 #import <EtoileUI/ETViewModelLayout.h>
 #import <EtoileUI/ETTextEditorLayout.h>
 #import <EtoileUI/ETInspector.h>
+
+#ifdef COREOBJECT
+#import <EtoileUI/ETPersistencyController.h>
+#endif

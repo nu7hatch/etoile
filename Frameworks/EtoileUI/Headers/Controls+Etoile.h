@@ -1,12 +1,12 @@
 /*
-	ETApplication.h
+	Controls+Etoile.h
 	
-	NSApplication subclass implementing Etoile specific behavior.
+	NSControl class and subclass additions.
  
-	Copyright (C) 2007 Quentin Mathe
+	Copyright (C) 2008 Quentin Mathe
  
 	Author:  Quentin Mathe <qmathe@club-internet.fr>
-	Date:  November 2007
+	Date:  July 2008
  
 	Redistribution and use in source and binary forms, with or without
 	modification, are permitted provided that the following conditions are met:
@@ -32,28 +32,29 @@
 	ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
 
-/** If you use a custom NSApplication subclass, you must subclass ETApplication 
-	instead of NSApplication to make it Etoile-native.
-	This subclass takes care of enabling live development support at runtime. */
-@interface ETApplication : NSApplication 
-{
-	ETLayoutItemGroup *_windowLayer;
-}
+// TODO: Declare properties and work out all the default factory values to be 
+// used for cloning view-based items with EtoileUI. Only NSTextField is 
+// partially implemented for now.
 
-- (ETLayoutItemGroup *) layoutItem;
-- (NSMenu *) applicationMenu;
-- (NSMenuItem *) developmentMenuItem;
+@interface NSControl (Etoile)
 
-/* Actions */
+/* Copying */
 
-- (id) targetForAction: (SEL)anAction;
-- (IBAction) browseLayoutItemTree: (id)sender;
-- (IBAction) toggleDevelopmentMenu: (id)sender;
-- (IBAction) toggleLiveDevelopment: (id)sender;
+- (id) copyWithZone: (NSZone *)zone;
+
+/* Property Value Coding */
+
+- (NSArray *) properties;
 
 @end
+
+
+@interface NSTextField (Etoile)
++ (NSRect) defaultFrame;
+- (NSArray *) properties;
+@end
+
