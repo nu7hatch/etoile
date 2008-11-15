@@ -27,4 +27,3 @@ export system = no
 export addressmanager = no
 export hardware = no
 export lookandbehavior = no
-export melodie = no
