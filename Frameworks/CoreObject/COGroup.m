@@ -31,6 +31,7 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 @interface COGroup (Private)
 - (void) _addAsParent: (id) object;
 - (void) _removeAsParent: (id) object;
+- (NSArray *) _members;
 - (BOOL) _tryReplaceFaultObject: (id)aFault 
                         inArray: (NSMutableArray *)objects 
                      withObject: (id)resolvedObject;
@@ -191,7 +192,10 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 	// Could check whether a contains a fault for object by comparing the UUIDs 
 	// in another method than -containsObject... containsObjectOrFault:
 	// otherwise -resolveFaults is called by invocation playback and it gets
-	// messy unless we check whether -isReverting is true.
+	// messy unless we check whether -isReverting is true. Be also careful with 
+	// the fact this method is called by -_addAsParent:, itself called by 
+	// -replaceObject:byObject:collectAllErrors: for which fault resolution 
+	// is forbidden.
 	//[self resolveFaults];
 
 	NSMutableArray *a = [self valueForProperty: kCOGroupChildrenProperty];
@@ -257,9 +261,14 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 - (NSArray *) members
 {
 	[self resolveFaults];
+	return [self _members];
+}
 
-	return [[self valueForProperty: kCOGroupChildrenProperty] arrayByAddingObjectsFromArray:
-	            [self valueForProperty: kCOGroupSubgroupsProperty]];
+/* Private getter that does no fault resolution. */
+- (NSArray *) _members
+{
+	return [[self valueForProperty: kCOGroupChildrenProperty] 
+		arrayByAddingObjectsFromArray: [self valueForProperty: kCOGroupSubgroupsProperty]];	
 }
 
 - (BOOL) addGroup: (id <COGroup>)aGroup
@@ -443,7 +452,7 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 		FOREACHI(subgroups, aChildGroup)
 		{
 			if ([anObject isTemporalInstance: aChildGroup])
-				return YES;;
+				return YES;
 		}
 	}
 	else
@@ -465,7 +474,29 @@ NSString *kCOGroupChild = @"kCOGroupChild";
                 isTemporalMerge: (BOOL)temporal 
                           error: (NSError **)error
 {
-	[self resolveFaults];
+	// WARNING: Do not resolve trigger fault resolution in this method.
+	// This can result in very nasty bugs when restoring a context. For example:
+	// an object A is a member of a group Z
+	// the group Z is a member of a group X 
+	// finally Z is currently a fault
+	// For a context restore, an object A is replaced by temporal instance A2,
+	// -[COObjectContext replaceObject: A byObject: A2 ...] will call 
+	// -[COObjectServer updateRelationshipsToObject: A], which in turn will 
+	// iterate over all cached groups (Z, X etc.) and call
+	// [X replaceObject: A byObject: A2 ...]
+	// If -resolveFaults is called at this point, Z will be resolved. When Z 
+	// gets deserialized, -lookUpObjectForUUID: UUID(A) is called... because 
+	// A is cached, it gets immediately resolved as a Z member. But by getting 
+	// just cached now, Z isn't in the enumerator of cached objects for which 
+	// the relationship to A remain to be checked. So A will remain as a member  
+	// of Z and won't get correctly replaced by A2 as expected. Quickly 
+	// afterwards unregister/register on the context will swap A and A2 in the 
+	// context and the cache though.
+	// Tests may fail very randomly for this kind of bugs. To give an example,
+	// Z may be part of the objects to restore or load, and the order in which 
+	// all the objects are processed can vary: Z before A or the reverse. If Z 
+	// exists initially as a cached object, -updateRelationshipsToObject: will 
+	// call [Z replaceObject: A byObject: A2 ...], and the tests will pass.
 
 	if (temporal && [otherObject isMemberOfClass: [anObject class]] == NO)
 	{
@@ -474,8 +505,11 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 		return COMergeResultNone;
 	}
 
-	if ([[self members] containsObject: anObject] == NO)
+	/* Don't use -members to not trigger fault resolution */
+	if ([[self _members] containsObject: anObject] == NO)
 		return COMergeResultNone; // Nothing to merge in the receiver
+	
+	// TODO: Eventually turn on the following extra check
 	//if ([self containsTemporalInstance: otherObject])
 	//	return COMergeResultNone; // Nothing to merge in the receiver
 
@@ -514,6 +548,7 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 	[targetChildObjects removeObject: anObject];
 	[self _addAsParent: otherObject];
 	[targetChildObjects insertObject: otherObject atIndex: indexOfReplacedObject];
+
 	// TODO: Post a kGroupMergeObjectNotification.
 	//	[_nc postNotificationName: kCOGroupMergeObjectNotification
 	//	     object: self
@@ -537,8 +572,31 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 - (void) mergeObjectsWithObjectsOfGroup: (COGroup *)aGroup 
                                  policy: (COChildrenMergePolicy)aPolicy
 {
-	[self resolveFaults];
-	[aGroup resolveFaults];
+	// FIXME: This doesn't work well if 'self' is a temporal instance, 
+	 // [self objectContext] returns nil when we got called indirectly by 
+	// -replaceObject:byObject:collectAllErrors:. 
+	// The instances are swapped in the context right after we return. Hence 
+	// moving -tryMergeRelationshipsOfObject:intoInstance: to follow 
+	// unregister/register is useless, because aGroup will now miss a context.
+	// See also the warnings logged by -resolveFaults.
+	// Until a better approach is worked out, a hack has been added to 
+	// -[COObjectContext replaceObject:byObject:collectAllErrors:]. 
+	// Working approaches could be to turn all members into faults for the merge, 
+	// or extend NSSet in a way or antoher so that it treats a UUID and the 
+	// object bound to it as equal.
+	// Moreover triggering fault resolution here can lead to the same effect 
+	// than -replaceObject:byObject:... -resolveFaults may load a group with 
+	// a UUID reference on self/aGroup, but aGroup is still the cached object, 
+	// so -lookUpObjectForUUID: will resolve it wrongly to aGroup rather than 
+	// self. The same arises if self/aGroup holds an unresolved reference on itself.
+
+	// HACK: Don't resolve if we are restoring the context especially, but 
+	// do it in -[COObjectContext replaceObject:byObject:...]
+	if ([self isTemporalInstance: aGroup] == NO)
+	{
+		[self resolveFaults];
+		[aGroup resolveFaults];
+	}
 
 	[self mergeArray: [aGroup valueForProperty: kCOGroupChildrenProperty]
 	       intoArray: [self valueForProperty: kCOGroupChildrenProperty]
@@ -620,6 +678,8 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 {
 	if ([self hasFaults] == NO)
 		return;
+	
+	ETDebugLog(@"Resolve faults in %@", self);
 
 	// NOTE: Don't call -objects here, because it calls -resolveFaults.
 	NSMutableArray *childObjects = [self valueForProperty: kCOGroupChildrenProperty];
@@ -633,12 +693,16 @@ NSString *kCOGroupChild = @"kCOGroupChild";
 		if ([anObject isFault] == NO)
 			continue;
 
+		if ([self objectContext] == nil)
+			ETLog(@"WARNING: Trying to resolve fault with a nil context");
+
 		resolvedObject = [[self objectContext] resolvedObjectForFault: anObject];
 
 		if (resolvedObject == nil)
 		{
 			resolvedAllFaults = NO;
-			ETLog(@"NOTE: No object available for UUID %@", anObject);
+			ETLog(@"Failed to resolve object %@, the object might not be "
+				   "available in store or referenced in the metadata DB", anObject);
 			continue;
 		}
 

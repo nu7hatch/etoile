@@ -125,7 +125,8 @@ static COObjectContext *currentObjectContext = nil;
 
 - (NSString *) description
 {
-	return [NSString stringWithFormat: @"%@ version: %i", [super description], [self version]];
+	return [NSString stringWithFormat: @"%@ id: %@ version: %i", 
+ 		[super description], [self UUID], [self version]];
 }
 
 /** Returns the lastest object context version in the metadata server.
@@ -351,7 +352,7 @@ static COObjectContext *currentObjectContext = nil;
 	// server rather than simply inserting it into the receiver. This means 
 	// managed object must be associated with a main object context that plays 
 	// the role of an owner.
-	return [self objectForUUID: aFault];;
+	return [self objectForUUID: aFault];
 }
 
 /** Returns the UUIDs of the all the objects that belongs the receiver for the 
@@ -436,6 +437,21 @@ static COObjectContext *currentObjectContext = nil;
 	if (isTemporal)
 		[self beginRestoreObject: anObject];
 
+	// HACK: Work around the issue explained in -[COGroup mergeObjectsWithObjectsOfGroup:]
+	// It is safe to be do that here, because anObject still has a context and 
+	// any UUID references that will got resolved to anObject are going to be 
+	// properly replaced by temporalInstance by -updateRelationshipsToObject:
+	if ([anObject isKindOfClass: [COGroup class]])
+		[anObject resolveFaults];
+
+	/* Swap the instances in the context */
+	[self unregisterObject: anObject];
+	[self registerObject: temporalInstance];
+
+	// HACK: Next part of the work around.
+	if ([temporalInstance isKindOfClass: [COGroup class]])
+		[temporalInstance resolveFaults];
+
 	mergeResult = [[self objectServer] updateRelationshipsToObject: anObject 
 	                                                  withInstance: temporalInstance];
 
@@ -443,12 +459,7 @@ static COObjectContext *currentObjectContext = nil;
 	    objects are groups we need to merge their member/children references. */
 	[self tryMergeRelationshipsOfObject: anObject intoInstance: temporalInstance];
 
-	/* Swap the instances in the context */
-	[self unregisterObject: anObject];
-	[self registerObject: temporalInstance];
-
 	[self commitMergeOfInstance: temporalInstance forObject: anObject];
-
 	if (isTemporal)
 		[self endRestore];
 
@@ -496,10 +507,12 @@ static COObjectContext *currentObjectContext = nil;
 		int lastObjectVersion = [[self metadataServer] objectVersionForUUID: [temporalInstance UUID]];
 		[temporalInstance _setObjectVersion: lastObjectVersion];
 	}
+
+	// TODO: May be write unit tests to ensure we write the expected .save file 
+	// and log the correct incremented version.
 	[self snapshotObject: temporalInstance shouldIncrementObjectVersion: YES];
-	if (anObject == nil)
-		anObject = temporalInstance;
-	[self logRecord: anObject objectVersion: [anObject objectVersion] 
+	ETDebugLog(@"Commit merge of %@", temporalInstance);
+	[self logRecord: temporalInstance objectVersion: [temporalInstance objectVersion] 
 		timestamp: [NSDate date] shouldIncrementContextVersion: isSingleObjectChange];	
 }
 
@@ -642,7 +655,7 @@ static COObjectContext *currentObjectContext = nil;
 	[self restoreToVersion: ++_restoredVersionUndoCursor];
 	_isRedoing = NO;
 
-	BOOL hasRevertedAllUndoActions = (_firstUndoVersion == _restoredVersionUndoCursor);
+	BOOL hasRevertedAllUndoActions = (_restoredVersionUndoCursor == (_firstUndoVersion - 1));
 
 	if (hasRevertedAllUndoActions)
 		[self endUndoSequence];
@@ -819,6 +832,15 @@ static COObjectContext *currentObjectContext = nil;
 		else
 		{
 			[self replaceObject: anObject byObject: restoredObject collectAllErrors: YES];
+		}
+
+		BOOL shouldNotifyNowOfMerge = ([self isRestoringContext] == NO);
+		if (shouldNotifyNowOfMerge)
+		{
+			[[NSNotificationCenter defaultCenter] 
+				postNotificationName: COObjectContextDidMergeObjectsNotification
+				object: self
+				userInfo: D(COMergedObjectsKey, A(restoredObject))];
 		}
 	}
 
@@ -1006,10 +1028,13 @@ static COObjectContext *currentObjectContext = nil;
 
 	/* Record */
 	deltaSerializer = [self deltaSerializerForObject: object];
-	// NOTE: Don't use [deltaSerializer newVersion]; here because 
-	// -serializeObject:withName: already takes care of calling -newVersion.
-	// We instead retrieve the version right after serializing the invocation.
 	[inv setTarget: nil];
+	/* Don't use [deltaSerializer newVersion]; here because 
+	   -serializeObject:withName: already takes care of calling -newVersion.
+	   No need to call -setVersion: either because -deltaSerializerForObject: 
+	   initializes the serializer with the current object version.
+	   The invocation is written on disk as (version + 1).save and we 
+	   retrieve this new version. */
 	[deltaSerializer serializeObject: inv withName: @"Delta"];
 	version = [deltaSerializer version];
 	ETDebugLog(@"Serialized invocation with version %d", version);
@@ -1063,7 +1088,7 @@ static COObjectContext *currentObjectContext = nil;
 	ETDebugLog(@"Log %@ objectUUID %@ objectVersion %i contextVersion %i", 
 		aRecord, [object UUID], aVersion, _version);
 
-	BOOL exitingUndoSequence = ([self isUndoing] == NO || [self isRedoing] == NO);
+	BOOL exitingUndoSequence = ([self isUndoing] == NO && [self isRedoing] == NO);
 
 	if (exitingUndoSequence)
 		[self endUndoSequence];
@@ -1110,6 +1135,8 @@ static COObjectContext *currentObjectContext = nil;
     You should usually call -snapshotObject: rather than this method. */
 - (void) snapshotObject: (id)object shouldIncrementObjectVersion: (BOOL)updateVersion
 {
+	/* -snapshotSerializerForObject: initializes the serializer with the current 
+	   object version. */
 	id snapshotSerializer = [self snapshotSerializerForObject: object];
 	id realObject = ([object isCoreObjectProxy] ? [object _realObject] : object);
 	

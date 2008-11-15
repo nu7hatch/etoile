@@ -393,6 +393,7 @@ static COObjectServer *localObjectServer = nil;
 	if ([[_coreObjectTable allValues] containsObject: object])
 		return NO;
 
+	ETDebugLog(@"Cache object %@", object);
 	[_coreObjectTable setObject: object forKey: [object UUID]];
 	return YES;
 
@@ -452,6 +453,9 @@ static COObjectServer *localObjectServer = nil;
 	// to a past version.
 	FOREACHI(_coreObjectTable, managedObject)
 	{
+		ETDebugLog(@"Update relationship of %@ from %@ to %@", managedObject, 
+			anObject, newObject);
+
 		// TODO: Asks each managed object if the merge is possible before 
 		// attempting to apply it. If the merge fails, we are in an invalid 
 		// state with both object and newObject being referenced in 
@@ -513,7 +517,7 @@ static COObjectServer *localObjectServer = nil;
 			[fixedGroups addObject: object];
 	}
 	
-	ETLog(@"Resolved fault %@ in groups %@", anUUID, fixedGroups);
+	ETDebugLog(@"Resolved fault %@ in groups %@", anUUID, fixedGroups);
 }
 
 /** Returns the serialization URL.
@@ -541,9 +545,25 @@ static COObjectServer *localObjectServer = nil;
     a delta. If no such version can be found (no snapshot or delta available 
     unless an error occured), returns -1.
     If object hasn't been made persistent yet or isn't registered in the 
-    receiver also returns -1. Hence this method returns -1 for rolledback 
+    receiver also returns -1. Hence this method returns -1 for restored
     objects not yet inserted in an object context. */
 - (int) lastVersionOfObjectWithURL: (NSURL *)anURL
+{
+	int deltaVersion = [self lastDeltaVersionOfObjectWithURL: anURL];
+	int snapshotVersion = [self lastSnapshotVersionOfObjectWithURL: anURL];
+	int lastVersion = deltaVersion;
+
+	/* The last version can be a snapshot if the object got recently restored */
+	if (snapshotVersion > deltaVersion)
+		lastVersion = snapshotVersion;
+
+	return lastVersion;
+}
+
+/** Returns the first version back in time which corresponds to a delta and 
+    not a snapshot. If no such version can be found (probably no delta 
+    available), returns -1. */
+- (int) lastDeltaVersionOfObjectWithURL: (NSURL *)anURL
 {
 	// TODO: Move this code into ETSerialObjectBundle, probably by adding 
 	// methods such -lastVersion:inBranch: and -lastVersion. We may also cache 
