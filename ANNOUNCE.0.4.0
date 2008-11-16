@@ -1,12 +1,13 @@
 Étoilé 0.4.0 Release Announcement
 =================================
 
-Étoilé intends to be an innovative GNUstep based user environment built from
-the ground up on highly modular and light components with project and document
-orientation in mind, in order to allow users to create their own workflow by
-reshaping or recombining provided Services (aka Applications), Components etc.
-Flexibility and modularity on both User Interface and code level should allow
-us to scale from PDA to computer environment.
+Étoilé intends to be an innovative, GNUstep-based, user environment built from
+the ground up on highly modular and light components. It is created with
+project and document orientation in mind, in order to allow users to create
+their own workflow by reshaping or recombining provided Services (aka
+Applications) and Components.  Flexibility and modularity on both User
+Interface and code level should allow us to scale from handheld to desktop 
+environments.
 
 0.4 is a developer-targeted release on its way towards this goal.  As a
 developer-focussed release, this predominantly consists of frameworks.  A few
@@ -21,7 +22,7 @@ Highlights
 supports automatic persistence and versioning by recording messages sent to
 objects. It offers a flexible versioning scheme where both individual objects
 and their entire object graph can be versioned separately. The built-in object
-model is a generalization of the  property model used by the AddressBook
+model is a generalization of the property model used by the AddressBook
 framework.  Foreign model objects can be also integrated by wrapping them with
 a special proxy.  CoreObject uses the *EtoileSerialize* framework which, in many
 cases, allows objects and messages to be automatically serialized with no
@@ -41,15 +42,16 @@ includes a number of extensions to the Objective-C object model, allowing
 traits and mixins.  This framework is used by most of the rest of Étoilé and
 provides a number of core functions, such as UUID and XML handling.
 
-*EtoileUI* is also available as an early preview release and should not be 
-considered stable. EtoileUI is a high-level OOUI toolkit that provides a 
-uniform tree representation for graphical objects on top of the AppKit. All User 
-Interface concerns such as layouts, event handlers, styles, model objects etc. 
-intends to be implemented as pluggable aspects. It also shares the same 
-interfaces as other CoreObject systems. The combination of these three key 
-features makes possible to inspect and reshape both User Interface and model 
-objects at runtime through direct manipulation. It comes with a library of 
-layouts where each one encapsulates a custom and pluggable visual presentation.
+*EtoileUI* is also available as an early preview release and should not be
+considered stable.  EtoileUI is a high-level, object-oriented, user interface
+toolkit that provides a uniform tree representation for graphical objects on
+top of the AppKit.  All User Interface concerns such as layouts, event handlers,
+styles, model objects etc. will be implemented as pluggable aspects.  It
+also shares the same interfaces as other CoreObject systems.  The combination of
+these three key features makes possible to inspect and reshape both User
+Interface and model objects at runtime through direct manipulation.  It comes
+with a library of layouts where each one encapsulates a custom and pluggable
+visual presentation.
 
 Other frameworks, such as *LuceneKit*, providing full-text indexing and
 searching, and *OgreKit*, a powerful regular expression framework are also
@@ -62,7 +64,7 @@ for modifying basic X11 keyboard settings and monitoring the battery level.
 Several applications are part of this release, such as *Mélodie*, a music
 jukebox using CoreObject for the music library and *MediaKit* for playback.
 Étoilé applications which use *ScriptKit* are scriptable from outside using
-Objective-C or Smalltalk.  This is used by the hit corners and gesture
+Objective-C or Smalltalk.  This is used by the hot corners and gesture
 recognition tool to run arbitrary commands in response to corner activations or
 mouse gestures, and by *ScriptServices* which allows arbitrary shell or
 Smalltalk scripts to be invoked on the current selection from any GNUstep or
