@@ -81,8 +81,8 @@ It may also be obtained from Subversion with the following command:
 svn co svn://svn.gna.org/svn/etoile/tags/Etoile-0.4.0
 
 If you wish to use the latest stable release, then you can download
-<http://download.gna.org/etoile/etoile-0.4.0.tar.gz> before running `svn up` to 
-seed your source tree.
+<http://download.gna.org/etoile/etoile-0.4.0-svn.tar.gz> before running 
+`svn up` to seed your source tree.
 
 
 More Information
