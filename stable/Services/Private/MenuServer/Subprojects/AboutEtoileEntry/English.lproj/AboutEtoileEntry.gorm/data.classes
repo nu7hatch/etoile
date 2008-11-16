@@ -1,0 +1,27 @@
+{
+    "## Comment" = "Do NOT change this file, Gorm maintains it";
+    AboutEtoileEntry = {
+	Actions = (
+	);
+	Outlets = (
+	    window,
+	    cpu,
+	    cpuFreq,
+	    etoileVersion,
+	    hostName,
+	    kernelVersion,
+	    machine,
+	    memory,
+	    operatingSystem,
+	    image
+	);
+	Super = NSObject;
+    };
+    ScrollingImageView = {
+	Actions = (
+	);
+	Outlets = (
+	);
+	Super = NSImageView;
+    };
+}

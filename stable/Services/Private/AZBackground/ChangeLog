@@ -1,0 +1,33 @@
+2007-04-12  Yen-Ju Chen <yjchenx at gmail>
+
+	* Perform service when called from notification.
+	* Move finding active window into XWindowServerKit.
+
+2007-03-18  Yen-Ju Chen <yjchenx at gmail>
+
+	* Bundle some background image.
+
+2007-03-17  Yen-Ju Chen <yjchenx at gmail>
+	
+	* Use XWindow protocol for background.
+          It is native and should eliminate refreshing problem.
+
+2007-02-13  Guenther Noack <guenther@unix-ag.uni-kl.de>
+
+	* GNUmakefile: Added include path /usr/X11R6/include
+
+2007-02-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* GNUmakefile: Replaced GNUSTEP_INSTALL_DOMAIN by ETOILE_CORE_MODULE.
+
+2007-02-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	* GNUmakefile: Modified to include etoile.make and also to use now
+	GNUSTEP_INSTALL_DOMAIN instead of GNUSTEP_INSTALL_DIR.
+
+2006-12-17  Yen-Ju Chen <yjchenx at gmail>
+
+	* Initial import.
+	* Read image file from command line.
+	* Read image file from user default "File".
+

@@ -1,0 +1,399 @@
+2008-11-06  Quentin Mathe <qmathe@club-internet.fr>
+
+	Bumped framework version from 0.1 to 0.2, rather than 0.1.1 to clearly mark 
+	the license change. This is for Etoile 0.4 release. 
+	* GNUmakefile: Introduced framework versioning.
+	* README:
+	* INSTALL:
+	Tweaked the content and the formatting a bit. Bumped version and documented 
+	license in README.
+	* NEWS: 
+	* TODO: 
+	Added.
+	* Info.plist: Bumped version.
+
+2007-09-07  Isaiah Beerbower <public@ipaqah.com>
+
+	Change license to 3-clause BSD (With permission from all those concerned).
+	Make the Xcode project work. Testing to follow...
+
+2007-09-07  Isaiah Beerbower <public@ipaqah.com>
+
+	Change license to 3-clause BSD (With permission from all those concerned).
+	Make the Xcode project work. Testing to follow...
+
+2007-08-24  Isaiah Beerbower <public@ipaqah.com>
+
+	Change license on Quentin's and Nicolas' (permission from Quentin):
+	* Headers/IKApplicationIconProvider.h
+	* Headers/IKIconTheme.h
+	* Headers/IKCompositor.h
+	* Headers/IKThumbnailProvider.h
+	* Headers/IKCompositorOperation.h
+	* Headers/IKIconProvider.h
+	* Headers/NSFileManager+IconKit.h
+	* Source/IKIconProvider.m
+	* Source/NSFileManager+IconKit.m
+	* Source/IKApplicationIconProvider.m
+	* Source/IKIconTheme.m
+	* Source/IKCompositor.m
+	* Source/IKThumbnailProvider.m
+	* Source/IKCompositorOperation.m
+	Added Xcode project and Mac OS X compatibility header
+	(for my own convenience):
+	* Info.plist
+	* IconKit.xcodeproj
+	* Headers/IKCompat.h
+	* Source/IKIcon.m
+	* Source/NSString+MD5Hash.m
+	* Source/IKWorkspaceAdditions.m
+
+2007-06-30  Yen-Ju Chen <yjchen gmail>
+
+    * GNUstep.icontheme/Resources/: 
+	  Convert PNG to TIFF to avoid GNUstep bug on PNG format.
+	* Source/IKIconTheme.m:
+	* Source/IKThumbnailProvider.m:
+	  Use TIF by default and fix bug when real identifier has extension already.
+
+2007-06-13  Quentin Mathe <qmathe@club-internet.fr>
+
+	Modified IKIcon to use the provider architecture. Wrote the missing code 
+	in IKIconProvider to have a working implementation. Implemented it with a
+	rudimentary scheme which checks a mapping file to convert file extensions 
+	to IKIconTheme icon identifiers. In future, we should use UTI database to
+	get the proper icon identifier, as a side effect we would gain supercasting
+	(as David nicknames it ;-)... To take a bad example: when no icon has been
+	registered for xhtml, fallback occurs on any parent types (like xml, html
+	or text) which have a registered icon rather than default document icon. The 
+	real result of this commit is visible in OuterSpace which now displays 
+	files with GNUstep/Etoile icon theme.
+	* GNUstep.icontheme/Resources/IdentifierMapping.plist: Added new mappings 
+	which can prove to be useful.
+	* GNUstep.icontheme/Resources/Application-Application.png: New icon for 
+	applications without bundled icon.
+	* ExtensionMapping.plist: New plist file to map extensions to icon theme
+	identifiers.
+	* IconKitInfo.plist: Added (includes CFBundleIdentifier).
+	* Source/IKIcon.m (-initForFile:): Now uses IKIconProvider.
+	* Headers/IKIconProvider.h:
+	* Source/IKIconProvider.m:
+	Added ivar _systemIconMappingList.
+	(-init): Updated to init new ivar.
+	(-dealloc): Added to release new ivar.
+	(-_loadSystemIconMappingList:): New method.
+	(-iconForURL:): Turned off thumbnails and cached icons.
+	(-defaultIconForURL:): Updated to take in account application package and
+	document icons registered by applications. Documented too.
+	(-systemIconForURL:): Wrote implementation and documented.
+
+2007-05-04  Yen-Ju Chen <yjchenx at gmail>
+
+	* Fix a typo which make IconKit unusable.
+
+2007-05-03  Yen-Ju Chen <yjchenx at gmail>
+
+	* Toplevel GNUmakefile make the frameworks
+	  while Source/GNUmakefile make the subproject
+
+2007-04-29  Yen-Ju Chen <yjchen gmail.com>
+
+	* Remove unnecessary HEADER_INSTALL_DIR.
+	* Use <IconKit/IK...> as headers.
+
+2007-04-27  Yen-Ju Chen <yjchen gmail.com>
+
+	* Turn IconKit into frameworks in order to have resources.
+	* Include GNUstep.icontheme as resource to be loaded as defualt theme.
+	  Tested with Vindallo.
+
+2007-04-26  Quentin Mathe <qmathe@club-internet.fr>
+
+	Last tweaks to make Icon Theme support effective.
+	* Source/IKIcon.m: Added a logging statement for debugging.
+	* Source/IKIconTheme.m:
+	(-findAllThemeBundles): Modified to look for icon themes in Themes 
+	directory directly too.
+	(+theme): Improved to return a default theme when no theme has already been
+	loaded and activated.
+	(-iconPathForIdentifier:): Fixed not to return nil when the identifier 
+	already includes filename extension. Added a logging statement.
+
+2007-04-20  Yen-Ju Chen <yjchenx gmail>
+
+	* Return nil if icon is not found.
+
+2007-03-19  Yen-Ju Chen <yjchenx gmail>
+
+	* Disable unit kit if not specified.
+
+2007-03-16  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/IconKit.h: Includes IKIconTheme.h now.
+
+2007-03-16  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/IKIcon.m: Updated formatting and indentation to be cleaner and
+	match GNUstep coding style rules.
+
+2007-03-13  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/IKIcon.h: Updated formatting and indentation to be cleaner and
+	match GNUstep coding style rules.
+
+2007-03-13  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/IKIcon.m (-initWithIdentifier:, -update): Updated to use 
+	IKIconTheme and -[NSImage imageNamed:] only as a fallback.
+
+2007-03-13  Quentin Mathe <qmathe@club-internet.fr>
+
+	* GNUmakefile.preamble:
+	* GNUmakefile.postamble:
+	Deleted old content not needed at all now we use etoile.make.
+	* Source/GNUmakefile: Replaced GNUSTEP_INSTALLATION_DIR by 
+	ETOILE_CORE_MODULE.
+
+2007-03-13  Quentin Mathe <qmathe@club-internet.fr>
+
+	New icon theme support (not yet used by IKIcon)
+	* Headers/IKIconTheme.h:
+	* Source/IKIconTheme.m:
+	Added.
+	* Source/GNUmakefile: Updated.
+	* test.icontheme: Theme bundle used to test icon theme support. Also useful
+	as a template. 
+	Works and pass all unit tests.
+
+2007-02-19 Yen-Ju Chen <yjchenx at gmail _dot_ com>
+
+	* Format README in reStructuedText
+
+2007-02-28  Quentin Mathe <qmathe@club-internet.fr>
+
+	* QuickTest.io: Added Io script to test basic IconKit features by enabling 
+	to interact quickly and directly. Script interest and code quality is 
+	really low for now...
+
+2006-11-28  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/IKIconProvider.m: Fixed icons path by creating the cache 
+	in User domain rather than Local.
+	* Source/IKApplicationIconProvider.m: Added logs statement to aid debugging. 
+	Fixed composited icons path by creating the cache in User domain rather than 
+	Local.
+	* Source/NSFileManager+IconKit.m: Fixed file manager related calls by
+	referencing the singleton object rather than 'self' (NSFileManager is 
+	probably a class cluster).
+
+2006-11-28  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/IKIcon.h:
+	* Headers/IKCompositor.h:
+	* Headers/IconKit.h:
+	Fixed headers import within the library and updated the umbrella header to 
+	include more headers. This allows to use the library now (previously project
+	compilation would have failed on header import).
+	* Source/GNUmakefile: Updated to install headers even if 'test' isn't set to 
+	'no'. Removed headers related lines which serve no purpose.
+
+2006-11-02  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/IKIconProvider.m:
+	* Source/NSFileManager+IconKit.m:
+	* Source/IKApplicationIconProvider.m:
+	* Source/GNUmakefile:
+	Got of rid of all the remaining warnings except two. Declared HAVE_UKTEST 
+	to put test methods between conditional directives based on this define.
+
+2006-10-29  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/GNUmakefile:
+	* Source/IKIcon.m:
+	* Source/IKCompositor.m:
+	* Headers/IKIcon.h:
+	* Headers/IKIconPositions.h:
+	Shut down various compiler warnings and replaced include statements by 
+	import ones. truncf is now used through GCC equivalent builtin function.
+
+2006-09-27  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * GNUmakefile: Updated to include etoile.make.
+
+2005-06-14  Quentin Mathe <qmathe@club-internet.fr>
+    
+    WARNING: many tests fail
+    * Source/GNUmakefile: Updated to include correctly GNUmakefile.preamble and
+    GNUmakefile.postamble.
+
+2005-06-14  Quentin Mathe <qmathe@club-internet.fr>
+    
+    WARNING: many tests fail
+    * GNUmakefile.postamble:
+    * GNUmakefile.preamble:
+    Added (in order to allow compilation with 'make test=yes' from parent
+    directories when UnitKit isn't already installed).
+    * GNUmakefile: Updated to include GNUmakefile.preamble and
+    GNUmakefile.postamble.
+
+2005-05-15  Quentin Mathe <qmathe@club-internet.fr>
+    
+    WARNING: many tests fail
+    * Source/GNUmakefile: Updated to support UnitKit in order to produce tests
+    bundle.
+    * Headers/IKApplicationIconProvider.h: Adopted UKTest protocol to support 
+    UnitKit.
+    (-invalidCache): Renamed -invalidateCache.
+    (-invalidCacheAll): Renamed -invalidateCacheAll.
+    * Source/IKApplicationIconProvider.m:
+    Added macros DOCUMENT_PATH_COMPONENT and PLUGIN_PATH_COMPONENT for path 
+    components used in a recurrent way.	Fixed 'invalid' term incorrect use in 
+    method names when 'invalidate' should be used.
+    (-initWithBundlePath:): Raise needed exceptions.
+    (-initWithBundleIdentifier:): Raise needed exception.
+    (-invalidCache): Renamed -invalidateCache.
+    (-invalidCacheAll): Renamed -invalidateCacheAll.
+    (-_cacheIcon:forVariant:): Fixed cached icon file name in order to include an 
+    extension.
+    (-initForTest): Add custom init method for UnitKit tests suite.
+    (-testInit):
+    (-testApplicationIcon):
+    (-test_documentIconForExtension):
+    (-test_compositeIconForVariant):
+    (-test_compositedIconsPath):
+    (-test_cachedIconForVariant):
+    (-test_cacheIconForVariant):
+    (-test_buildDirectoryStructureForCompositedIconsCache):
+    (-test_blankDocumentIcon):
+    (-test_blankPluginIcon): Added unit tests with UnitKit (need to be refined).
+
+2005-05-05  Quentin Mathe <qmathe@club-internet.fr>
+    
+    * Source/GNUmakefile: Removed unneeded GNUSTEP_MAKEFILES definition which
+    seems to break compilation with recent GNUstep version.
+    
+2005-03-15  Quentin Mathe  <qmathe@club-internet.fr>
+    
+    * Headers/IKIcon.h:
+    * Headers/IKIconPositions.h:
+    * Source/IKIcon.m:
+    Fixed various development errors in order to have IconKit compiles new code 
+    like IKIcon.
+    * Source/GNUmakefile:
+    Modified to take in account the recently added files.
+
+2005-03-14  Quentin Mathe  <qmathe@club-internet.fr>
+    
+    * Headers/IconKit.h:
+    * Headers/IKIcon.h:
+    * Headers/IKIconIdentifier.h
+    * Headers/IKIconPositions.h:
+    * Headers/IKWorkspaceAdditions.h:
+    Updated indentation to be more in line with Etoile and GNUstep coding
+    guidelines.
+
+2005-03-14  Quentin Mathe  <qmathe@club-internet.fr>
+    
+    * Headers/IconKit.h:
+    * Headers/IKIcon.h:
+    * Headers/IKIconIdentifier.h
+    * Headers/IKIconPositions.h:
+    * Headers/IKWorkspaceAdditions.h:
+    * Source/IKIcon.m:
+    * Source/IKWorkspaceAdditions.m:
+    Added IconKit new GNUstep version related files written by Uli Kusterer.
+    
+2005-03-10  Quentin Mathe  <qmathe@club-internet.fr>
+    
+    * INSTALL: Updated to talk about IconKit and not Gorm.
+    * Source/GNUmakefile: Improved formatting.
+    
+2004-11-10  Quentin Mathe  <qmathe@club-internet.fr>
+        
+	* Source/IKCompositor.m: Makes the code compliant with the GNUstep
+	coding rules (memory management macros, designated initializer) and
+	improved the -render method to return an image with a bitmap
+	representation which can be written to the disk in whatever image
+	formats supported. 
+
+2004-11-09  Quentin Mathe  <qmathe@club-internet.fr>
+        
+	WARNING: many things don't work
+    * Headers/IKIconProvider.h:
+	* Source/IKApplicationIconProvider.m:
+	* Source/IKIconProvider.m:
+    * Source/IKThumbnailProvider.m:
+	Many corrections to make the framework partially works.
+
+2004-08-24  Quentin Mathe <qmathe@club-internet.fr>
+
+    WARNING: not tested.
+    * Headers/IKApplicationIconProvider.h:
+    * Headers/IKCompositor.h:
+    * Headers/IKIconProvider.h:
+    * Headers/IKThumbnailProvider.h:
+    * Headers/NSFileManager+IconKit.h:
+    * Source/IKApplicationIconProvider.m:
+    * Source/IKIconProvider.m:
+    * Source/NSFileManager+IconKit.m:
+    * Source/GNUmakefile:
+    Lot of corrections to make the framework compiles.
+
+2004-08-17  Quentin Mathe <qmathe@club-internet.fr>
+        
+	WARNING: doesn't compile.
+	* Headers/IKApplicationIconProvider.h: Reworded methods choice and
+	methods names, doesn't use anymore a singleton pattern.
+	* Source/IKApplicationIconProvider.m: Reworded methods choice and
+	methods names, doesn't use anymore a singleton pattern. Added initial
+	implementation. 
+	* Headers/IKIconProvider.h: Minor modifications.
+	* Source/IKIconProvider.m: Initial implementation.
+	* Headers/IKThumbnailProvider.h: Added.
+	* Source/IKThumbnailProvider.m: Added with initial implementation, still
+	work to do on the libpng based write method.
+	* Headers/IKCompositor.h:
+	* Source/IKCompositor.m:
+	Changed the method name -composite to the method name -render and other
+	minor modifications.
+	* Headers/IKCompositorOperation.h: Renamed the enumeration
+	IKCompositedIconPosition to IKCompositedImagePosition.
+	* Headers/NSString+MD5Hash:h:
+	* Source/NSString+MD5Hash.m: 
+	Added (not written by us).
+	* Headers/NSFilerManager+IconKit.h:
+	* Source/NSFileManager+IconKit.m: 
+	Added.
+	* Source/GNUmakefile: Edited to include the newly added files.
+
+2004-08-16  Nicolas Roard <nicolas@roard.com>
+
+    * README: Added introduction and text about the compositor
+
+2004-08-14  Nicolas Roard <nicolas@roard.com>
+	
+	* Source/IKCompositor.m:
+	* Source/IKCompositorOperation.m:
+	Initial implementation of the IconKit compositor, but still lacks 
+	IKCompositedIconPosition possibilites and automatic rescaling using
+	originalSize/compositingSize (the exercise is left to the reader ;-)
+	* IKCompositor.h:
+	* IKCompositorOperation.h:
+	Minor modifications.
+
+2004-08-14  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ChangeLog:
+    * README:
+    * INSTALL:
+    * GNUmakefile:
+    * Headers/IKCompositor.h:
+    * Headers/IKCompositorOperation.h:
+    * Headers/IKIconProvider.h:
+    * Headers/IKApplicationIconProvider.h:
+    * Source/IKCompositor.m:
+    * Source/IKCompositorOperation.m:
+    * Source/IKIconProvider.m:
+    * Source/IKApplicationIconProvider.m:
+    * Source/GNUmakefile:
+    Initial import.

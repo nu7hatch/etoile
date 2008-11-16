@@ -1,0 +1,45 @@
+OgreKit (GNUstep) INSTALL
+=========================
+
+Required software
+-----------------
+
+You need to have the GNUstep core libraries installed in order to
+compile and use OgreKit. The core packages are, at a minimum:
+
+   * gnustep-make
+
+   * gnustep-base
+
+See <http://www.gnustep.org/> for further information.
+
+You also need to have OniGuruma library installed:
+
+    * libonig 5 or higher
+      If OniGuruma is not packaged for your host system, it is available in 
+      Etoile repository at etoile/trunk/Dependencies/oniguruma5.
+      You can also compile against libonig 4.0.1 (or higher 4.x releases), see 
+      Build and Install
+
+See <http://www.geocities.jp/kosako3/oniguruma/> for further information.
+
+
+Build and Install
+-----------------
+
+Square brackets "[ ]" are used to indicate optional parameters.
+
+   Steps to build:
+
+   * make [old=yes]
+
+   * [sudo [-E]] make install
+
+Only specifies 'old=yes' argument to build against OniGuruma 4.x releases.
+
+
+Trouble
+-------
+
+Give us feedback! Tell us what you like; tell us what you think
+could be better. Send bug reports and patches to <etoile-track@gna.org>.

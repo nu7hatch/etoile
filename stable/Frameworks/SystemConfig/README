@@ -1,0 +1,79 @@
+============
+SystemConfig
+============
+
+:Maintainer: Quentin Mathe <qmathe@club-internet.fr>
+:Author: Quentin Mathe, Yen-Ju Chen, Guenther Noack, David Chisnall, 
+Nyap Hong Koh, Lennart Mezler
+:License: LGPL 2.1 License (see COPYING document)
+:Version: 0.2
+
+SystemConfig is a framework which provides various a common way to set system 
+specific preferences by interfacing with the host system. Host system means the 
+following combo:
+
+	* operating sytem
+	* additional abstraction support (sound, network etc.)
+	* display/window server
+
+Versatile and flexible devices support is often done through an extra 
+abstraction layer/library on top of the kernel. This is what 'additional 
+abstraction support' means. GNOME System tools backend is an example of such
+library that allows to set various settings (like network related ones) without
+having to pay attention on which operating system Etoile is used.
+
+This framework is only partially implemented, so if you are interested to 
+contribute, patches are really welcome :-) For example, there is no support 
+at all for network settings, and display settings are currently very limited. 
+
+To know more about SystemConfig: 
+<http://www.etoile-project.org/dev/0.4/SystemConfig>
+
+
+Licensing
+---------
+
+This framework is released under LGPL 2.1, but several files are under the 
+Modified BSD license.
+
+
+Build and Install
+-----------------
+
+Read INSTALL document.
+
+
+Mac OS X support
+----------------
+
+SystemConfig is a framework specific to Etoile/GNUstep, then it makes no sense 
+to use it on a system like Mac OS X without a comprehensive GNUstep install.
+There is a similarly named framework on Mac OS X that allows to set some of 
+these system preferences.
+
+
+Known issues
+------------ 
+
+     * Most of the implementation code is currently missing.
+
+
+Developer notes
+===============
+
+Tests suite
+-----------
+
+UnitKit (bundled with Etoile) is required.
+
+    Steps to produce a test bundle and run tests suite:
+
+    * make test=yes 
+
+    * ukrun
+
+
+Contribute 
+----------
+
+Read TODO document.
