@@ -47,13 +47,21 @@ Build and Install
 -----------------
 
 **WARNING:** If you don't run setup.sh script, Etoile environment won't be fully 
-installed and will simply fail to start. setup.sh is currently unsupported on 
-platforms other than Linux. So the set up process has been to be done manually 
-on systems such as FreeBSD.
+installed.
+
+**WARNING:** setup.sh is currently unsupported on platforms other than Linux. 
+So the set up process has been to be done manually on systems such as FreeBSD.
+
+**WARNING:** For stable, both setup.sh and setdown.sh will log various warnings 
+about missing elements or failures. This is expected because these scripts have 
+been written for trunk initially and have not yet been adjusted for the stable 
+branch. They also don't report and handle errors in a very user-friendly way, 
+only the error output of the shell commands that failed will be logged.
 
 **Note:** If you encounter path related error, you can source GNUstep.sh or 
 GNUstep.csh in your shell, read the GNUstep documentation to know more about 
 this topic.
+
 
 Steps to build:
 
@@ -64,10 +72,8 @@ Steps to build:
 setup.sh script takes care of various operations mandatory to have a ready to 
 use environment that includes:
 
- * the environment startup tool (named 'etoile_system')
  * Nesedah theme
  * Horizontal menu bar
- * X11 session support (to start Etoile with KDM, GDM etc.)
 
 This involves to copy or link various elements and set several preferences 
 (called 'defaults' in GNUstep terminology). 
