@@ -135,6 +135,7 @@ static inline void __sync_fetch_and_add(unsigned long *ptr, unsigned int value)
 #define REMOVE(x,r) do {\
 	while (ISEMPTY)\
 	{\
+		if (terminate) { return; }\
 		if (idle && [object shouldIdle])\
 		{\
 			[object idle];\
@@ -148,14 +149,47 @@ static inline void __sync_fetch_and_add(unsigned long *ptr, unsigned int value)
 			}\
 			pthread_mutex_unlock(&mutex);\
 		}\
-		if (terminate) { return; }\
 	}\
 	x = invocations[MASK(consumer)];\
 	r = invocations[MASK(consumer+1)];\
 	__sync_fetch_and_add(&consumer, 2);\
 } while(0);
 
+
+@interface NSMethodSignature (TypeEncodings)
+/**
+ * Returns the ObjC encoded type string for this method.
+ */
+- (const char*) _methodTypes;
+@end
+
+@implementation NSMethodSignature (TypeEncodings)
+- (const char*) _methodTypes
+{
+	return _methodTypes;
+}
+@end
+
+@interface NSInvocation (_Private)
+/**
+ * Exposes the private method which tells the NSInvocation not to store its
+ * return value in the original location.
+ */
+- (void) _storeRetval;
+@end
+
+
 @implementation ETThreadedObject
+// Remove this when GNUstep is fixed.
++ (void) initialize
+{
+	if (Nil != NSClassFromString(@"GSFFCallInvocation"))
+	{
+		NSLog(@"WARNING: You are using FFCall-based NSInvocations.  "
+				"This will result in random stack corruption.  "
+				"Any bugs you file will be ignored.");
+	}
+}
 
 /* Designated initializer */
 - (id) init
@@ -209,6 +243,8 @@ static inline void __sync_fetch_and_add(unsigned long *ptr, unsigned int value)
 	pthread_cond_destroy(&conditionVariable);
 	pthread_mutex_destroy(&mutex);
 
+	[object release];
+
 	[super dealloc];
 }
 
@@ -230,13 +266,19 @@ static inline void __sync_fetch_and_add(unsigned long *ptr, unsigned int value)
 			//TODO: Implement auto-boxing for non-object returns
 		}
 		*/
+
+		// If we are returning an object, we don't want to be overwriting the
+		// proxy on the stack.
+		if (retVal != nil)
+		{
+			[anInvocation _storeRetval];
+		}
 		[anInvocation invokeWithTarget:object];
 		if (retVal != nil)
 		{
 			id realReturn;
 			[anInvocation getReturnValue:&realReturn];
 			[retVal setProxyObject:realReturn];
-			[retVal release];
 			/*
 			  Proxy return object is created with a retain count of 2 and an
 			  autorelease count of 1 in the main thread.  This will set it to a
@@ -278,7 +320,6 @@ static inline void __sync_fetch_and_add(unsigned long *ptr, unsigned int value)
 	if (returnType == '@')
 	{
 		retVal = [[[ETThreadProxyReturn alloc] init] autorelease];
-		[retVal retain];
 		proxy = retVal;
 		/*
 		  This is a hack to force the invocation to stop blocking the caller.
