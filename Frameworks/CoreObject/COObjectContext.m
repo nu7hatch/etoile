@@ -715,7 +715,7 @@ static COObjectContext *currentObjectContext = nil;
                  forVersion: (int)aVersion 
             snapshotVersion: (int *)snapshotVersion;
 {
-	id snapshotDeserializer = [[self snapshotSerializerForObject: object] deserializer];
+	ETDeserializer *snapshotDeserializer = [[self snapshotSerializerForObject: object] deserializer];
 	int fullSaveVersion = [self lastSnapshotVersionOfObject: object forVersion: aVersion];
 
 	if (fullSaveVersion < 0)
@@ -1008,7 +1008,7 @@ static COObjectContext *currentObjectContext = nil;
 - (int) serializeInvocation: (NSInvocation *)inv
 {
 	id object = [inv target];
-	id deltaSerializer = nil;
+	ETSerializer *deltaSerializer = nil;
 	int version = [object objectVersion];
 
 	/* First Snapshot if needed (aka Base Version) */

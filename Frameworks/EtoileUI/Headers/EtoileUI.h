@@ -35,6 +35,7 @@
  */
 
 #import <EtoileUI/ETCompatibility.h>
+#import <EtoileUI/ETGeometry.h>
 
 #import <EtoileUI/NSObject+EtoileUI.h>
 #import <EtoileUI/NSView+Etoile.h>
@@ -49,6 +50,7 @@
 #import <EtoileUI/ETPickboard.h>
 
 #import <EtoileUI/ETStyle.h>
+#import <EtoileUI/ETShape.h>
 #import <EtoileUI/ETContainer.h>
 #import <EtoileUI/ETContainers.h>
 #import <EtoileUI/ETLayoutItem.h>

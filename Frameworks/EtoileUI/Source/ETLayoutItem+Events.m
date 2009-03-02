@@ -44,6 +44,47 @@
 #import <EtoileUI/ETContainer.h>
 #import <EtoileUI/ETCompatibility.h>
 
+
+@implementation ETActionHandler
+
+static ETActionHandler *defaultActionHandler = nil;
+
++ (id) sharedInstance
+{
+	if (defaultActionHandler == nil)
+		defaultActionHandler = [[self alloc] init];
+	
+	return defaultActionHandler;
+}
+
+- (void) handleClickItem: (ETLayoutItem *)item
+{
+	ETLog(@"Click %@", item);
+}
+
+- (void) handleEnterItem: (ETLayoutItem *)item
+{
+	ETLog(@"Enter %@", item);
+}
+
+- (void) handleExitItem: (ETLayoutItem *)item
+{
+	ETLog(@"Exit %@", item);
+}
+
+- (void) handleEnterChildItem: (ETLayoutItem *)childItem
+{
+	ETLog(@"Exit child %@", childItem);
+}
+
+- (void) handleExitChildItem: (ETLayoutItem *)childItem
+{
+	ETLog(@"Enter child %@", childItem);
+}
+
+@end
+
+
 #define FORWARDER [self eventForwarder]
 
 // TODO: When factoring out (ETEventHandler) in a standalone class, introduce 
@@ -159,6 +200,19 @@
 	}
 }
 
+- (void) mouseUp: (ETEvent *)event on: (id)item;
+{	
+	if ([self hasValidRepresentedPathBase])
+	{
+		// ?
+	}
+	else
+	{
+		[[self parentLayoutItem] mouseUp: event on: item];
+	}
+}
+
+
 /** This method is short-circuited by view-based layouts that come with their
 	own drag and drop implementation. For example ETTableLayout handles the drag
 	directly by catching the event, calling -[ETLayoutItem handleDrag:forItem:] 
@@ -187,6 +241,30 @@
 	else
 	{
 		[[self parentLayoutItem] mouseDragged: event on: item];
+	}
+}
+
+- (void) handleMouseDown: (ETEvent *)event forItem: (id)item layout: (id)layout
+{
+	if (layout != nil && [layout respondsToSelector: @selector(handleMouseDown:forItem:layout:)])
+	{
+		[layout handleMouseDown: event forItem: item layout: layout];
+	}
+	else
+	{
+		// ?
+	}
+}
+
+- (void) handleClick: (ETEvent *)event forItem: (id)item layout: (id)layout
+{
+	if (layout != nil && [layout respondsToSelector: @selector(handleClick:forItem:layout:)])
+	{
+		[layout handleClick: event forItem: item layout: layout];
+	}
+	else
+	{
+		// ?
 	}
 }
 
@@ -297,7 +375,7 @@
 		[dragSupervisor dragImage: dragIcon
 							   at: [event locationInWindow]
 						   offset: NSZeroSize
-							event: event 
+							event: (NSEvent *)[event backendEvent] 
 					   pasteboard: [NSPasteboard pasteboardWithName: NSDragPboard]
 						   source: self
 						slideBack: YES];

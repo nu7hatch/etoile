@@ -1,3 +1,42 @@
+2009-01-21  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/NSObject+Etoile.m:
+	(ETInstanceVariable -value, -setValue:): Fixed to check the type encoding 
+	before trying to set or get the value. For example, this eliminates the 
+	exception raised by -value with most C structures not supported by NSValue.
+	-setValue: often results in a crash when I edit a text cell that calls it 
+	with an NSString, no idea why for now... 
+
+2009-01-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Source/NSObject+Etoile.m:
+	(ETInstanceVariable -value, -setValue:): Modified to support reading and 
+	writing common primitive types in addition to objects, thanks to GNUstep KVC 
+	related helper functions. Now does what the documentation states :-)
+
+2009-01-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/NSObject+Etoile.h:
+	* Source/NSObject+Etoile.m:
+	ETInstanceVariable
+	Documented public methods.
+	(-typeEncoding, -isObjectType, -properties): Added.
+	(-typeName): Extracted the type encoding retrieval into the new method 
+	-typeEncoding.
+
+2009-01-17  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/NSObject+Etoile.h: Modified _ivar in ETInstanceVariable to 
+	support NEXT_RUNTIME_2.
+	* Source/NSObject+Etoile.m:
+	(-instanceVariableForName:, -instanceVariableNames): 
+	(ETInstanceVariable -name, -type, -value, -setValue:):
+	Added NEXT_RUNTIME_2 support.
+
+2008-11-21  Günther Noack <guenther@unix-ag.uni-kl.de>
+
+	* ETTranscript class added
+
 2008-11-15  Quentin Mathe <qmathe@club-internet.fr>
 
 	* GNUmakefile: Bumped the framework version to 0.4. Cleaned a bit also.

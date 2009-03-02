@@ -38,16 +38,41 @@
 
 #import <EtoileFoundation/NSIndexPath+Etoile.h>
 #import <EtoileFoundation/NSObject+Model.h>
-#import <EtoileUI/ETLayoutItem.h>
-#import <EtoileUI/ETLayoutItem+Events.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-#import <EtoileUI/ETWindowItem.h>
-#import <EtoileUI/ETStyleRenderer.h>
-#import <EtoileUI/ETView.h>
-#import <EtoileUI/ETContainer.h>
-#import <EtoileUI/ETInspector.h>
-#import <EtoileUI/NSView+Etoile.h>
-#import <EtoileUI/ETCompatibility.h>
+#import <EtoileFoundation/ETUTI.h>
+#import <EtoileFoundation/Macros.h>
+#import "ETLayoutItem.h"
+#import "ETGeometry.h"
+#import "ETLayoutItem+Events.h"
+#import "ETLayoutItemGroup.h"
+#import "ETWindowItem.h"
+#import "ETStyleRenderer.h"
+#import "ETView.h"
+#import "ETContainer.h"
+#import "ETInspector.h"
+#import "NSView+Etoile.h"
+#import "ETCompatibility.h"
+
+/* Properties */
+
+NSString *kETAnchorPointProperty = @"anchorPoint";
+NSString *kETActionHandlerProperty = @"actionHandler";
+NSString *kETAutoresizingMask = @"autoresizingMask";
+NSString *kETDefaultFrameProperty = @"defaultFrame";
+NSString *kETFlippedProperty = @"flipped";
+NSString *kETFrameProperty = @"frame";
+NSString *kETIconProperty = @"icon";
+NSString *kETImageProperty = @"image";
+NSString *kETInspectorProperty = @"inspector";
+NSString *kETNameProperty = @"name";
+NSString *kETNeedsDisplayProperty = @"needsDisplay";
+NSString *kETParentItemProperty = @"parentItem";
+NSString *kETPersistentFrameProperty = @"persistentFrame";
+NSString *kETRepresentedObjectProperty = @"representedObject";
+NSString *kRepresentedPathBaseProperty = @"representedPathBase";
+NSString *kETSelectedProperty = @"selected";
+NSString *kETStyleProperty = @"style";
+NSString *kETValueProperty = @"value";
+NSString *kETVisibleProperty = @"visible";
 
 #define DETAILED_DESCRIPTION
 /* Don't forget that -variableProperties creates the property dictionary */
@@ -56,6 +81,8 @@
 #define ETUTIAttribute @"uti"
 
 @interface ETLayoutItem (Private)
+- (NSRect) bounds;
+- (NSPoint) centeredAnchorPoint;
 - (void) setImage: (NSImage *)img;
 - (void) setIcon: (NSImage *)img;
 - (void) layoutItemViewFrameDidChange: (NSNotification *)notif;
@@ -96,6 +123,18 @@
 
 @implementation ETLayoutItem
 
++ (BOOL) automaticallyNotifiesObserversForKey: (NSString *)theKey 
+{
+    if ([theKey isEqualToString: kETSelectedProperty]) 
+	{
+		return NO;
+    } 
+	else 
+	{
+		return [super automaticallyNotifiesObserversForKey: theKey];
+    }
+}
+
 - (id) init
 {
 	return [self initWithView: nil value: nil representedObject: nil];
@@ -118,19 +157,29 @@
 
 - (id) initWithView: (NSView *)view value: (id)value representedObject: (id)repObject
 {
+	/* For now, we don't call ETStyle designated initializer to avoid extra 
+	   complexity in the initialization path. */
     self = [super init];
     
     if (self != nil)
     {
-		_variableProperties = nil; /* Lazy init in -variableProperties */
-		_parentLayoutItem = nil;
+		// TODO: Examine common use cases and see whether we should pass a 
+		// capacity hint to improve performances.
+		_variableProperties = [[NSMutableDictionary alloc] init];
+		_parentItem = nil;
 		//_decoratorItem = nil;
+		_frame = ETNullRect;
+		[self setFlipped: YES];
 		[self setDecoratedItem: nil];
 		[self setView: view];
 		[self setVisible: NO];
-		[self setStyleRenderer: [ETBasicItemStyle sharedInstance]];
+		[self setStyle: [ETBasicItemStyle sharedInstance]];
+		[self setActionHandler: [ETActionHandler sharedInstance]];
 		[self setValue: value];
 		[self setRepresentedObject: repObject];
+
+		if (view == nil)
+			[self setFrame: NSMakeRect(0, 0, 50, 50)];
     }
     
     return self;
@@ -186,9 +235,8 @@
 	if (_decoratorItem != self)
 		DESTROY(_decoratorItem);
     DESTROY(_view);
-	DESTROY(_value);
 	DESTROY(_modelObject);
-	_parentLayoutItem = nil; /* weak reference */
+	_parentItem = nil; /* weak reference */
     
     [super dealloc];
 }
@@ -206,7 +254,8 @@
 	                                      representedObject: [self representedObject]];
 
 	[item setName: [self name]];
-	[item setStyleRenderer: [self renderer]];
+	[item setStyle: [self style]];
+	[item setActionHandler: [self actionHandler]];
 	[item setFrame: [self frame]];
 	[item setAppliesResizingToBounds: [self appliesResizingToBounds]];
 	
@@ -279,15 +328,16 @@
 	return desc;
 }
 
-/** Returns the root item of the layout item tree to which the receiver
-	belongs to. 
-	This method never returns nil because the returned value is equal to self
-	when the receiver has no parent item. */
+/** Returns the root item of the layout item tree to which the receiver belongs 
+to. 
+
+This method never returns nil because the returned value is equal to self when 
+the receiver has no parent item. */
 - (id) rootItem
 {
-	if ([self parentLayoutItem] != nil)
+	if (_parentItem != nil)
 	{
-		return [[self parentLayoutItem] rootItem];	
+		return [_parentItem rootItem];	
 	}
 	else
 	{
@@ -295,20 +345,24 @@
 	}
 }
 
-/** Returns the layout item group which controls the receiver. An item group
-	is said to control descendant items when -representedPathBase returns a non
-	nil or blank value.
-	A base item usually handles events and data source mutation for all 
-	descendant items belonging to it. All child items are controlled by a common 
-	base item until a descendant item is declared as a new base item (by 
-	providing a represented path base). See also -representedPathBase, 
-	-[ETContainer representedPath], -[ETContainer source], -[ETLayoutItemGroup 
-	baseContainer].
-	If an item group uses a source, it is automatically bound to a represented 
-	path base.
-	This method will return nil when the receiver isn't a base item, hasn't yet 
-	been added as a descendant of a base item or has just been removed as a 
-	descendant of a base item. */
+/** Returns the layout item group which controls the receiver. An item group is
+said to be base item that controls descendant items when -representedPathBase
+returns a non nil or blank value (see -hasValidRepresentedPathBase).
+
+A base item usually coordinates the event handling, the loading of 
+layout items which are provided by a source and the source related mutations, 
+for all descendant items that fall under its control. 
+
+All child items are controlled by a common base item until a descendant item is 
+declared as a new base item (by providing a represented path base). See also 
+-representedPathBase, -representedPath, -[ETLayoutItemGroup source] and related 
+setter methods.
+
+An item group is automatically turned into a base item, when you set a source.
+
+This method will return nil when the receiver isn't a base item, hasn't yet 
+been added as a descendant of a base item or has just been removed as a 
+descendant of a base item. */
 - (id) baseItem
 {
 	if ([self hasValidRepresentedPathBase])
@@ -317,14 +371,25 @@
 	}
 	else
 	{
-		return [[self parentLayoutItem] baseItem];
+		return [_parentItem baseItem];
 	}
 }
 
+/** Returns whether the receiver is a base item or not.
+
+To be a base itemn the receiver must have a valid represented path base set. 
+See -setRepresentedPathBase:. */
+- (BOOL) isBaseItem
+{
+	return [self hasValidRepresentedPathBase];
+}
+
+/** Returns whether the current -representedPathBase value is valid to qualify 
+the receiver as a base item. */
 - (BOOL) hasValidRepresentedPathBase
 {
 	return ([self representedPathBase] != nil 
-		&& [[self representedPathBase] isEqual: @""] == NO);
+		&& [[self representedPathBase] isEqualToString: @""] == NO);
 }
 
 /** Returns the layout item group to which the receiver belongs to. 
@@ -334,7 +399,7 @@
 	item group or has just been removed from an item group. */
 - (ETLayoutItemGroup *) parentItem
 {
-	return _parentLayoutItem;
+	return _parentItem;
 }
 
 /** Returns the layout item group to which the receiver belongs to. 
@@ -346,9 +411,9 @@
 - (void) setParentItem: (ETLayoutItemGroup *)parent
 {
 	//ETDebugLog(@"For item %@ with supervisor view %@, modify the parent item from "
-	//	"%@ to %@", self, [self supervisorView], _parentLayoutItem, parent, self);
+	//	"%@ to %@", self, [self supervisorView], _parentItem, parent, self);
 
-	_parentLayoutItem = parent;
+	_parentItem = parent;
 }
 
 /** Detaches the receiver from the layout item group it belongs to.
@@ -356,12 +421,12 @@
 	deallocated if no other objects retains it. */
 - (void ) removeFromParent
 {
-	if ([self parentLayoutItem] != nil)
+	if (_parentItem != nil)
 	{
 		/* -removeItem: will release us, so to be sure we won't deallocated 
 		   right now we use retain/autorelease */
 		RETAIN(self);
-		[[self parentLayoutItem] removeItem: self];
+		[_parentItem removeItem: self];
 		AUTORELEASE(self);
 	}
 }
@@ -371,29 +436,53 @@
 	if ([[self displayView] isKindOfClass: [ETContainer class]])
 		return (ETContainer *)[self displayView];
 		
-	if ([self parentLayoutItem] != nil)
+	if (_parentItem != nil)
 	{
-		return [[self parentLayoutItem] closestAncestorContainer];
+		return [_parentItem closestAncestorContainer];
 	}
 	else
 	{
-		ETLog(@"WARNING: Found no ancestor container by ending lookup on %@", self);
 		return nil;
 	}
 }
 
-- (ETView *) closestAncestorDisplayView
+/** Returns the first layout item bound to a view upwards in the layout item 
+tree. 
+
+The receiver itself can be returned. */
+- (ETLayoutItem *) closestAncestorItemWithDisplayView
 {
 	if ([self displayView] != nil)
-		return [self displayView];
+		return self;
 
-	if ([self parentLayoutItem] != nil)
+	if (_parentItem != nil)
 	{
-		return [[self parentLayoutItem] closestAncestorDisplayView];
+		return [_parentItem closestAncestorItemWithDisplayView];
 	}
 	else
 	{
-		ETLog(@"WARNING: Found no ancestor display view by ending lookup on %@", self);
+		return nil;
+	}
+}
+
+/** Returns the first display view bound to a layout item upwards in the layout 
+item tree. This layout item is identical to the one returned by 
+-closestAncestorItemWithDisplayView. 
+
+The receiver display view itself can be returned. */
+- (ETView *) closestAncestorDisplayView
+{
+	ETView *displayView = [self displayView];
+
+	if (displayView != nil)
+		return displayView;
+
+	if (_parentItem != nil)
+	{
+		return [_parentItem closestAncestorDisplayView];
+	}
+	else
+	{
 		return nil;
 	}
 }
@@ -414,13 +503,13 @@
 	if (item == nil && self == [self rootItem])
 		baseItemReached = YES;
 	
-	if ([self parentLayoutItem] != nil && item != self)
+	if (_parentItem != nil && item != self)
 	{
-		indexPath = [[self parentLayoutItem] indexPathFromItem: item];
+		indexPath = [_parentItem indexPathFromItem: item];
 		if (indexPath != nil)
 		{
 			indexPath = [indexPath indexPathByAddingIndex: 
-				[(ETLayoutItemGroup *)[self parentLayoutItem] indexOfItem: (id)self]];
+				[(ETLayoutItemGroup *)_parentItem indexOfItem: (id)self]];
 		}
 	}
 	else if (baseItemReached)
@@ -466,25 +555,26 @@
 	   we belong. */
 	NSString *path = @"/";
 	
-	if ([self parentLayoutItem] != nil)
+	if (_parentItem != nil)
 	{
-		path = [[[self parentLayoutItem] path] 
+		path = [[_parentItem path] 
 			stringByAppendingPathComponent: [self identifier]];
 	}
 	
 	return path;
 }
 
-/** Returns the represented path. */
+/** Returns the represented path which is built with the represented path base 
+provided by the base item. */
 - (NSString *) representedPath
 {
 	NSString *path = [self representedPathBase];
 	
 	if (path == nil)
 	{
-		if ([self parentLayoutItem] != nil)
+		if (_parentItem != nil)
 		{
-			path = [[self parentLayoutItem] representedPath];
+			path = [_parentItem representedPath];
 			path = [path stringByAppendingPathComponent: [self identifier]];
 		}
 		else
@@ -496,40 +586,42 @@
 	return path;
 }
 
-/** Returns the represented path base which is nil by default. This represented
-	path base can be provided by a container, then allowing to build 
-	represented paths for every descendant layout items which don't specify 
-	their own custom represented path base (in other words when this method 
-	returns nil). 
-	By setting the represented path of a container, the related layout item 
-	group is able to provide a represented path base automatically used by 
-	descendant items. This represented path base is valid until a descendant 
-	provides a new represented path base. */
+/** Returns the represented path base. By default, returns nil.
+
+With a represented path base, an ETLayoutItemGroup instance becomes a base 
+item, and provides a path base used by descendant items to build their 
+represented paths (see -representedPath). This path base is valid until a 
+descendant provides a new represented path base and as such becomes a base item.
+See -[ETLayoutItemGroup setRepresentedPathBase:].
+
+Finally take note represented paths are relative to the base item unlike paths 
+returned by -path which are absolute paths. */
 - (NSString *) representedPathBase
 {
-	return nil;
+	return GET_PROPERTY(kRepresentedPathBaseProperty);
 }
 
-/** Returns the identifier associated with the layout item. By default, the
-	returned value is the name. If -name returns nil or an empty string, the
-	identifier is a string made of the index used by the parent item to 
-	reference the receiver. */
+/** Returns the identifier associated with the layout item. By default, the 
+returned value is the name. 
+
+If -name returns nil or an empty string, the identifier is a string made of 
+the index used by the parent item to reference the receiver. */
 - (NSString *) identifier
 {
 	NSString *identifier = [self name];
 	
 	if (identifier == nil || [identifier isEqual: @""])
 	{
-		id parentRepObject = [[self parentLayoutItem] representedObject];
+		id parentRepObject = [_parentItem representedObject];
 		
 		// TODO: Should try to retrieve -UniqueID, -UUID and -UUIDString and 
 		// simplify the if conditional.
 		/* -identifierAtIndex: is implemented by some classes like NSDictionary */
 		if ([parentRepObject isCollection] && [parentRepObject isEmpty] == NO
 		 && [parentRepObject respondsToSelector: @selector(identifierAtIndex:)]
-		 && [[self parentLayoutItem] usesRepresentedObjectAsProvider])
+		 && [_parentItem usesRepresentedObjectAsProvider])
 		{
-			unsigned int index = [[self parentLayoutItem] indexOfItem: self];
+			unsigned int index = [_parentItem indexOfItem: self];
 			identifier = [parentRepObject identifierAtIndex: index];
 		}
 	}
@@ -537,17 +629,17 @@
 	/*if (identifier == nil || [identifier isEqual: @""])	
 		identifier = [self name];*/
 
-	
 	if (identifier == nil || [identifier isEqual: @""])
 	{
 		identifier = [NSString stringWithFormat: @"%d", 
-			[(ETLayoutItemGroup *)[self parentLayoutItem] indexOfItem: (id)self]];
+			[(ETLayoutItemGroup *)_parentItem indexOfItem: (id)self]];
 	}
 	
 	return identifier;
 }
 
-// FIXME: we should probably define -displayName and may be -name on NSObject
+/** Returns the display name associated with the receiver. See also 
+NSObject(Model) in EtoileFoundation. */
 - (NSString *) displayName
 {
 	id name = [self name];
@@ -579,36 +671,42 @@
 }
 
 /** Returns the name associated with the layout item.
-	Take note the returned value can be nil or an empty string. */
+ 
+Take note the returned value can be nil or an empty string. */
 - (NSString *) name
 {
-	return _name;
+	return GET_PROPERTY(kETNameProperty);
 }
 
 /** Sets the name associated with the layout item.
-	Take note the returned value can be nil or an empty string. */
+ 
+Take note the returned value can be nil or an empty string. */
 - (void) setName: (NSString *)name
 {
-	ASSIGN(_name, name);
+	SET_PROPERTY(name, kETNameProperty);
 }
 
-/** Returns a value which is used when only one value can be displayed like in
-	a table view with a single column or an icon view with a rudimentary icon 
-	unit cell. */
+/** Returns a value object, that can be used when a single property has to be 
+displayed. See also -setValue:. */
 - (id) value
 {
-	return _value;
+	return GET_PROPERTY(kETValueProperty);
 }
 
-/** Sets a value to be used when only one value can be displayed like in
-	a table view with a single column or an icon view with a rudimentary icon 
-	unit cell.
-	Most of time this method can be used as a conveniency which allows to 
-	bypass -valueForProperty: and -setValue:forProperty: when the layout item
-	is used by combox box, single column table view, line view made of simple
-	images etc. */
+/** Sets a value object, that can be used when a single property has to be 
+displayed. For example, in a table layout with a single column or a simple 
+positional layout where each basic item style will try to draw it. To know how 
+such value object might be used by a layout, see each ETLayout and ETStyle 
+subclass documentation.
+
+The value object is typically a string, a number or an image.
+
+Most of time this method can be used as a conveniency which allows to bypass
+-valueForProperty: and -setValue:forProperty: when the layout item is used by
+combox box, single column table layout, line layout made of simple images etc. */
 - (void) setValue: (id)value
 {
+	// TODO: Should we restrict what values can be accepted...
 	/*if ([value isCommonObjectValue] == NO)
 	{
 		[NSException raise: NSInvalidArgumentException format: @"Value %@ must "
@@ -616,40 +714,21 @@
 		return;
 	}*/
 	
-	ASSIGN(_value, value);
-	
-#if 0
-	if ([_value isKindOfClass: [NSImage class]])
-	{
-		/*ETImageStyle *imgStyle = [ETImageStyle styleWithImage: (NSImage *)_value];
-		
-		[self setDefaultFrame: ETMakeRect(NSZeroPoint, [_value size])];
-		[self setStyleRenderer: imgStyle];*/
-	}
-	else if ([_value isKindOfClass: [NSString class]])
-	{
-	
-	}
-	else if ([_value isKindOfClass: [NSAttributedString class]])
-	{
-	
-	}
-#endif
+	SET_PROPERTY(value, kETValueProperty);
 }
 
-/** Returns model object which embeds the representation of what the layout 
-	item displays. When a new layout item is created, by default it uses a
-	dictionary as a rudimentary model object. */
+/** Returns the model object which embeds the data to be displayed and 
+represented on screen by the receiver. See also -setRepresentedObject:. */
 - (id) representedObject
 {
 	return _modelObject;
 }
 
-/** Sets model object which embeds the representation of what the layout 
-	item displays. 
-	If you want to restore default model object initally set, pass a mutable 
-	dictionary instance as parameter to this method.
-	See -representedObject for more details. */
+/** Sets the model object which embeds the data to be displayed and represented 
+on screen by the receiver.
+
+Take note modelObject can be any objects including an ETLayoutItem instance, in 
+this case the receiver becomes a meta item and returns YES for -isMetaLayoutItem. */
 - (void) setRepresentedObject: (id)modelObject
 {
 	ASSIGN(_modelObject, modelObject);
@@ -698,7 +777,7 @@
 		/* Stop to observe notifications on current view and reset bounds size */
 		[self setAppliesResizingToBounds: NO];
 	}
-	_defaultFrame = NSZeroRect;
+	SET_PROPERTY([NSValue valueWithRect: NSZeroRect], kETDefaultFrameProperty);
 	
 	/* Inserts the new view */
 	
@@ -767,24 +846,30 @@
 
 - (id) valueForUndefinedKey: (NSString *)key
 {
-	//ETLog(@"WARNING: -valueForUndefinedKey: %@ called in %@", key, self);
-	return [VARIABLE_PROPERTIES objectForKey: key]; /* May return nil */
+	//ETLog(@"NOTE: -valueForUndefinedKey: %@ called in %@", key, self);
+	return GET_PROPERTY(key); /* May return nil */
 }
 
 - (void) setValue: (id)value forUndefinedKey: (NSString *)key
 {
-	//ETLog(@"WARNING: -setValue:forUndefinedKey: %@ called in %@", key, self);
-	[VARIABLE_PROPERTIES setObject: value forKey: key];
+	//ETLog(@"NOTE: -setValue:forUndefinedKey: %@ called in %@", key, self);
+	SET_PROPERTY(value, key);
 }
 
 /* Property Value Coding */
 
-/** Returns a value of the model object -representedObject, usually by 
-	calling -valueForProperty: else -valueForKey: with key parameter. By default 
-	the model object is a simple dictionary which gets returned by both this 
-	method and -representedObject method.
-	When the model object is a custom one, it must implement -valueForProperty:
-	and -setValue:forProperty: or conform to NSKeyValueCoding protocol. */
+/** Returns a value of the model object -representedObject, usually by calling
+-valueForProperty: on the represented object. If the represented object is a 
+layout item, -valueForKey: will be  called instead of -valueForProperty:. 
+
+-valueForProperty: is implemented by NSObject as part of the 
+ETPropertyValueCoding informal protocol. When the represented object is a custom 
+model object, it must override -valueForProperty: and -setValue:forProperty: or 
+conform to NSKeyValueCoding protocol. See ETPropertyValueCoding to understand 
+how to implement your model object.
+
+When the represented object is a layout item, the receiver is a meta layout item 
+(see -isMetaItem and -[NSObject(ETLayoutItem) isLayoutItem]). */
 - (id) valueForProperty: (NSString *)key
 {
 	id modelObject = [self representedObject];
@@ -800,9 +885,11 @@
 		}
 		else
 		{
+			/* We  cannot use -valueForKey here because many classes such as 
+			   NSArray, NSDictionary etc. overrides KVC accessors with their own 
+			   semantic. */
 			value = [modelObject valueForProperty: key];
 		}
-		//value = [modelObject valueForKey: key];
 	}
 	else
 	{
@@ -813,8 +900,9 @@
 }
 
 /** Sets a value identified by key of the model object returned by 
-	-representedObject. 
-	See -valueForProperty: for more details. */
+-representedObject. 
+
+See -valueForProperty: for more details. */
 - (BOOL) setValue: (id)value forProperty: (NSString *)key
 {
 	id modelObject = [self representedObject];
@@ -830,9 +918,11 @@
 		}
 		else
 		{
+			/* We  cannot use -setValue:forKey here because many classes such as 
+			   NSArray, NSDictionary etc. overrides KVC accessors with their own 
+			   semantic. */
 			result = [modelObject setValue: value forProperty: key];
 		}
-		//[modelObject setValue: value forKey: key];
 	}
 	else
 	{
@@ -847,21 +937,25 @@
 
 - (NSArray *) properties
 {
-	NSArray *properties = [NSArray arrayWithObjects: @"identifier", @"name", 
-		@"x", @"y", @"width", @"height", @"view", @"selected", 
-		@"visible", @"image", @"frame", @"representedObject", 
-		@"parentLayoutItem", @"UIMetalevel", @"UIMetalayer", nil];
+	NSArray *properties = A(@"identifier", kETNameProperty, @"x", @"y", @"width", 
+		@"height", @"view", kETSelectedProperty, kETSelectedProperty, 
+		kETImageProperty, kETFrameProperty, kETRepresentedObjectProperty, 
+		kRepresentedPathBaseProperty, kETParentItemProperty, @"UIMetalevel", 
+		@"UIMetalayer");
 
 	properties = [[VARIABLE_PROPERTIES allKeys] arrayByAddingObjectsFromArray: properties];
 		
 	return [[super properties] arrayByAddingObjectsFromArray: properties];
 }
 
+/* Returns a dictionary representation of every property/value pairs not stored 
+in ivars.
+ 
+Unless you write a subclass or reflection code, you should never need this 
+method, but use the property accessors or Property Value Coding methods to read 
+and write the receiver properties. */
 - (NSDictionary *) variableProperties
 {
-	if (_variableProperties == nil)
-		ASSIGN(_variableProperties, [NSMutableDictionary dictionary]);
-		
 	return _variableProperties;
 }
 
@@ -947,7 +1041,7 @@
 	int metalayer = [self UIMetalevel];
 	id parent = self;
 	
-	while ((parent = [parent parentLayoutItem]) != nil)
+	while ((parent = [parent parentItem]) != nil)
 	{
 		if ([parent UIMetalevel] > metalayer)
 			metalayer = [parent UIMetalevel];
@@ -981,11 +1075,6 @@
 	return NO;
 }
 
-- (void) didChangeValueForKey: (NSString *)key
-{
-
-}
-
 /** Returns the display view of the receiver. The display view is the last
 	supervisor view of the decorator item chain. Display view is an instance of 
 	ETView class or subclasses.
@@ -1011,25 +1100,35 @@
 }
 
 /** Sets the receiver selection state.
-    You rarely need to call this method. Take note the new selection state won't 
-	be visible until a redisplay occurs. */
+
+You rarely need to call this method. Take note the new selection state won't be 
+apparent until a redisplay occurs. */
 - (void) setSelected: (BOOL)selected
 {
+	if (selected == _selected)
+		return;
+
+	[self willChangeValueForKey: kETSelectedProperty];
 	_selected = selected;
 	ETDebugLog(@"Set layout item selection state %@", self);
+	[self didChangeValueForKey: kETSelectedProperty];
 }
 
-/** Returns the receiver selection state. */
+/** Returns the receiver selection state. See also -setSelected:. */
 - (BOOL) isSelected
 {
 	return _selected;
 }
 
+/** Sets whether the receiver should be displayed or not.
+
+Take note the new visibility state won't be apparent until a redisplay occurs. */
 - (void) setVisible: (BOOL)visible
 {
 	_visible = visible;
 }
 
+/** Returns whether the receiver should be displayed or not. See also -setVisible:. */
 - (BOOL) isVisible
 {
 	return _visible;
@@ -1041,8 +1140,7 @@
 	if ([self representedObject] == nil
 	 && [[self representedObject] isKindOfClass: [NSDictionary class]] == NO)
 	{
-		// FIXME: Replace by [ETUTI typeForClass: [self class]]
-		return NSStringFromClass([self class]);
+		return [ETUTI typeWithClass: [self class]];
 	}	
 	else if ([[self representedObject] valueForProperty: ETUTIAttribute] != nil)
 	{
@@ -1050,8 +1148,7 @@
 	}
 	else
 	{
-		// FIXME: Replace by [ETUTI typeForClass: [self class]]
-		return NSStringFromClass([[self representedObject] class]);
+		return [ETUTI typeWithClass: [[self representedObject] class]];
 	}
 }
 
@@ -1088,8 +1185,8 @@
 
 - (void) checkDecorator
 {
-	NSAssert2([self parentLayoutItem] == nil, @"Decorator %@ "
-		@"must have no parent %@ set", self, [self parentLayoutItem]);
+	NSAssert2(_parentItem == nil, @"Decorator %@ "
+		@"must have no parent %@ set", self, _parentItem);
 
 	// TODO: If there is a window item in the decorator chain, the receiver 
 	// supervisor view or the outermost supervisor view (display view) don't 
@@ -1129,7 +1226,7 @@
 	       not give the parent view in this case but the decorator view. */
 		id parentView = [[self displayView] superview];
 		NSRect frame = [[self displayView] frame];
-		// parentView isEqual: [[item parentLayoutItem] view]
+		// parentView isEqual: [[item parentItem] view]
 		
 		[[self displayView] removeFromSuperview];
 
@@ -1280,7 +1377,7 @@
 		   the size and location of the previous one. Unlike when you add or
 		   or remove an item which involves to recompute the layout. */
 		//[self handleAttachViewOfItem: item];
-		//ETDebugLog(@"parent %@ parent view %@ item display view %@", [item parentLayoutItem],
+		//ETDebugLog(@"parent %@ parent view %@ item display view %@", [item parentItem],
 		//	parentView, [item displayView]);
 		[parentView addSubview: [self displayView]]; // More sure than [item displayView]
 	}
@@ -1306,21 +1403,20 @@
 
 - (void) setSupervisorView: (ETView *)supervisorView
 {
-	id parent = [self parentLayoutItem];
-
-	//if ([self decoratorItem] == nil)
-		[supervisorView setLayoutItemWithoutInsertingView: self];
+	 /* isFlipped is also sync in -setFlipped: */
+	[supervisorView setFlipped: [self isFlipped]];
+	[supervisorView setLayoutItemWithoutInsertingView: self];
 	ASSIGN(_view, supervisorView);
-	
+
 	if ([self decoratorItem] != nil)
 	{
 		id parentView = [[self displayView] superview];
 		/* Usually results in [[self decoratorItem] setView: supervisorView] */
 		[[self decoratorItem] handleDecorateItem: self inView: parentView];
 	}
-	else if (parent != nil)
+	else if (_parentItem != nil)
 	{
-		[parent handleAttachViewOfItem: self];
+		[_parentItem handleAttachViewOfItem: self];
 	}
 }
 
@@ -1381,7 +1477,9 @@
 	ETView *drawingView = [self supervisorView];
 	NSRect drawingFrame = [self frame];
 	drawingFrame.origin = NSZeroPoint;
-	
+
+	// FIXME: This code doesn't work as desired...
+#if 0
 	if (drawingView != nil) /* Has supervisor view */
 	{
 		/* Exclude the title bar area */
@@ -1393,7 +1491,8 @@
 		if (drawingView != nil)
 			drawingFrame = [[drawingView wrappedView] frame];
 	}
-	
+#endif
+
 	return drawingFrame;
 }
 
@@ -1448,7 +1547,7 @@
 	}
 #endif
 
-	[[self renderer] render: inputValues layoutItem: self dirtyRect: dirtyRect];
+	[[self style] render: inputValues layoutItem: self dirtyRect: dirtyRect];
 }
 
 /** A shortcut method for -render: inherited from ETStyle. */
@@ -1457,52 +1556,112 @@
 	[self render: nil];
 }
 
-- (void) setNeedsDisplay: (BOOL)now
+/** Looks up the view which can display a rect by climbing up the layout 
+item tree until a display view which contains rect is found. This view is 
+returned through the out parameter aView and the returned value is the dirty 
+rect in the coordinate space of aView.
+
+This method hooks the layout item tree display mechanism into the AppKit view 
+hierarchy which implements the underlying display support.
+
+You should never need to call this method, unless you write a subclass which 
+needs some special redisplay policy. */
+- (NSRect) convertDisplayRect: (NSRect)rect toAncestorDisplayView: (NSView **)aView
 {
-	NSRect displayRect = [self frame];
-	
-	/* If the layout item has a display view, this view will be asked to draw
-	   by itself, so the rect to refresh must be expressed in display view
-	   coordinates system and not the one of its superview. */
-	if ([self displayView] != nil)
-		displayRect.origin = NSZeroPoint;
-		
-	[[self closestAncestorDisplayView] setNeedsDisplayInRect: displayRect];
+	NSRect newRect = rect;
+	// WARNING: If -[ETWindowItem supervisorView] is changed, the next line must 
+	// be updated.
+	NSView *topView = [[[[self closestAncestorDisplayView] window] contentView] superview];
+	NSView *displayView = [self displayView];
+	ETLayoutItem *parent = self;
+
+	/* The displayed receiver has no ancestors bound to a view */
+	if (topView == nil)
+		return NSZeroRect;
+
+	/* We expect topView to be never nil, so that the loop can be entered on a nil displayView. */
+	while (displayView != topView 
+		&& (displayView == nil || NSContainsRect([parent frame], newRect) == NO))
+	{
+		newRect = [parent convertRectToParent: newRect];
+		parent = [parent parentItem];
+		displayView = [parent displayView];
+	}
+
+	*aView = displayView;
+	return newRect;
 }
 
-// TODO: Evaluate whether we really need the two following methods
+/** Marks the receiver and the entire layout item tree owned by it to be 
+redisplayed the next time an ancestor view receives a display if needed 
+request (see -[NSView displayIfNeededXXX] methods). 
 
-- (void) lockFocus
+More explanations in -display. */
+- (void) setNeedsDisplay: (BOOL)flag
 {
-	// FIXME: Finds the first layout item ancestor with a view and asks it to
-	// redraw itself at our rect location, this will flow back to us.
+	NSView *displayView = nil;
+	NSRect displayRect = [self convertDisplayRect: [self boundingBox] 
+	                        toAncestorDisplayView: &displayView];
+
+	[displayView setNeedsDisplayInRect: displayRect];
 }
 
-- (void) unlockFocus
-{
+/** Triggers the redisplay of the receiver and the entire layout item tree 
+owned by it. 
 
+To handle the display, an ancestor view is looked up and the rect to refresh is 
+converted into this ancestor coordinate space. Precisely both the lookup and the 
+conversion are handled by -convertDisplayRect:toAncestorDisplayView:.
+
+If the receiver has a display view, this view will be asked to drawby itself.  */
+- (void) display
+{
+	// NOTE: We could also use the next two lines to redisplay, but 
+	// -convertDisplayRect:toAncestorDisplayView: is more optimized.
+	// ETLayoutItem *ancestor = [self closestAncestorWithDisplayView];
+	// [[ancestor displayView] displayRect: [self convertRect: [self boundingBox] toItem: ancestor]];
+
+	NSView *displayView = nil;
+	NSRect displayRect = [self convertDisplayRect: [self boundingBox] 
+	                        toAncestorDisplayView: &displayView];
+	[displayView displayRect: displayRect];
 }
 
-- (ETStyle *) renderer
+/** Returns the style object associated with the receiver. By default, returns 
+ETBasicItemStyle. */    
+- (ETStyle *) style
 {
-	return _renderer;
+	return	[self nextStyle];
 }
 
-- (void) setStyleRenderer: (ETStyle *)renderer
+/** Sets the style object associated with the receiver.
+
+The style object controls the drawing of the receiver. See ETStyle to 
+understand how to customize the layout item look. */
+- (void) setStyle: (ETStyle *)aStyle
 {
-	ASSIGN(_renderer, renderer);
+	[self setNextStyle: aStyle];
 }
 
+/* Geometry */
 
 /** Returns a rect expressed in parent layout item coordinate space equivalent 
 	to rect parameter expressed in the receiver coordinate space. */
 - (NSRect) convertRectToParent: (NSRect)rect
 {
-	NSAffineTransform *transform = [NSAffineTransform transform];
 	NSRect rectInParent = rect;
+
+	// NOTE: See -convertRectFromParent:...
+	// NSAffineTransform *transform = [NSAffineTransform transform];
+	// [transform translateXBy: [self x] yBy: [self y]];
+	// rectInParent.origin = [transform transformPoint: rect.origin];
+	rectInParent.origin.x = rect.origin.x + [self x];
+	rectInParent.origin.y = rect.origin.y + [self y];
 	
-	[transform translateXBy: [self x] yBy: [self y]];
-	rectInParent.origin = [transform transformPoint: rect.origin];
+	if ([self isFlipped] != [_parentItem isFlipped])
+	{
+		rectInParent.origin.y = [_parentItem height] - rectInParent.origin.y - rectInParent.size.height;
+	}
 	
 	return rectInParent;
 }
@@ -1511,29 +1670,195 @@
 	rect parameter expressed in the parent layout item coordinate space. */
 - (NSRect) convertRectFromParent: (NSRect)rect
 {
-	NSAffineTransform *transform = [NSAffineTransform transform];
-	NSRect rectInChild = rect;
-	
-	[transform translateXBy: -([self x]) yBy: -([self y])];
-	rectInChild.origin = [transform transformPoint: rect.origin];
-	
-	return rectInChild;
+	NSRect rectInReceiver = rect; /* Keep the size as is */
+
+	// NOTE: If we want to handle bounds transformations (rotation, translation,  
+	// and scaling), we should switch to NSAffineTransform, the current code 
+	// would be...
+	// NSAffineTransform *transform = [NSAffineTransform transform];
+	// [transform translateXBy: -([self x]) yBy: -([self y])];
+	// rectInChild.origin = [transform transformPoint: rect.origin];
+	rectInReceiver.origin.x = rect.origin.x - [self x];
+	rectInReceiver.origin.y = rect.origin.y - [self y];
+
+	if ([self isFlipped] != [_parentItem isFlipped])
+	{
+		rectInReceiver.origin.y = [self height] - rectInReceiver.origin.y - rectInReceiver.size.height;
+	}
+
+	return rectInReceiver;
 }
 
+/** Returns a point expressed in parent layout item coordinate space equivalent 
+	to point parameter expressed in the receiver coordinate space. */
+- (NSPoint) convertPointToParent: (NSPoint)point
+{
+	return [self convertRectToParent: ETMakeRect(point, NSZeroSize)].origin;
+}
+
+/** Returns a rect expressed in the receiver coordinate space equivalent to rect 
+parameter expressed in ancestor coordinate space.
+
+In case the receiver is not a descendent or ancestor is nil, returns a null rect. */
+- (NSRect) convertRect: (NSRect)rect fromItem: (ETLayoutItemGroup *)ancestor
+{
+	if (ETIsNullRect(rect) || _parentItem == nil || ancestor == nil)
+		return ETNullRect;
+
+	NSRect newRect = rect;
+
+	if (_parentItem != ancestor)
+	{
+		newRect = [_parentItem convertRect: rect fromItem: ancestor];
+	}
+
+	return [self convertRectFromParent: newRect];
+}
+
+/** Returns a rect expressed in ancestor coordinate space equivalent to rect 
+parameter expressed in the receiver coordinate space.
+
+In case the receiver is not a descendent or ancestor is nil, returns a null rect. */
+- (NSRect) convertRect: (NSRect)rect toItem: (ETLayoutItemGroup *)ancestor
+{
+	if (ETIsNullRect(rect) || _parentItem == nil || ancestor == nil)
+		return ETNullRect;
+
+	NSRect newRect = rect;
+	ETLayoutItem *parent = self;
+
+	while (parent != ancestor)
+	{
+		newRect = [self convertRectToParent: newRect];
+		parent = [parent parentItem];
+	}
+
+	return newRect;
+}
+
+/** Returns whether the receiver uses flipped coordinates to position its 
+content. 
+ 
+The returned value will be taken in account in methods related to geometry, 
+event handling and drawing. If you want to alter the flipping, you must use 
+-setFlipped: and never alter the supervisor view directly with 
+-[ETView setFlipped:].  */
+- (BOOL) isFlipped
+{
+	// TODO: Review ETLayoutItem hierarchy to be sure flipped coordinates are 
+	// well supported.
+	ETView *supervisorView = [self supervisorView];
+	
+	if (supervisorView != nil)
+	{
+		// TODO: Enable later...
+		/*if (_flipped != [supervisorView isFlipped])
+		{
+			ETLog(@"WARNING: -isFlipped doesn't match between the layout item "
+				"%@ and its supervisor view %@... You may have wrongly called "
+				"-setFlipped: on the supervisor view.", supervisorView, self);
+		}*/
+		return [supervisorView isFlipped];
+	}
+
+	return _flipped;
+}
+
+/** Sets whether the receiver uses flipped coordinates to position its content. 
+
+This method updates the supervisor view to match the flipping of the receiver.
+The anchor point location is also adjusted if needed.
+
+You must never alter the supervisor view directly with -[ETView setFlipped:]. */
+- (void) setFlipped: (BOOL)flip
+{
+	if (flip == _flipped)
+		return;
+
+	_flipped = flip;
+	[[self supervisorView] setFlipped: flip];
+	if (HAS_PROPERTY(kETAnchorPointProperty))
+	{
+		NSPoint anchorPoint = [self anchorPoint];
+		anchorPoint.y -= [self bounds].size.height;
+		[self setAnchorPoint: anchorPoint];
+	}
+}
+
+/** Returns a point expressed in the receiver coordinate space equivalent to
+	point parameter expressed in the parent layout item coordinate space. */
+- (NSPoint) convertPointFromParent: (NSPoint)point
+{
+	return [self convertRectFromParent: ETMakeRect(point, NSZeroSize)].origin;
+}
+
+/** Returns whether a point expressed in the parent item coordinate space is 
+    is within the receiver frame. The item frame is also expressed in the parent 
+	item coordinate space.
+ 
+	This method checks whether the parent item is flipped or not. */
+- (BOOL) containsPoint: (NSPoint)point
+{
+	return NSMouseInRect(point, [self frame], [_parentItem isFlipped]);
+}
+
+/** Returns whether a point expressed in the receiver coordinate space is inside 
+    the receiver bounds.
+ 
+	For now, the bounds size is always equal to the item frame and the origin 
+	to zero.
+ 
+	TODO: Ensure the next paragraph really holds...
+	If you convert a point expressed in the parent coordinate space to the 
+	receiver coordinate space with -convertPointFromParent:, if the receiver 
+	is flipped, the point will be adjusted as needed. Hence you can safely pass 
+	a point once converted without worrying whether the parent or the receiver 
+	are flipped. */
+- (BOOL) pointInside: (NSPoint)point
+{
+	return NSPointInRect(point, [self bounds]);
+}
+
+- (NSRect) bounds
+{
+	NSRect bounds = [self frame];
+	bounds.origin = NSZeroPoint;
+	return bounds;
+}
+
+/** Returns the persistent frame associated with the receiver. 
+
+This custom frame is used by ETFreeLayout. This property keeps track of the 
+fixed location and size that are used for the receiver in the free layout, even 
+if you switch to another layout that alters the receiver frame. The current 
+frame is returned by -frame in all cases, hence when ETFreeLayout is in use, 
+-frame is equal to -persistentFrame. */
 - (NSRect) persistentFrame
 {
-	// TODO: Find the best way to allow the represented object to provide and 
-	// store the persistent frame.
-	//[[[self representedObject] valueForProperty: @"kPersistentFrame"] rectValue];
-	return [[VARIABLE_PROPERTIES objectForKey: @"kPersistentFrame"] rectValue];
+	// TODO: Find the best way to eventually allow the represented object to 
+	// provide and store the persistent frame.
+	NSValue *value = GET_PROPERTY(kETPersistentFrameProperty);
+	
+	/* -rectValue wrongly returns random rect values when value is nil */
+	if (value == nil)
+		return ETNullRect;
+
+	return [value rectValue];
 }
 
+/** Sets the persistent frame associated with the receiver. See -persistentFrame. */
 - (void) setPersistentFrame: (NSRect) frame
 {
-	//[[self representedObject] setValue: [NSValue valueWithRect: frame] forProperty: @"kPersistentFrame"];
-	[VARIABLE_PROPERTIES setObject: [NSValue valueWithRect: frame] forKey: @"kPersistentFrame"];
+	SET_PROPERTY([NSValue valueWithRect: frame], kETPersistentFrameProperty);
 }
 
+/** Returns the current frame. If the receiver has a view attached to it, the 
+returned frame is equivalent to the display view frame.  
+
+This value is always in sync with the persistent frame in a positional and 
+non-computed layout such as ETFreeLayout, but is usually different when the 
+layout is computed. 
+See also -setPersistentFrame: */
 - (NSRect) frame
 {
 	if ([self displayView] != nil)
@@ -1546,9 +1871,14 @@
 	}
 }
 
+/** Sets the current frame and also the persistent frame if the layout of the 
+parent item is positional and non-computed such as ETFreeLayout.
+
+See also -[ETLayout isPositional] and -[ETLayout isComputedLayout]. */
 - (void) setFrame: (NSRect)rect
 {
-	//ETDebugLog(@"-setFrame: %@ on %@", NSStringFromRect(rect), self);
+	ETDebugLog(@"-setFrame: %@ on %@", NSStringFromRect(rect), self);  
+
 	if ([self displayView] != nil)
 	{
 		[[self displayView] setFrame: rect];
@@ -1557,16 +1887,21 @@
 	{
 		_frame = rect;
 	}
-	// NOTE: the next line introduces ETLayoutItemGroup import 
-	if ([[[self parentLayoutItem] layout] isComputedLayout] == NO)
+
+	[[self style] didChangeItemBounds: ETMakeRect(NSZeroPoint, rect.size)];
+
+	ETLayout *parentLayout = [_parentItem layout];
+	if ([parentLayout isPositional] && [parentLayout isComputedLayout] == NO)
 		[self setPersistentFrame: rect];
 }
 
+/** Returns the current origin associated with the receiver frame. See also -frame. */
 - (NSPoint) origin
 {
 	return [self frame].origin;
 }
 
+/** Sets the current origin associated with the receiver frame. See also -setFrame:. */   
 - (void) setOrigin: (NSPoint)origin
 {
 	NSRect newFrame = [self frame];
@@ -1575,11 +1910,77 @@
 	[self setFrame: newFrame];
 }
 
+/** Returns the current anchor point associated with the receiver bounds. The 
+anchor point is expressed in the receiver coordinate space.
+
+By default, the anchor point is centered in the bounds rectangle.
+
+The item position is relative to the anchor point. */
+- (NSPoint) anchorPoint
+{
+	if (HAS_PROPERTY(kETAnchorPointProperty) == NO)
+		return [self centeredAnchorPoint];
+
+	return [GET_PROPERTY(kETAnchorPointProperty) pointValue];
+}
+
+/* Returns the center of the bounds rectangle in the receiver coordinate space. */
+- (NSPoint) centeredAnchorPoint
+{
+	NSSize boundsSize = [self bounds].size;	
+	NSPoint anchorPoint = NSZeroPoint;
+	
+	anchorPoint.x = boundsSize.width / 2.0;
+	anchorPoint.y = boundsSize.height / 2.0;
+	
+	return anchorPoint;
+}
+
+/** Sets the current anchor point associated with the receiver bounds. anchor 
+must be expressed in the receiver coordinate space. */  
+- (void) setAnchorPoint: (NSPoint)anchor
+{
+	SET_PROPERTY([NSValue valueWithPoint: anchor], kETAnchorPointProperty);
+}
+
+/** Returns the current position associated with the receiver frame. The 
+position is expressed in the parent item coordinate space. See also 
+-setPosition:. */
+- (NSPoint) position
+{
+	NSPoint anchorPoint = [self anchorPoint];
+	NSPoint position = [self frame].origin;
+
+	position.x += anchorPoint.x;
+	position.y += anchorPoint.y;
+
+	return position;
+}
+
+/** Sets the current position associated with the receiver frame.
+
+When -setPosition: is called, the position is applied relative to -anchorPoint. 
+position must be expressed in the parent item coordinate space (exactly as the 
+frame). When the position is set, the frame is moved to have the anchor point 
+location in the parent item coordinate space equal to the new position value. */  
+- (void) setPosition: (NSPoint)position
+{
+	NSPoint anchorPoint = [self anchorPoint];
+	NSPoint origin = position;
+
+	origin.x -= anchorPoint.x;
+	origin.y -= anchorPoint.y;
+	
+	[self setOrigin: origin];
+}
+
+/** Returns the current size associated with the receiver frame. See also -frame. */       
 - (NSSize) size
 {
 	return [self frame].size;
 }
 
+/** Sets the current size associated with the receiver frame. See also -setFrame:. */           
 - (void) setSize: (NSSize)size
 {
 	NSRect newFrame = [self frame];
@@ -1588,71 +1989,109 @@
 	[self setFrame: newFrame];
 }
 
+/** Returns the current x coordinate associated with the receiver frame origin. 
+See also -frame. */       
 - (float) x
 {
 	return [self frame].origin.x;
 }
 
+/** Sets the current x coordinate associated with the receiver frame origin. 
+See also -setFrame:. */
 - (void) setX: (float)x
 {
 	[self setOrigin: NSMakePoint(x, [self y])];
 }
 
+/** Returns the current y coordinate associated with the receiver frame origin. 
+See also -frame. */
 - (float) y
 {
 	return [self frame].origin.y;
 }
 
+/** Sets the current y coordinate associated with the receiver frame origin. 
+See also -setFrame:. */
 - (void) setY: (float)y
 {
 	[self setOrigin: NSMakePoint([self x], y)];
 }
 
+/** Returns the current height associated with the receiver frame size. See also 
+-frame. */
 - (float) height
 {
 	return [self size].height;
 }
 
+/** Sets the current height associated with the receiver frame size. See also 
+-setFrame:. */
 - (void) setHeight: (float)height
 {
 	[self setSize: NSMakeSize([self width], height)];
 }
 
+/** Returns the current width associated with the receiver frame size. See also 
+-frame. */
 - (float) width
 {
 	return [self size].width;
 }
 
+/** Sets the current width associated with the receiver frame size. See also 
+-setFrame:. */
 - (void) setWidth: (float)width
 {
 	[self setSize: NSMakeSize(width, [self height])];
 }
 
-- (NSRect) defaultFrame 
-{ 
-	return _defaultFrame; 
+- (NSRect) boundingBox
+{
+	// TODO: Very crude, we need to figure out what we really needs. For example,
+	// -setBoundingBox: could be called when a handle group is inserted, or the 
+	// layout and/or the style could have a hook -boundingBoxForItem:. We 
+	// probably want to cache the bounding box value in an ivar too.
+	return NSInsetRect([self frame], -10.0, -10.0);
 }
 
-/** Modifies the item view frame when the item has a view. Default frame won't
-	be touched by container transforms (like item scaling) unlike frame value
-	returned by NSView. 
-	Initiliazed with view frame passed in argument on ETLayoutItem instance
-	initialization, else set to NSZeroRet. */
+/** Returns the default frame associated with the receiver. See -setDefaultFrame:.
+
+By default, returns ETNullRect. */
+- (NSRect) defaultFrame 
+{
+	NSValue *value = GET_PROPERTY(kETDefaultFrameProperty);
+	
+	/* -rectValue wrongly returns random rect values when value is nil */
+	if (value == nil)
+		return ETNullRect;
+
+	return [value rectValue]; 
+}
+
+/** Sets the default frame associated with the receiver and updates the item 
+frame to match. The default frame is not touched by layout-related transforms 
+(such as item scaling) unlike the item frame returned by -frame. 
+
+If a view is provided to the initializer when the layout item gets instantiated, 
+the value is initially set to this view frame, else -defaultFrame returns 
+a null rect. */
 - (void) setDefaultFrame: (NSRect)frame
 { 
-	_defaultFrame = frame;
+	SET_PROPERTY([NSValue valueWithRect: frame], kETDefaultFrameProperty);
 	/* Update display view frame only if needed */
-	if (NSEqualRects(_defaultFrame, [[self displayView] frame]) == NO)
+	if (NSEqualRects(frame, [self frame]) == NO)
 		[self restoreDefaultFrame];
 }
 
+/** Modifies the frame associated with the receiver to match the current default 
+frame. */
 - (void) restoreDefaultFrame
 { 
 	[self setFrame: [self defaultFrame]]; 
 }
 
-/** Returns the autoresizing mask that applies to the layout item. This mask 
-    is identical to the autoresizing mask of the supervisor view if one exists. */
+/** Returns the autoresizing mask that applies to the layout item. This mask is 
+identical to the autoresizing mask of the supervisor view if one exists. */
 - (unsigned int) autoresizingMask
 {
 	if ([self displayView] != nil)
@@ -1666,8 +2105,8 @@
 	}
 }
 
-/** Sets the autoresizing mask that applies to the layout item. This mask 
-    is also set as the autoresizing mask of the supervisor view if one exists. */
+/** Sets the autoresizing mask that applies to the layout item. This mask is 
+also set as the autoresizing mask of the supervisor view if one exists. */
 - (void) setAutoresizingMask: (unsigned int)mask
 {
 	if ([self displayView] != nil)
@@ -1682,19 +2121,16 @@
 
 
 /** When the layout item uses a view, pass YES to this method to have the 
-	content resize when the view itself is resized (by modifying frame).
-	Resizing content in a view is possible by simply updating bounds size to 
-	match the view frame. 
-	Presently uses in ETPaneSwitcherLayout. */
+content resize when the view itself is resized (by modifying frame).
+
+Resizing content in a view is possible by simply updating bounds size to match 
+the view frame. */
 - (void) setAppliesResizingToBounds: (BOOL)flag
 {
 	_resizeBounds = flag;
 	
 	if ([self displayView] == nil)
-	{
-		NSLog(@"WARNING: -setAppliesResizingToBounds: called with no view for %@", self);
 		return;
-	}
 	
 	if (_resizeBounds && [self displayView] != nil)
 	{
@@ -1733,13 +2169,20 @@
 	[[self displayView] setNeedsDisplay: YES];
 }
 
-/** Returns a default image representation of the layout item. 
-	It tries to find it by looking up for 'image' property, then 'icon' 
-	property. If none is found and a view is referenced by the layout item, it 
-	generates an image by taking a snapshot of the view. */
+/** Returns the image representation associated with the receiver.
+
+By default this method, returns by decreasing order of priority:
+<enum>
+<item>the receiver image (aka ETImageProperty), if -setImage: was called previously</item>
+<item>the receiver value, if -value returns an NSImage object</item>
+<item>nil, if none of the above conditions are met</item>
+</enum>.
+The returned image can be overriden by calling -setImage:. 
+ 
+See also -icon. */
 - (NSImage *) image
 {
-	NSImage *img = [VARIABLE_PROPERTIES objectForKey: @"image"];
+	NSImage *img = GET_PROPERTY(kETImageProperty);
 	
 	if (img == nil && [[self value] isKindOfClass: [NSImage class]])
 		img = [self value];
@@ -1747,9 +2190,15 @@
 	return img;
 }
 
+/** Sets the image representation associated with the receiver.
+
+If img is nil, then the default behavior of -image is restored and the returned 
+image should not be expected to be nil. */
 - (void) setImage: (NSImage *)img
 {
-	[(NSMutableDictionary *)VARIABLE_PROPERTIES setObject: img forKey: @"image"];
+	SET_PROPERTY(img, kETImageProperty);
+
+	// TODO: Think about whether this is really the best to do...
 	if (img != nil)
 	{
 		[self setSize: [img size]];
@@ -1760,21 +2209,32 @@
 	}
 }
 
+// NOTE: May be we should have -displayIcon (or -customIcon, -setCustomIcon:) to 
+// eliminate the lack of symetry between -icon and -setIcon:.
 /** Returns the image to be displayed when the receiver must be represented in a 
 	symbolic style. This icon is commonly used by some layouts and also if the 
 	receiver represents another layout item (when -isMetaLayoutItem returns YES).
-	By default this method, returns either -image if the returned value isn't 
-	nil or a view snapshot when -view isn't nil. 
+
+	By default, this method returns by decreasing order of priority:
+    <enum>
+    <item>the receiver icon (aka ETIconProperty), if -setIcon: was called previously</item>
+    <item>the receiver image (aka ETImageProperty), if -image doesn't return nil</item>
+	<item>a view snapshot, if -view doesn't return nil</item>
+	<item>the represented object icon, if the represented object and the icon 
+    associated with it are not nil</item>
+    <item>nil, if none of the above conditions are met</item>
+    </enum>. 
+	The returned image can be overriden by calling -setIcon:.
+
 	-image and -icon can be considered as symetric equivalents of -name and 
 	-displayName methods. */
 - (NSImage *) icon
 {
-	NSImage *icon = [VARIABLE_PROPERTIES objectForKey: @"icon"];
+	NSImage *icon = GET_PROPERTY(kETIconProperty);
 	
 	if (icon == nil)
 		icon = [self image];
 
-	// NOTE: -bitmapImageRepForCachingDisplayInRect:(NSRect)aRect on Mac OS 10.4
 	if (icon == nil && [self displayView] != nil)
 		icon = [[self displayView] snapshot];
 		
@@ -1787,45 +2247,74 @@
 	return icon;
 }
 
+/** Sets the image to be displayed when the receiver must be represented in a 
+    symbolic style. See also -icon.
+
+    If img is nil, then the default behavior of -icon is restored and the 
+    icon image should not be expected to be nil. */
 - (void) setIcon: (NSImage *)img
 {
-	[VARIABLE_PROPERTIES setObject: img forKey: @"icon"];
+	SET_PROPERTY(img, kETIconProperty);
 }
 
 /* Events & Actions */
 
-/** Returns the event handler associated with the receiver. The returned object
-	must implement ETEventHandler protocol.
-	By default the receiver returns itself. See ETLayoutItem+Events to know 
-	more about event handling in the layout item tree. */
-- (id <ETEventHandler>) eventHandler
+/** Returns the action handler associated with the receiver. See ETInstrument to 
+know more about event handling in the layout item tree. */
+- (id) actionHandler
 {
-	return self;
+	return GET_PROPERTY(kETActionHandlerProperty);
 }
 
-/* You can override this method for your own custom layout item */
-- (void) doubleClick
+/** Sets the action handler associated with the receiver. */
+- (void) setActionHandler: (id)anHandler
 {
-
+	SET_PROPERTY(anHandler, kETActionHandlerProperty);
 }
 
-- (void) showInspectorPanel
+/** Returns NO when the receiver should be ignored by the instruments for both 
+hit tests and action dispatch. By default, returns YES, otherwise NO when 
+-actionsHandler returns nil. */
+- (BOOL) acceptsActions
 {
-	[[[self inspector] panel] makeKeyAndOrderFront: self];
+	return (GET_PROPERTY(kETActionHandlerProperty) != nil);
 }
 
+/** Controls the automatic enabling/disabling of UI elements (such as menu 
+items) that uses the responder chain to validate themselves, based on whether 
+the receiver or its action handler can respond to the selector action that would 
+be sent by the UI element in the EtoileUI responder chain. */
+- (BOOL) validateUserInterfaceItem: (id <NSValidatedUserInterfaceItem>)anItem
+{
+	SEL action = [anItem action];
+	SEL twoParamSelector = NSSelectorFromString([NSStringFromSelector(action) 
+		stringByAppendingString: @"onItem:"]);
+
+	if ([self respondsToSelector: action])
+		return YES;
+
+	if ([[self actionHandler] respondsToSelector: twoParamSelector])
+		return YES;
+
+	return NO;
+}
+
+/** Returns the custom inspector associated with the receiver. By default, 
+returns nil.
+
+-[NSObject(EtoileUI) inspect:] will show this inspector, unless nil is returned. */
 - (id <ETInspector>) inspector
 {
-	ETContainer *container = [self closestAncestorContainer];
-	id <ETInspector> inspector = nil;
-	
-	if (container != nil)
-		inspector = [container inspector];
-		
-	if (inspector != nil)
-		[inspector setInspectedItems: [NSArray arrayWithObject: self]];
-		
+	id <ETInspector> inspector = GET_PROPERTY(kETInspectorProperty);
+	[inspector setInspectedObjects: A(self)];
 	return inspector;
+}
+
+
+/** Sets the custom inspector associated with the receiver. */
+- (void) setInspector: (id <ETInspector>)inspector
+{
+	SET_PROPERTY(inspector, kETInspectorProperty);
 }
 
 /* Live Development */
@@ -1854,11 +2343,22 @@
 	[self setParentItem: parent];
 }
 
+/** Returns the event handler associated with the receiver. The returned object
+ must implement ETEventHandler protocol.
+ By default the receiver returns itself. See ETLayoutItem+Events to know 
+ more about event handling in the layout item tree. */
+- (id <ETEventHandler>) eventHandler
+{
+	return self;
+}
+
 @end
 
 
 @implementation NSObject (ETLayoutItem)
 
+/** Returns YES if the receiver is an ETLayoutItem class or subclass instance, 
+otherwise returns NO. */
 - (BOOL) isLayoutItem
 {
 	return ([self isKindOfClass: [ETLayoutItem class]]);

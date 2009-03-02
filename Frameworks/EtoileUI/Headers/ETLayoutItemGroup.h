@@ -42,6 +42,11 @@
 @class ETLayout;
 
 
+/* Properties */
+
+extern NSString *kSourceProperty; /** source property name */
+extern NSString *kDelegateProperty; /** delegate property name */
+
 @interface ETLayoutItemGroup : ETLayoutItem <ETLayoutingContext, ETCollection, ETCollectionMutation>
 {
 	NSMutableArray *_layoutItems;
@@ -58,13 +63,6 @@
 	BOOL _shouldMutateRepresentedObject;
 }
 
-/* Factory methods useful for controllers
-   NOTE: probably to be moved elsewhere or refactored a bit. */
-
-- (id) itemWithObject: (id)object isValue: (BOOL)isValue;
-- (id) newItemGroup;
-- (id) newItem;
-
 /* Initialization */
 
 - (id) initWithItems: (NSArray *)layoutItems view: (NSView *)view;
@@ -72,7 +70,6 @@
 /* Finding Container */
 
 - (BOOL) isContainer;
-- (ETContainer *) baseContainer;
 
 /* Traversing Layout Item Tree */
 
@@ -80,6 +77,8 @@
 - (NSIndexPath *) indexPathForPath: (NSString *)path;
 - (ETLayoutItem *) itemAtIndexPath: (NSIndexPath *)path;
 - (ETLayoutItem *) itemAtPath: (NSString *)path;
+
+- (void) setRepresentedPathBase: (NSString *)aPath;
 
 /*  Manipulating Layout Item Tree */
 
@@ -113,6 +112,10 @@
 - (BOOL) shouldMutateRepresentedObject;
 - (void) setShouldMutateRepresentedObject: (BOOL)flag;
 - (BOOL) usesRepresentedObjectAsProvider;
+- (id) source;
+- (void) setSource: (id)source;
+- (id) delegate;
+- (void) setDelegate: (id)delegate;
 
 /* Layout */
 
@@ -173,6 +176,10 @@
 
 /* Selection */
 
+- (unsigned int) selectionIndex;
+- (void) setSelectionIndex: (unsigned int)index;
+- (NSMutableIndexSet *) selectionIndexes;
+- (void) setSelectionIndexes: (NSIndexSet *)indexes;
 - (NSArray *) selectionIndexPaths;
 - (void) setSelectionIndexPaths: (NSArray *)indexPaths;
 
@@ -196,3 +203,55 @@
 - (id) initWithLayoutItems: (NSArray *)layoutItems view: (NSView *)view;
 
 @end
+
+
+/** Informal flat source protocol based on child index, which can be implemented 
+by the source object set with -[ETLayoutItemGroup setSource:]. */
+@interface NSObject (ETLayoutItemGroupIndexSource)
+
+- (int) numberOfItemsInItemGroup: (ETLayoutItemGroup *)baseItem;
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtIndex: (int)index;
+
+@end
+		
+/** Informal tree source protocol based on index path, which can be implemented 
+by the source object set with -[ETLayoutItemGroup setSource:]. */
+@interface NSObject (ETLayoutItemGroupPathSource)
+
+- (int) itemGroup: (ETLayoutItemGroup *)baseItem
+	numberOfItemsAtPath: (NSIndexPath *)indexPath;
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem 
+	itemAtPath: (NSIndexPath *)indexPath;
+
+@end
+
+/** Additional methods that makes up the informal source protocol. */
+@interface NSObject (ETLayoutItemGroupSource)
+- (NSArray *) displayedItemPropertiesInItemGroup: (ETLayoutItemGroup *)itemGroup;
+@end
+
+/** Informal delegate protocol that can be implemented by the object set with 
+-[ETLayoutItemGroup setDelegate:]. */
+@interface NSObject (ETLayoutItemGroupDelegate)
+/** Delegate method that corresponds to ETItemGroupSelectionDidChangeNotification. */
+- (void) itemGroupSelectionDidChange: (NSNotification *)notif;
+@end
+
+/** Notification posted by ETLayoutItemGroup and subclasses in reply to 
+selection change in the layout item tree connected to the poster object. The 
+poster object is always an item group and can be retrieved through 
+-[NSNotification object].
+
+This notification is posted when a selection related method such as 
+-setSelectionIndexPaths: has been called on the object associated with the 
+notification, or when the selection is modified by the user, in this last case 
+the poster object will always be a base item. */
+extern NSString *ETItemGroupSelectionDidChangeNotification;
+
+// TODO: Documentation to be reused somewhere...
+/* In this case, each time the user enters a new level, you are in charge of
+removing then adding the proper items which are associated with the level
+requested by the user. Implementing a data source, alleviates you from this
+task, you simply need to return the items, EtoileUI will build takes care of
+building and managing the tree structure. To set a represented path base, turns
+the item group into an entry point in your model, */

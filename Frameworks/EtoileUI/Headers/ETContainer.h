@@ -38,45 +38,26 @@
 #import <EtoileFoundation/ETCollection.h>
 #import <EtoileUI/ETView.h>
 #import <EtoileUI/ETLayout.h>
-#import <EtoileUI/ETInspecting.h>
-
-#ifdef GNUSTEP
-// NOTE: This hack is needed because GNUstep doesn't retrieve -isFlipped in a 
-// consistent way. For example in -[NSView _rebuildCoordinates] doesn't call 
-// -isFlipped and instead retrieve it directly from the rFlags structure.
-#define USE_NSVIEW_RFLAGS
-#endif
 
 @class ETLayoutItem, ETLayout, ETLayer, ETLayoutItemGroup, ETSelection, 
 	ETPickboard, ETEvent;
 
+extern NSString *ETLayoutItemPboardType;
 
-@interface ETContainer : ETView <ETObjectInspection, ETCollection, ETCollectionMutation> //ETLayoutingContext
+@interface ETContainer : ETView
 {
 	ETLayoutItem *_scrollViewDecorator;
 	BOOL _scrollViewShown;
 
-	NSView *_displayView;
-#ifndef USE_NSVIEW_RFLAGS
-	BOOL _flipped;
-#endif
+	NSView *_layoutView;
 
-	// NOTE: path ivar may move to ETLayoutItem later
-	NSString *_path; /* A path type could replace NSString later */
-	id _dataSource;
-	id _delegate; // TODO: check this ivar doesn't overshadow a superclass ivar
-	
 	BOOL _subviewHitTest;
 	SEL _doubleClickAction;
 	id _target;
 	ETLayoutItem *_doubleClickedItem;
 	
 	float _itemScale;
-	
-	// NOTE: May be used as a cache, selection state is stored in ETLayoutItem
-	//NSMutableIndexSet *_selection;
-	ETSelection *_selectionShape;
-	NSRect _selectionRect;
+
 	BOOL _multipleSelectionAllowed;
 	BOOL _emptySelectionAllowed;
 	BOOL _dragAllowed;
@@ -84,14 +65,6 @@
 	BOOL _removeItemsAtPickTime;
 	/* Insertion indicator to erase on next mouse move event in a drag */
 	NSRect _prevInsertionIndicatorRect; 
-	
-	id <ETInspector> _inspector;
-
-	/* ETContainer(ETController) ivars, they will be removed later */
-	ETLayoutItem *_templateItem;
-	ETLayoutItemGroup *_templateItemGroup;
-	Class _objectClass;
-	Class _groupClass;
 }
 
 - (id) initWithLayoutView: (NSView *)layoutView;
@@ -102,44 +75,14 @@
 
 /* Basic Accessors */
 
-- (NSString *) representedPath;
-- (void) setRepresentedPath: (NSString *)path;
-- (id) source;
-- (void) setSource: (id)source;
-- (id) delegate;
-- (void) setDelegate: (id)delegate;
-
-- (BOOL) isFlipped;
-- (void) setFlipped: (BOOL)flag;
-
-/* Layout */
-
-- (BOOL) isAutolayout;
-- (void) setAutolayout: (BOOL)flag;
-- (BOOL) canUpdateLayout;
-- (void) updateLayout;
-- (void) reloadAndUpdateLayout;
-
-- (ETLayout *) layout;
-- (void) setLayout: (ETLayout *)layout;
-
-- (NSView *) displayView;
-- (void) setDisplayView: (NSView *)view;
+- (NSView *) layoutView;
+- (void) setLayoutView: (NSView *)view;
 
 /* - (ETLayoutAlignment) layoutAlignment;
 - (void) setLayoutAlignment: (ETLayoutAlignment)alignment;
 
 - (ETLayoutOverflowStyle) overflowStyle;
 - (void) setOverflowStyle: (ETLayoutOverflowStyle); */
-
-/* Inspecting */
-
-- (IBAction) inspect: (id)sender;
-- (IBAction) inspectSelection: (id)sender;
-- (void) setInspector: (id <ETInspector>)inspector;
-/** Returns inspector based on selection */
-- (id <ETInspector>) inspector;
-- (id <ETInspector>) inspectorForItems: (NSArray *)items;
 
 /* Scrolling */
 
@@ -151,37 +94,12 @@
 - (void) setHasHorizontalScroller: (BOOL)scroll;
 - (NSScrollView *) scrollView;
 
-/* Layout Item Tree */
-
-- (void) addItem: (ETLayoutItem *)item;
-- (void) insertItem: (ETLayoutItem *)item atIndex: (int)index;
-- (void) removeItem: (ETLayoutItem *)item;
-- (void) removeItemAtIndex: (int)index;
-- (ETLayoutItem *) itemAtIndex: (int)index;
-- (int) indexOfItem: (ETLayoutItem *)item;
-- (BOOL) containsItem: (ETLayoutItem *)item;
-- (int) numberOfItems;
-- (NSArray *) items;
-- (void) addItems: (NSArray *)items;
-- (void) removeItems: (NSArray *)items;
-- (void) removeAllItems;
-
 /* Selection */
 
-- (NSArray *) selectedItemsInLayout;
-- (NSArray *) selectionIndexPaths;
-- (void) setSelectionIndexPaths: (NSArray *)indexPaths;
-- (void) setSelectionIndexes: (NSIndexSet *)selection;
-- (NSMutableIndexSet *) selectionIndexes;
-- (void) setSelectionIndex: (unsigned int)index;
-- (unsigned int) selectionIndex;
 - (BOOL) allowsMultipleSelection;
 - (void) setAllowsMultipleSelection: (BOOL)multiple;
 - (BOOL) allowsEmptySelection;
 - (void) setAllowsEmptySelection: (BOOL)empty;
-
-/*- (void) setSelectionShape: (ETSelection *)shape;
-- (ETSelection *) selectionShape;*/
 
 /* Pick & Drop */
 
@@ -227,14 +145,6 @@
 /*- (float) itemRotationAngle;
 - (void) setItemRotationAngle: (float)factor;*/
 
-/* Layers */
-
-- (void) addLayer: (ETLayoutItem *)item;
-- (void) insertLayer: (ETLayoutItem *)item atIndex: (int)layerIndex;
-- (void) insertLayer: (ETLayoutItem *)item atZIndex: (int)z;
-- (void) removeLayer: (ETLayoutItem *)item;
-- (void) removeLayerAtIndex: (int)layerIndex;
-
 /* Rendering Chain */
 
 - (void) render;
@@ -250,38 +160,15 @@
 - (BOOL) isHitTestEnabled;
 - (void) setEnablesHitTest: (BOOL)hit;
 
-/* Collection Protocol */
-
-- (BOOL) isOrdered;
-- (BOOL) isEmpty;
-- (id) content;
-- (NSArray *) contentArray;
-- (void) addObject: (id)object;
-- (void) insertObject: (id)object atIndex: (unsigned int)index;
-- (void) removeObject: (id)object;
-
 /* Private Use */
 
 - (void) didChangeDecoratorOfItem: (ETLayoutItem *)item;
-// TOOD: Evaluate whether this method wouldn't be better located hidden in
-// ETLayoutItemGroup+Mutation
-- (int) checkSourceProtocolConformance;
 
 @end
 
+/* Deprecated (DO NOT USE, WILL BE REMOVED LATER) */
+
 @interface NSObject (ETContainerSource)
-
-// TODO: Create new set structure NSPathSet rather than using NSArray
-
-/* Basic index retrieval */
-- (int) numberOfItemsInContainer: (ETContainer *)container;
-- (ETLayoutItem *) container: (ETContainer *)container itemAtIndex: (int)index;
-
-/* Index path retrieval useful with containers displaying tree structure */
-- (int) container: (ETContainer *)container 
-	numberOfItemsAtPath: (NSIndexPath *)indexPath;
-- (ETLayoutItem *) container: (ETContainer *)container 
-	itemAtPath: (NSIndexPath *)indexPath;
 
 /* Coordinates retrieval useful with containers oriented towards graphics and 
    spreadsheet */
@@ -291,7 +178,6 @@
 	forItem: (ETLayoutItem *)item;*/
 
 /* Extra infos */
-- (NSArray *) displayedItemPropertiesInContainer: (ETContainer *)container;
 - (NSArray *) editableItemPropertiesInContainer: (ETContainer *)container;
 - (NSView *) container: (ETContainer *)container 
 	editorObjectForProperty: (NSString *)property ;
@@ -337,7 +223,6 @@
 
 @interface ETContainer (ETContainerDelegate)
 
-- (void) containerSelectionDidChange: (NSNotification *)notif;
 - (void) containerShouldStackItem: (NSNotification *)notif;
 - (void) containerDidStackItem: (NSNotification *)notif;
 - (void) containerShouldGroupItem: (NSNotification *)notif;
@@ -347,6 +232,54 @@
 
 @end
 
+@interface ETContainer (Deprecated)
 
-extern NSString *ETContainerSelectionDidChangeNotification;
-extern NSString *ETLayoutItemPboardType;
+- (NSString *) representedPath;
+- (void) setRepresentedPath: (NSString *)path;
+- (id) source;
+- (void) setSource: (id)source;
+- (id) delegate;
+- (void) setDelegate: (id)delegate;
+
+/* Inspecting */
+
+- (IBAction) inspect: (id)sender;
+- (IBAction) inspectSelection: (id)sender;
+
+/* Layout */
+
+- (BOOL) isAutolayout;
+- (void) setAutolayout: (BOOL)flag;
+- (BOOL) canUpdateLayout;
+- (void) updateLayout;
+- (void) reloadAndUpdateLayout;
+
+- (ETLayout *) layout;
+- (void) setLayout: (ETLayout *)layout;
+
+/* Layout Item Tree */
+
+- (void) addItem: (ETLayoutItem *)item;
+- (void) insertItem: (ETLayoutItem *)item atIndex: (int)index;
+- (void) removeItem: (ETLayoutItem *)item;
+- (void) removeItemAtIndex: (int)index;
+- (ETLayoutItem *) itemAtIndex: (int)index;
+- (int) indexOfItem: (ETLayoutItem *)item;
+- (BOOL) containsItem: (ETLayoutItem *)item;
+- (int) numberOfItems;
+- (NSArray *) items;
+- (void) addItems: (NSArray *)items;
+- (void) removeItems: (NSArray *)items;
+- (void) removeAllItems;
+
+/* Selection */
+
+- (NSArray *) selectedItemsInLayout;
+- (NSArray *) selectionIndexPaths;
+- (void) setSelectionIndexPaths: (NSArray *)indexPaths;
+- (void) setSelectionIndexes: (NSIndexSet *)selection;
+- (NSMutableIndexSet *) selectionIndexes;
+- (void) setSelectionIndex: (unsigned int)index;
+- (unsigned int) selectionIndex;
+
+@end

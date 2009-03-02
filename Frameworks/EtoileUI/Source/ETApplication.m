@@ -34,16 +34,15 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import <EtoileUI/ETApplication.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-#import <EtoileUI/ETLayoutItem+Factory.h>
-#import <EtoileUI/ETLayoutItemBuilder.h>
-#import <EtoileUI/ETObjectBrowserLayout.h>
-#import <EtoileUI/ETCompatibility.h>
-
-#define DEVMENU_TAG 999
+#import "ETApplication.h"
+#import "ETLayoutItemGroup.h"
+#import "ETLayoutItem+Factory.h"
+#import "ETLayoutItemBuilder.h"
+#import "ETObjectBrowserLayout.h"
+#import "ETCompatibility.h"
 
 @interface ETApplication (Private)
+- (void) _instantiateAppDelegateIfSpecified;
 - (void) _buildLayoutItemTree;
 - (void) _setUpAppMenu;
 - (int) _defaultInsertionIndexInAppMenu;
@@ -58,30 +57,81 @@
 @implementation ETApplication
 
 /** Returns the layout item representing the application. 
-	The method returns a local root item which is usually the window group or
-	layer under the application control. */
+
+The method returns a local root item which is usually the window group or layer
+under the application control.*/
 - (ETLayoutItemGroup *) layoutItem
 {
 	return [ETLayoutItem localRootGroup];
 }
 
+/* The order of the method calls in this method is critical, be very cautious 
+with it.
+
+Unlike Cocoa, GNUstep does not load the main menu from the nib before 
+-finishLaunching. That means, if you call -_buildMainMenuIfNeeded before 
+-[super finishLaunching] on GNUstep, -mainMenu returns nil and therefore 
+-_buildMainMenuIfNeeded wrongly creates a main menu. This doesn't play well with 
+the main menu to be loaded from the main gorm/nib file, a warning is logged: 
+'Services menu not in main menu!'.<br />
+See also -_buildMainMenuIfNeeded. 
+
+-_instantiateAppDelegateIfSpecified must also be called before 
+-[super finishLaunching], to ensure the delegate will receive NSApplication 
+launching notifications. */
 - (void) finishLaunching
 {
+#ifdef GNUSTEP
+	[self _instantiateAppDelegateIfSpecified];
 	[super finishLaunching];
 	[self _buildMainMenuIfNeeded];
 	[self _setUpAppMenu];
+#else
+	[self _buildMainMenuIfNeeded];
+	[self _setUpAppMenu];
+	[self _instantiateAppDelegateIfSpecified];
+	[super finishLaunching];
+#endif
+
+	/* Must be called last, because it processes the loaded nib and the menu. */
 	[self _buildLayoutItemTree];
 }
 
-/** Generates a single layout item tree for the whole application, by mapping 
-    AppKit components to layout items, if those aren't already owned by 
-	a layout item. If an AppKit component is already driven by a layout item,
-	the layout item tree connected to it will be attached to the main layout 
-	item tree that is getting generated.
-    The implementation delegates this process to ETEtoileUIBuilder, which 
-	traverses the window and view hierarchy, in order to ouput a new layout item 
-	tree whose root item will be made available through 
-	-[ETApplication layoutItem]. */
+/* If ETPrincipalControllerClass key is present in the bundle info plist, 
+tries to instantiate the class with the specified name and sets it as the 
+application delegate. The delegate will receive -applicationWillFinishLaunching: 
+and any subsequent notifications. 
+
+The main controller is never released. */
+- (void) _instantiateAppDelegateIfSpecified
+{
+	NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
+
+	if ([[infoDict allKeys] containsObject: @"ETPrincipalControllerClass"] == NO)
+		return;
+
+	NSString *className = [infoDict objectForKey: @"ETPrincipalControllerClass"];
+	Class delegateClass = NSClassFromString(className);
+
+	if (delegateClass == Nil)
+	{
+		ETLog(@"WARNING: ETPrincipalControllerClass named %@ cannot be found",
+			className);
+		return;
+	}
+
+	[self setDelegate: [[delegateClass alloc] init]];
+}
+
+/** Generates a single layout item tree for the whole application, by mapping
+AppKit components to layout items, if those aren't already owned by a layout
+item. If an AppKit component is already driven by a layout item, the layout item
+tree connected to it will be attached to the main layout item tree that is
+getting generated.
+
+The implementation delegates this process to ETEtoileUIBuilder, which traverses
+the window and view hierarchy, in order to ouput a new layout item tree whose
+root item will be made available through -[ETApplication layoutItem]. */
 - (void) _buildLayoutItemTree
 {
 	ETEtoileUIBuilder *builder = [ETEtoileUIBuilder builder];
@@ -89,12 +139,13 @@
 	[ETLayoutItemGroup setWindowGroup: [builder render: self]];
 }
 
-/* If -mainMenu returns nil, builds a new main menu with -_createApplicationMenu 
-   and installs it by calling -setMainMenu:. Also takes care of calling other 
-   set up methods such -setAppleMenu:, which tend to vary with the platform 
-   (GNUstep or Cocoa). 
-   For now, only used on Mac OS X where no main menu exists if no nib is loaded.
-   On GNUstep, a minimal main menu is always created. */
+/* If -mainMenu returns nil, builds a new main menu with -_createApplicationMenu
+and installs it by calling -setMainMenu:. Also takes care of calling other set
+up methods such -setAppleMenu:, which tend to vary with the platform (GNUstep or
+Cocoa).
+
+For now, only used on Mac OS X where no main menu exists if no nib is loaded. On
+GNUstep, a minimal main menu is always created. */
 - (void) _buildMainMenuIfNeeded
 {
 	if ([self mainMenu] != nil)
@@ -114,7 +165,7 @@
 	[appMenuItem setSubmenu: appMenu];
 	[mainMenu addItem: appMenuItem];
 	RELEASE(appMenuItem);
-	
+
 	// NOTE: -setAppleMenu: must be called before calling -setMainMenu: and is 
 	// a private Cocoa API that registers the menu as the application menu 
 	// (hence the method is wrongly called -setAppleMenu:). Ditto for 
@@ -125,10 +176,11 @@
 	RELEASE(mainMenu);
 }
 
-/* Creates a standard application menu by taking in account the expectations 
-   specific to each platform (GNUstep/Etoile and Cocoa). Only supports Mac OS X 
-   for now.
-   See also -_buildMainMenuIfNeeded. */
+/* Creates a standard application menu by taking in account the expectations
+specific to each platform (GNUstep/Etoile and Cocoa). Only supports Mac OS X for
+now.
+
+See also -_buildMainMenuIfNeeded. */
 - (NSMenu *) _createApplicationMenu
 {
 	// TODO: Append the app name to aboutTitle, hideTitle and quitTitle
@@ -139,38 +191,38 @@
 
 	[appMenu addItemWithTitle: aboutTitle 
 	                   action: @selector(about:) 
-				keyEquivalent: @""];
+	            keyEquivalent: @""];
 	[appMenu addItemWithTitle: _(@"Preferences...") 
 	                   action: NULL 
-				keyEquivalent: @","];
-				
+	            keyEquivalent: @","];
+
 	[appMenu addItem: [NSMenuItem separatorItem]];
-	
+
 	[appMenu addItemWithTitle: _(@"Services") 
-					   action: NULL 
-				keyEquivalent: @""];
+	                   action: NULL 
+	            keyEquivalent: @""];
 	[[appMenu itemWithTitle: _(@"Services")] 
 		setSubmenu: AUTORELEASE([[NSMenu alloc] initWithTitle: @""])];
-		
+
 	[appMenu addItem: [NSMenuItem separatorItem]];
-	
+
 	[appMenu addItemWithTitle: hideTitle 
 	                   action: @selector(hide:) 
-				keyEquivalent: @"h"];
+	            keyEquivalent: @"h"];
 	[appMenu addItemWithTitle: _(@"Hide Others") 
 	                   action: @selector(hideOtherApplications:) 
-				keyEquivalent: @""];
+	            keyEquivalent: @""];
 	[appMenu addItemWithTitle: _(@"Show All") 
 	                   action: @selector(unhideAllApplications:) 
-				keyEquivalent: @""];
-				
+	            keyEquivalent: @""];
+
 	[appMenu addItem: [NSMenuItem separatorItem]];
-	
+
 	[appMenu addItemWithTitle: quitTitle 
 	                   action: @selector(terminate:) 
-				keyEquivalent: @"q"];  
-   
-   return appMenu;
+	            keyEquivalent: @"q"];  
+
+	return appMenu;
 }
 
 - (void) _setUpAppMenu
@@ -187,7 +239,7 @@
 {
 	NSMenu *appMenu = [self applicationMenu];
 	int insertionIndex = -1; 
-	
+
 #ifdef GNUSTEP
 	if ([[appMenu menuRepresentation] isHorizontal])
 		insertionIndex = [appMenu indexOfItemWithTitle: _(@"Hide")];
@@ -207,22 +259,20 @@
 	return [[[self mainMenu] itemAtIndex: 0] submenu];
 }
 
-/** Returns the visible development menu if there is one already inserted in the 
-	menu bar, otherwise builds a new instance and returns it. */
+/** Returns the visible development menu if there is one already inserted in the
+menu bar, otherwise builds a new instance and returns it. */
 - (NSMenuItem *) developmentMenuItem
 {
-	NSMenuItem *devMenuItem = [[self mainMenu] itemWithTag: DEVMENU_TAG];
+	NSMenuItem *devMenuItem = (id)[[self mainMenu] itemWithTag: ETDevelopmentMenuTag];
 	NSMenu *menu = nil;
 
 	if (devMenuItem != nil)
 		return devMenuItem;
 
-	devMenuItem = [[NSMenuItem alloc] initWithTitle: _(@"Development")
-		action: NULL keyEquivalent:@""];
-	[devMenuItem setTag: DEVMENU_TAG];
-	menu = [[NSMenu alloc] initWithTitle: _(@"Development")];
-	[devMenuItem setSubmenu: menu];
-	RELEASE(menu);
+	devMenuItem = [NSMenuItem menuItemWithTitle: _(@"Development")
+	                                        tag: ETDevelopmentMenuTag
+	                                     action: NULL];
+	menu = [devMenuItem submenu];
 
 	/* Builds and inserts menu items into the new dev menu */
 
@@ -237,23 +287,67 @@
 	[menu addItemWithTitle:  _(@"Inspect Selection")
 	                action: @selector(inspectSelection:) 
 	         keyEquivalent: @""];
-	
+
 	[menu addItemWithTitle: _(@"Browse")
 	                action: @selector(browse:) 
 	         keyEquivalent: @""];
 
 	[menu addItemWithTitle: _(@"Browse Layout Item Tree")
 	                action: @selector(browseLayoutItemTree:) 
-             keyEquivalent: @""];
+	         keyEquivalent: @""];
 
-	return AUTORELEASE(devMenuItem);
+	return devMenuItem;
+}
+
+/** Returns the visible Arrange menu if there is one already inserted in the 
+menu bar, otherwise builds a new instance and returns it. */
+- (NSMenuItem *) arrangeMenuItem
+{
+	NSMenuItem *menuItem = (id)[[self mainMenu] itemWithTag: ETArrangeMenuTag];
+	NSMenu *menu = [menuItem submenu];
+
+	if (menuItem != nil)
+		return menuItem;
+
+	menuItem = [NSMenuItem menuItemWithTitle: _(@"Arrange")
+	                                     tag: ETArrangeMenuTag
+	                                  action: NULL];
+	menu = [menuItem submenu];
+
+	[menu addItemWithTitle: _(@"Bring Forward")
+	                action: @selector(bringForward:)
+	         keyEquivalent: @""];
+
+	[menu addItemWithTitle: _(@"Bring To Front")
+	                action: @selector(bringToFront:)
+	         keyEquivalent: @""];
+
+	[menu addItemWithTitle:  _(@"Send Backward")
+	                action: @selector(sendBackward:)
+	         keyEquivalent: @""];
+
+	[menu addItemWithTitle: _(@"Send To Back")
+	                action: @selector(sendToBack:)
+	         keyEquivalent: @""];
+
+	[menu addItem: [NSMenuItem separatorItem]];
+
+	[menu addItemWithTitle: _(@"Group")
+	                action: @selector(group:)
+	         keyEquivalent: @""];
+
+	[menu addItemWithTitle: _(@"Ungroup")
+	                action: @selector(ungroup:)
+	         keyEquivalent: @""];
+
+	return menuItem;
 }
 
 /* Actions */
 
 /** Returns the same target than -[NSApplication targetForAction:], except that 
-    it extends the responder chain to include ETPersistencyController right 
-    after the application delegate (and eventually NSDocumentController too). */
+it extends the responder chain to include ETPersistencyController right after
+the application delegate (and eventually NSDocumentController too). */
 - (id) targetForAction: (SEL)anAction
 {
 	id target = [super targetForAction: anAction];
@@ -275,7 +369,8 @@
 
 - (IBAction) toggleDevelopmentMenu: (id)sender
 {
-	NSMenuItem *devMenuItem = [[self mainMenu] itemWithTag: DEVMENU_TAG];
+	NSMenuItem *devMenuItem = (id)[[self mainMenu] 
+		itemWithTag: ETDevelopmentMenuTag];
 
 	if (devMenuItem == nil) /* Show dev menu */
 	{
@@ -293,6 +388,53 @@
 - (IBAction) toggleLiveDevelopment: (id)sender
 {
 	ETLog(@"Toggle live dev");
+}
+
+@end
+
+@implementation NSMenuItem (Etoile)
+
+/** Returns an autoreleased menu item already associated with an empty submenu. */ 
++ (NSMenuItem *) menuItemWithTitle: (NSString *)aTitle 
+                               tag: (int)aTag
+                            action: (SEL)anAction
+{
+	NSMenuItem *menuItem = AUTORELEASE([[NSMenuItem alloc] initWithTitle: aTitle
+		action: anAction keyEquivalent: @""]);
+
+	[menuItem setTag: aTag];
+	NSMenu *menu = [[NSMenu alloc] initWithTitle: aTitle];
+	[menuItem setSubmenu: menu];
+	RELEASE(menu);
+
+	return menuItem;
+}
+
+@end
+
+@implementation NSMenu (Etoile)
+
+/** Adds a menu item initialized with the given parameters to the receiver. */ 
+- (void) addItemWithTitle: (NSString *)aTitle
+                   target: (id)aTarget
+                   action: (SEL)anAction
+            keyEquivalent: (NSString *)aKey
+{
+	NSMenuItem *menuItem = AUTORELEASE([[NSMenuItem alloc] initWithTitle: aTitle
+		action: anAction keyEquivalent: @""]);
+	[menuItem setTarget: aTarget];
+	[self addItem: menuItem];
+}
+
+/** Adds a menu item with a submenu to the receiver. 
+
+The submenu title is set as the menu item title. */ 
+- (void) addItemWithSubmenu: (NSMenu *)aMenu
+{
+	NSMenuItem *menuItem = AUTORELEASE([[NSMenuItem alloc] initWithTitle: [aMenu title]
+		action: NULL keyEquivalent: @""]);
+	[menuItem setSubmenu: aMenu];
+	[self addItem: menuItem];
 }
 
 @end

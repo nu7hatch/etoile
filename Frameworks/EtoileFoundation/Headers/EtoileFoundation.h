@@ -54,18 +54,19 @@
 #import <EtoileFoundation/NSURL+Etoile.h>
 #import <EtoileFoundation/ETCollection.h>
 #import <EtoileFoundation/ETPropertyValueCoding.h>
-#import <EtoileFoundation/ETPrototype.h>
 #import <EtoileFoundation/ETObjectRegistry.h>
 #import <EtoileFoundation/ETObjectChain.h>
 #import <EtoileFoundation/ETFilter.h>
 #import <EtoileFoundation/ETRendering.h>
 #import <EtoileFoundation/ETUUID.h>
 #import <EtoileFoundation/ETGetOptionsDictionary.h>
+#import <EtoileFoundation/ETUTI.h>
 
 #ifdef GNUSTEP
 
 #import <EtoileFoundation/ETCArray.h>
 #import <EtoileFoundation/NSObject+Mixins.h>
+#import <EtoileFoundation/NSObject+Prototypes.h>
 
 /* EtoileFoundation subframeworks */
 

@@ -7,7 +7,7 @@ ADDITIONAL_OBJCFLAGS += -I.
 
 FRAMEWORK_NAME = EtoileUI
 PROJECT_NAME = $(FRAMEWORK_NAME)
-VERSION = 0.4
+VERSION = 0.4.1
 
 EtoileUI_LIBRARIES_DEPEND_UPON += -lm -lEtoileFoundation \
 	$(GUI_LIBS) $(FND_LIBS) $(OBJC_LIBS) $(SYSTEM_LIBS)
@@ -28,7 +28,7 @@ endif
 EtoileUI_HEADER_FILES_DIR = Headers
 
 EtoileUI_HEADER_FILES = \
-        Controls+Etoile.h \
+	Controls+Etoile.h \
 	ETApplication.h \
 	ETBrowserLayout.h \
 	ETCompatibility.h \
@@ -39,6 +39,7 @@ EtoileUI_HEADER_FILES = \
 	ETEvent.h \
 	ETFlowLayout.h \
 	ETFreeLayout.h \
+	ETGeometry.h \
 	ETInspecting.h \
 	ETInspector.h \
 	ETLayer.h \
@@ -60,6 +61,7 @@ EtoileUI_HEADER_FILES = \
 	ETPaneSwitcherLayout.h \
 	ETPersistencyController.h \
 	ETPickboard.h \
+	ETShape.h \
 	ETStackLayout.h \
 	ETStyle.h \
 	ETStyleRenderer.h \

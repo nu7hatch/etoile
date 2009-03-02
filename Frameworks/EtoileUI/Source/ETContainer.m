@@ -36,21 +36,21 @@
 
 #import <EtoileFoundation/NSIndexSet+Etoile.h>
 #import <EtoileFoundation/NSIndexPath+Etoile.h>
-#import <EtoileUI/ETContainer.h>
-#import <EtoileUI/ETContainer+Controller.h>
-#import <EtoileUI/ETLayoutItem.h>
-#import <EtoileUI/ETLayoutItem+Factory.h>
-#import <EtoileUI/ETLayoutItem+Events.h>
-#import <EtoileUI/ETEvent.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-#import <EtoileUI/ETLayout.h>
-#import <EtoileUI/ETLayer.h>
-#import <EtoileUI/ETInspector.h>
-#import <EtoileUI/ETPickboard.h>
-#import <EtoileUI/NSView+Etoile.h>
-#import <EtoileUI/ETCompatibility.h>
+#import "ETContainer.h"
+#import "ETContainer+Controller.h"
+#import "ETLayoutItem.h"
+#import "ETLayoutItem+Factory.h"
+#import "ETLayoutItem+Events.h"
+#import "ETEvent.h"
+#import "ETLayoutItemGroup.h"
+#import "ETLayout.h"
+#import "ETLayer.h"
+#import "ETInspector.h"
+#import "ETPickboard.h"
+#import "NSObject+EtoileUI.h"
+#import "NSView+Etoile.h"
+#import "ETCompatibility.h"
 
-NSString *ETContainerSelectionDidChangeNotification = @"ETContainerSelectionDidChangeNotification";
 NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace by UTI
 
 @interface ETContainer (ETEventHandling)
@@ -74,7 +74,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 - (ETLayoutItem *) cachedScrollViewDecoratorItem;
 - (ETLayoutItem *) createScrollViewDecoratorItem;
 - (BOOL) doesSelectionContainsPoint: (NSPoint)point;
-- (void) fixOwnerIfNeededForItem: (ETLayoutItem *)item;
 @end
 
 
@@ -141,14 +140,8 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	if (self != nil)
     {
 		[self setRepresentedPath: @"/"];
-		[self setTemplateItem: nil];
-		[self setTemplateItemGroup: nil];
 		_subviewHitTest = NO;
-		[self setFlipped: YES];
 		_itemScale = 1.0;
-		// NOTE: Not in use currently (see ivars in the header)
-		//_selection = [[NSMutableIndexSet alloc] init];
-		_selectionShape = nil;
 		_dragAllowed = YES;
 		_dropAllowed = YES;
 		[self setShouldRemoveItemsAtPickTime: NO];
@@ -156,7 +149,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 		[self setAllowsEmptySelection: YES];
 		_prevInsertionIndicatorRect = NSZeroRect;
 		_scrollViewDecorator = nil; /* First instance created by calling private method -setShowsScrollView: */
-		_inspector = nil; /* Instantiated lazily in -inspector if needed */
 		
 		[self registerForDraggedTypes: [NSArray arrayWithObjects:
 			ETLayoutItemPboardType, nil]];
@@ -173,18 +165,15 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 
 - (void) dealloc
 {
-	// FIXME: Clarify memory management of _displayView and _scrollView
+	/* NOTE: _layoutView is a weak reference (we retain it indirectly as a 
+	   subview though).
+	   We are owned by our layout item which retains its layout which itself 
+	   retains the layout view. Each time the layout is switched on -layoutItem, 
+	   we must update _layoutView with -setLayoutView: otherwise the ivar might 
+	   reference a freed object. See -[ETLayoutItemGroup setLayout:]. */
 	DESTROY(_doubleClickedItem);
-	DESTROY(_displayView);
-	DESTROY(_path);
-	// NOTE: Not in use currently
-	//DESTROY(_selection);
-	DESTROY(_selectionShape);
-	DESTROY(_inspector);
-	DESTROY(_templateItem);
-	DESTROY(_templateItemGroup);
-	_dataSource = nil;
-    
+	DESTROY(_scrollViewDecorator);
+
     [super dealloc];
 }
 
@@ -201,8 +190,8 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 		id itemViews = [[self items] valueForKey: @"displayView"];
 
 		ETDebugLog(@"> Won't be encoded");	
-		if ([self displayView] != nil)	
-			[archivableSubviews removeObject: [self displayView]];
+		if ([self layoutView] != nil)	
+			[archivableSubviews removeObject: [self layoutView]];
 		[itemViews removeObjectsInArray: archivableSubviews];
 		return archivableSubviews;
 	}
@@ -235,8 +224,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	          forKey: @"ETDoubleAction"];
 	[coder encodeObject: [self target] forKey: @"ETTarget"];
 	[coder encodeFloat: [self itemScaleFactor] forKey: @"ETItemScaleFactor"];
-	// FIXME: selectionShape not yet implemented
-	//[coder encodeObject: [self selectionShape] forKey: @"ETSelectionShape"];
 
 	[coder encodeBool: [self allowsEmptySelection] 
 	           forKey: @"ETAllowsMultipleSelection"];
@@ -273,7 +260,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 		NSSelectorFromString([coder decodeObjectForKey: @"ETDoubleAction"])];
 	[self setTarget: [coder decodeObjectForKey: @"ETTarget"]];
 	[self setItemScaleFactor: [coder decodeFloatForKey: @"ETItemScaleFactor"]];
-	//[self setSelectionShape: [coder decodeObjectForKey: @"ETSelectionShape"]];
 
 	[self setAllowsMultipleSelection: 
 		[coder decodeBoolForKey: @"ETAllowsMultipleSelection"]];
@@ -287,10 +273,12 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	return self;
 }
 
-#if 0
-- (void) copyWithZone: (NSZone *)zone
+// TODO: Finish to implement once ETContainer is cleaned.
+// If we decide to use EtoileSerialize here, we also have to update 
+// -[NSView(Etoile) copyWithZone:].
+- (id) copyWithZone: (NSZone *)zone
 {
-	#ifndef ETOILE_SERIALIZE
+#ifndef ETOILE_SERIALIZE
 	id container = [super copyWithZone: zone];
 	
 	/* Copy objects which doesn't support encoding usually or must not be copied
@@ -298,13 +286,12 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	[container setSource: [self source]];
 	[container setDelegate: [self delegate]];
 	
-	
 	return container;
-	#else
+#else
 	
-	#endif
-}
 #endif
+}
+
 /** Deep copies are never created by the container itself, but they are instead
 	delegated to the item group returned by -layoutItem. When the layout item
 	receives a deep copy request it will call back -copy on each view (including
@@ -329,9 +316,10 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 - (id) deepCopy
 {
 	id item = [[self layoutItem] deepCopy];
-	id container = [item view];
+	id container = [item supervisorView];
 	
-	//NSAssert3([container isKindOfClass: [ETContainer class]], 
+	// TODO: Finish to implement...
+	// NSAssert3([container isKindOfClass: [ETContainer class]], 
 	
 	return container;
 }
@@ -351,235 +339,18 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	return [self description];
 }
 
-/** Returns the layout item representing the receiver container in the layout
-	item tree. Layout item representing a container is always an instance of
-	ETLayoutItemGroup class kind (and not ETLayoutItem unlike ETView).
-	Never returns nil. */
+/** Returns the layout item to which the receiver is bound to. 
+
+This layout item can only be an ETLayoutItemGroup instance unlike ETView. See 
+also -[ETView setLayoutItem:].
+
+Never returns nil. */
 - (id) layoutItem
 {
-	/*NSAssert([[super layoutItem] isGroup], 
-		@"Layout item in a container must of ETLayoutItemGroup type");*/
 	if ([[super layoutItem] isGroup] == NO)
-		ETLog(@"Layout item in a container must of ETLayoutItemGroup type");
+		ETLog(@"WARNING: Layout item in a container must of ETLayoutItemGroup type");
+
 	return [super layoutItem];
-}
-
-/* Basic Accessors */
-
-/** Returns the represented path which is the model path whose content is 
-	currently displayed in the receiver. It is useful to keep track of your 
-	location inside the model currently browsed. Tree-related methods 
-	implemented by a data source are passed paths which are subpaths of the 
-	represented path.
-	This path is used as the represented path base in the layout item 
-	representing the receiver. [self representedPath] and
-	[[self layoutItem] representedPathBase] are equal and must always be.
-	[[self layoutItem] representedPath] returns a path which is also identical
-	to the previous methods. See ETLayoutItem and ETLayoutItemGroup to know 
-	more about path management and understand the difference between a 
-	represented path base and a represented path.
-	Finally take note represented paths are relative to the container unlike 
-	paths returned by -[ETLayoutItem path] which are absolute paths. */
-- (NSString *) representedPath
-{
-	return _path;
-}
-
-/** Sets the represented path. Path is only critical when a source is used, 
-	otherwise it's up to the developer to track the level of navigation inside 
-	the tree structure. 
-	Without a source, you can use -setRepresentedPath: as a conveniency to 
-	memorize the location currently displayed by the container. In this case, 
-	each time the user enters a new level, you are in charge of removing then 
-	adding the proper items which are associated with the level requested by 
-	the user. Implementing a data source, alleviates you from this task,
-	you simply need to return the items, EtoileUI will build takes care of 
-	building and managing the tree structure. 
-	To set a represented path turning the container into an entry point in your
-	model, you should use paths like '/', '/blabla/myModelObjectName'
-	You cannot pass an empty string to this method or it will throw an invalid
-	argument exception. If you want no represented path, use nil.
-	-representedPath is also used by ETLayoutItem as a represented path base, 
-	turning the item group related to the container into a base item which 
-	handles events. See also -representedPath, -[ETLayoutItem baseItem] and 
-	-[ETLayoutItem representedPathBase]. */
-- (void) setRepresentedPath: (NSString *)path
-{
-	if ([path isEqual: @""])
-	{
-		[NSException raise: NSInvalidArgumentException format: @"For %@ "
-			@"-setRepresentedPath argument must never be an empty string", self];
-		
-	}
-	
-	ASSIGN(_path, path);
-	
-	// NOTE: If the selection is cached, here the cache should be cleared
-	// [_selection removeAllIndexes]; /* Unset any selection */
-	[self updateLayout];
-}
-
-/** Returns the source which provides the content displayed by the receiver. 
-	A source implements either ETIndexSource or ETPathSource protocols.
-	If the container handles the layout item tree directly without the help of
-	a source object, then this method returns nil.*/
-- (id) source
-{
-	return _dataSource;
-}
-
-/** Sets the source which provides the content displayed by the receiver. 
-	A source can be any objects conforming to ETIndexSource or ETPathSource
-	protocol, both are variants of ETSource abstract protocol.
-	So you can write you own data source object by implementing either:
-	1) numberOfItemsInContainer:
-	   container:itemAtIndex:
-	2) container:numberOfItemsAtPath:
-	   container:itemAtPath:
-	Another common solution is to use an off-the-shelf controller object like
-	ETController, ETTreeController etc. which implements the source protocol
-	for you. This works well for basic stuff and brings extra flexibility at
-	runtime: you can edit how the controller access the model or simply 
-	replaces it by a different one.
-	A third solution is to use a component. EtoileUI implements a category on 
-	ETComponent (EtoileFoundation class) and this category conforms to 
-	ETPathSource protocol. Then every components can be used as a content 
-	provider for the receiver.
-	By calling -setComponent:, the input source of the component parameter will
-	automatically be set as the source of the receiver, replacing any 
-	previously set source. Usually you create a new component with 
-	-initWithContainer: or -initWithLayoutItem: which handles -setComponent:
-	call. 
-	Take note that modifying a source is followed by a layout update, the new 
-	content is immediately loaded and displayed. By setting a source, the
-	receiver represented path is automatically set to '/' unless another path 
-	was set previously. If you pass nil to get rid of a source, the represented
-	path isn't reset to nil but keeps its actual value in order to maintain it 
-	as a base item and avoid disturbing the related event handling logic. */
-//- (void) setSource: (id <ETSource>)source
-- (void) setSource: (id)source
-{
-	/* By safety, avoids to trigger extra updates */
-	if (_dataSource == source)
-		return;
-	
-	/* Also resets any particular state associated with the container like
-	   selection */
-	[self removeAllItems];
-	
-	_dataSource = source;
-	
-	// NOTE: -setPath: takes care of calling -updateLayout
-	if (source != nil && ([self representedPath] == nil || [[self representedPath] isEqual: @""]))
-	{
-		[self setRepresentedPath: @"/"];
-	}
-}
-
-- (id) delegate
-{
-	return _delegate;
-}
-
-- (void) setDelegate: (id)delegate
-{
-	_delegate = delegate;
-}
-
-/* Layout */
-
-/** See -[ETLayoutItemGroup isAutolayout] */
-- (BOOL) isAutolayout
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] isAutolayout];
-}
-
-/** See -[ETLayoutItemGroup setAutolayout:] */
-- (void) setAutolayout: (BOOL)flag
-{
-	[(ETLayoutItemGroup *)[self layoutItem] setAutolayout: flag];
-}
-
-/** See -[ETLayoutItemGroup canUpdateLayout] */
-- (BOOL) canUpdateLayout
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] canUpdateLayout];
-}
-
-/** See -[ETLayoutItemGroup updateLayout] */
-- (void) updateLayout
-{
-	[[self layoutItem] updateLayout];
-}
-
-/** See -[ETLayoutItemGroup reloadAndUpdateLayout] */
-- (void) reloadAndUpdateLayout
-{
-	[(ETLayoutItemGroup *)[self layoutItem] reloadAndUpdateLayout];
-}
-
-/** Returns 0 when source doesn't conform to any parts of ETContainerSource 
-	informal protocol.
-    Returns 1 when source conform to protocol for flat collections and display 
-	of items in a linear style.
-	Returns 2 when source conform to protocol for tree collections and display 
-	of items in a hiearchical style.
-	If tree collection part of the protocol is implemented through 
-	-container:numberOfItemsAtPath: , ETContainer by default ignores flat 
-	collection part of protocol like -numberOfItemsInContainer. */
-- (int) checkSourceProtocolConformance
-{
-	if ([[self source] isEqual: [self layoutItem]])
-	{
-		return 3;
-	}
-	else if ([[self source] respondsToSelector: @selector(container:numberOfItemsAtPath:)])
-	{
-		if ([[self source] respondsToSelector: @selector(container:itemAtPath:)])
-		{
-			return 2;
-		}
-		else
-		{
-			ETLog(@"%@ implements container:numberOfItemsAtPath: but misses "
-				  @"container:itemAtPath: as requested by ETContainerSource "
-				  @"protocol.", [self source]);
-			return 0;
-		}
-	}
-	else if ([[self source] respondsToSelector: @selector(numberOfItemsInContainer:)])
-	{
-		if ([[self source] respondsToSelector: @selector(container:itemAtIndex:)])
-		{
-			return 1;
-		}
-		else
-		{
-			ETLog(@"%@ implements numberOfItemsInContainer: but misses "
-				  @"container:itemAtIndex as  requested by "
-				  @"ETContainerSource protocol.", [self source]);
-			return 0;
-		}
-	}
-	else
-	{
-		ETLog(@"%@ implements neither numberOfItemsInContainer: nor "
-			  @"container:numberOfItemsAtPath: as requested by "
-			  @"ETContainerSource protocol.", [self source]);
-		return 0;
-	}
-}
-
-/** See -[ETLayoutItemGroup layout] */
-- (ETLayout *) layout
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] layout];
-}
-
-/** See -[ETLayoutItemGroup setLayout] */
-- (void) setLayout: (ETLayout *)layout
-{
-	[(ETLayoutItemGroup *)[self layoutItem] setLayout: layout];
 }
 
 /* Private helper methods to sync display view and container */
@@ -591,7 +362,7 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 {
 	NSInvocation *inv = nil;
 	
-	if (_displayView != nil)
+	if (_layoutView != nil)
 	{
 		SEL doubleAction = @selector(forwardDoubleActionFromLayout:);
 		id target = self;
@@ -649,14 +420,14 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 {
 	//id result = [[inv methodSignature] methodReturnLength];
 	
-	if ([_displayView respondsToSelector: [inv selector]])
+	if ([_layoutView respondsToSelector: [inv selector]])
 	{
-			[inv invokeWithTarget: _displayView];
+			[inv invokeWithTarget: _layoutView];
 	}
-	else if ([_displayView isKindOfClass: [NSScrollView class]])
+	else if ([_layoutView isKindOfClass: [NSScrollView class]])
 	{
 		/* May be the display view is packaged inside a scroll view */
-		id enclosedDisplayView = [(NSScrollView *)_displayView documentView];
+		id enclosedDisplayView = [(NSScrollView *)_layoutView documentView];
 		
 		if ([enclosedDisplayView respondsToSelector: [inv selector]]);
 			[inv invokeWithTarget: enclosedDisplayView];
@@ -674,7 +445,7 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
     scroll view, otherwise the returned view is identical to -layoutView. */
 - (NSView *) layoutViewWithoutScrollView
 {
-	id layoutView = [self displayView];
+	id layoutView = [self layoutView];
 
 	if ([layoutView isKindOfClass: [NSScrollView class]])
 		return [layoutView documentView];
@@ -707,69 +478,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	}
 }
 
-/* Inspecting */
-
-- (IBAction) inspect: (id)sender
-{
-	ETDebugLog(@"Inspect %@", self);
-	[[[self inspector] panel] makeKeyAndOrderFront: self];
-}
-
-- (IBAction) inspectSelection: (id)sender
-{
-	ETDebugLog(@"Inspect %@ selection", self);
-	
-	NSArray *selectedItems = [(id)[self layoutItem] selectedItemsInLayout];
-	id inspector = [self inspectorForItems: selectedItems];
-	
-	[[inspector panel] makeKeyAndOrderFront: self];
-}
-
-- (void) setInspector: (id <ETInspector>)inspector
-{
-	ASSIGN(_inspector, inspector);
-}
-
-/** Returns inspector based on selection unlike ETLayoutItem.
-	If the inspector hasn't been set by calling -setInspector:, it gets lazily
-	instantiated when this accessors is called. */
-- (id <ETInspector>) inspector
-{
-	return [self inspectorForItems: [NSArray arrayWithObject: [self layoutItem]]];
-}
-
-- (id <ETInspector>) inspectorForItems: (NSArray *)items
-{
-	if (_inspector == nil)
-		_inspector = [[ETInspector alloc] init];
-		
-	[_inspector setInspectedItems: items];
-	
-	return _inspector;
-}
-
-/** Returns whether the receiver uses flipped coordinates or not. 
-	Default returned value is YES. */
-- (BOOL) isFlipped
-{
-#ifdef USE_NSVIEW_RFLAGS
- 	return _rFlags.flipped_view;
-#else
-	return _flipped;
-#endif
-}
-
-/** Unlike NSView, ETContainer uses flipped coordinates by default in order to 
-	simplify layout computation.
-	You can revert to non-flipped coordinates by passing NO to this method. */
-- (void) setFlipped: (BOOL)flag
-{
-#ifdef USE_NSVIEW_RFLAGS
-	_rFlags.flipped_view = flag;
-#else
-	_flipped = flag;
-#endif
-}
 
 /* Scrollers */
 
@@ -817,7 +525,10 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	decorator chain bound to its layout item. */
 - (void) setHasVerticalScroller: (BOOL)scroll
 {
-	[self setShowsScrollView: YES];
+	if (scroll)
+	{
+		[self setShowsScrollView: YES];
+	}
 	[[self scrollView] setHasVerticalScroller: scroll];
 	
 	/* Updated NSBrowser, NSOutlineView enclosing scroll view etc. */
@@ -838,7 +549,10 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	decorator chain bound to its layout item. */
 - (void) setHasHorizontalScroller: (BOOL)scroll
 {
-	[self setShowsScrollView: YES];
+	if (scroll)
+	{
+		[self setShowsScrollView: YES];
+	}
 	[[self scrollView] setHasHorizontalScroller: scroll];
 	
 	/* Updated NSBrowser, NSOutlineView enclosing scroll view etc. */
@@ -985,7 +699,7 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 
 	// FIXME: Asks layout whether it handles scroll view itself or not. If 
 	// needed like with table layout, delegate scroll view handling.
-	BOOL layoutHandlesScrollView = ([self displayView] != nil);
+	BOOL layoutHandlesScrollView = ([self layoutView] != nil);
 	
 	_scrollViewShown = show;
 
@@ -1013,49 +727,49 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	scrollViewWrapper = [[ETScrollView alloc] initWithFrame: [self frame]];
 	AUTORELEASE(scrollViewWrapper);
 
+	NSScrollView *scrollView = (NSScrollView *)[scrollViewWrapper mainView];
+	BOOL noVisibleScrollers = ([scrollView hasVerticalScroller] == NO &&
+		[scrollView hasHorizontalScroller] == NO);
+	NSAssert2(noVisibleScrollers, @"New scrollview %@ wrapper is expected have "
+		"no visible scrollers to be used by %@", scrollViewWrapper, self);
+
 	return [scrollViewWrapper layoutItem];
 }
 
-/** Returns the view that takes care of the display. Most of time it is equal
-    to the container itself. But for some layout like ETTableLayout, the 
-	returned view would be an NSTableView instance. */
-- (NSView *) displayView
+/** Returns the custom view that might have been provided by the layout set 
+on -layoutItem.
+
+Returns nil by default. Only returns a view when a view-based layout is used, 
+see layout view related methods in ETLayout. */
+- (NSView *) layoutView
 {
-	return _displayView;
+	return _layoutView;
 }
 
-/** Never calls this method unless you write an ETLayout subclass.
-	Method called when we switch between layouts. Manipulating the display view
-	is the job of ETContainer, ETLayout instances may provide display view
-	prototype but they never never manipulate it as a subview in view hierachy. */
-- (void) setDisplayView: (NSView *)view
+/** Sets the custom view provided by the layout set on -layoutItem. 
+
+Never calls this method unless you write an ETLayout subclass.
+
+Method called when we switch between layouts. Manipulating the layout view is 
+the job of ETContainer, ETLayout instances may provide a layout view prototype
+but they never never manipulate it as a subview in view hierachy. */
+- (void) setLayoutView: (NSView *)view
 {
-	if (_displayView == nil && view == nil)
+	if (_layoutView == nil && view == nil)
 		return;
-	if (_displayView == view && (_displayView != nil || view != nil))
+
+	if (_layoutView == view && (_layoutView != nil || view != nil))
 	{
 		ETLog(@"WARNING: Trying to assign an identical display view to container %@", self);
 		return;
 	}
 	
-	[_displayView removeFromSuperview];
-	
-	_displayView = view;
-	
-	/* Be careful with scroll view code, it will call -displayView and thereby
-	   needs up-to-date _displayView */
-	/*if (view != nil && [self scrollView] != nil)
-	{
-		if ([self isScrollViewShown])
-			[self setShowsScrollView: NO];
-	}
-	else if (view == nil && [self scrollView] != nil)
-	{
-		if ([self isScrollViewShown] == NO)
-			[self setShowsScrollView: YES];		
-	}*/
-	
-	if (view != nil)
+	[_layoutView removeFromSuperview];
+	/* Retain indirectly by our layout item which retains the layout that 
+	   provides this view. Also retain as a subview by us just below. */
+	_layoutView = view; 
+
+	if (view != nil) /* Set up layout view */
 	{
 		[self hidesScrollViewDecoratorItem];
 		
@@ -1067,7 +781,7 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 		
 		[self syncDisplayViewWithContainer];
 	}
-	else
+	else /* Tear down layout view */
 	{
 		if ([self isScrollViewShown])
 			[self unhidesScrollViewDecoratorItem];		
@@ -1095,178 +809,7 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 }
 */
 
-/*  Manipulating Layout Item Tree */
-
-/** See -[ETLayoutItemGroup addItem:] */
-- (void) addItem: (ETLayoutItem *)item
-{
-	[(ETLayoutItemGroup *)[self layoutItem] addItem: item];
-}
-
-/** See -[ETLayoutItemGroup insertItem:atIndex:] */
-- (void) insertItem: (ETLayoutItem *)item atIndex: (int)index
-{
-	[(ETLayoutItemGroup *)[self layoutItem] insertItem: item atIndex: index];
-}
-
-/** See -[ETLayoutItemGroup removeItem:] */
-- (void) removeItem: (ETLayoutItem *)item
-{
-	[(ETLayoutItemGroup *)[self layoutItem] removeItem: item];
-}
-
-/** See -[ETLayoutItemGroup removeItem:atIndex:] */
-- (void) removeItemAtIndex: (int)index
-{
-	[(ETLayoutItemGroup *)[self layoutItem] removeItemAtIndex: index];
-}
-
-/** See -[ETLayoutItemGroup itemAtIndex:] */
-- (ETLayoutItem *) itemAtIndex: (int)index
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] itemAtIndex: index];
-}
-
-/** See -[ETLayoutItemGroup addItems:] */
-- (void) addItems: (NSArray *)items
-{
-	[(ETLayoutItemGroup *)[self layoutItem] addItems: items];
-}
-
-/** See -[ETLayoutItemGroup removeItems] */
-- (void) removeItems: (NSArray *)items
-{
-	[(ETLayoutItemGroup *)[self layoutItem] removeItems: items];
-}
-
-/** See -[ETLayoutItemGroup removeAllItems] */
-- (void) removeAllItems
-{
-	[(ETLayoutItemGroup *)[self layoutItem] removeAllItems];
-}
-
-/** See -[ETLayoutItemGroup indexOfItem:] */
-- (int) indexOfItem: (ETLayoutItem *)item
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] indexOfItem: item];
-}
-
-/** See -[ETLayoutItemGroup containsItem:] */
-- (BOOL) containsItem: (ETLayoutItem *)item
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] containsItem: item];
-}
-
-/** See -[ETLayoutItemGroup numberOfItems] */
-- (int) numberOfItems
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] numberOfItems];
-}
-
-/** See -[ETLayoutItemGroup items] */
-- (NSArray *) items
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] items];
-}
-
 /* Selection */
-
-/** See -[ETLayoutItemGroup selectedItemsInLayout] */
-- (NSArray *) selectedItemsInLayout
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] selectedItemsInLayout];
-}
-
-/** See -[ETLayoutItemGroup selectionIndexPaths] */
-- (NSArray *) selectionIndexPaths
-{
-	return [(ETLayoutItemGroup *)[self layoutItem] selectionIndexPaths];
-}
-
-/** See -[ETLayoutItemGroup setSelectionIndexPaths] */
-- (void) setSelectionIndexPaths: (NSArray *)indexPaths
-{
-	[(ETLayoutItemGroup *)[self layoutItem] setSelectionIndexPaths: indexPaths];
-	
-	// FIXME: Move this code into -[ETLayoutItemGroup setSelectionIndexPaths:]
-	/* Finally propagate changes by posting notification */
-	NSNotification *notif = [NSNotification 
-		notificationWithName: ETContainerSelectionDidChangeNotification object: self];
-	
-	if ([[self delegate] respondsToSelector: @selector(containerSelectionDidChange:)])
-		[[self delegate] containerSelectionDidChange: notif];
-
-	[[NSNotificationCenter defaultCenter] postNotification: notif];
-	
-	/* Reflect selection change immediately */
-	[self display];
-}
-
-/** Sets the selected items identified by indexes in the receiver and discards 
-	any existing selection index paths previously set. */
-- (void) setSelectionIndexes: (NSIndexSet *)indexes
-{
-	int numberOfItems = [[self items] count];
-	int lastSelectionIndex = [[self selectionIndexes] lastIndex];
-	
-	ETDebugLog(@"Set selection indexes to %@ in %@", indexes, self);
-	
-	if (lastSelectionIndex > (numberOfItems - 1) && lastSelectionIndex != NSNotFound) /* NSNotFound is a big value and not -1 */
-	{
-		ETLog(@"WARNING: Try to set selection index %d when container %@ only contains %d items",
-			lastSelectionIndex, self, numberOfItems);
-		return;
-	}
-
-	/* Update selection */
-	[self setSelectionIndexPaths: [indexes indexPaths]];
-}
-
-/** Returns all indexes matching selected items which are immediate children of
-	the receiver. 
-	Put in another way, the method returns the first index of all index paths
-	with a length equal one. */
-- (NSMutableIndexSet *) selectionIndexes
-{
-	NSMutableIndexSet *indexes = [NSMutableIndexSet indexSet];
-	NSEnumerator *e = [[self selectionIndexPaths] objectEnumerator];
-	NSIndexPath *indexPath = nil;
-	
-	while ((indexPath = [e nextObject]) != nil)
-	{
-		if ([indexPath length] == 1)
-			[indexes addIndex: [indexPath firstIndex]];
-	}
-	
-	return indexes;
-}
-
-/** Sets the selected item identified by index in the receiver and discards 
-	any existing selection index paths previously set. */
-- (void) setSelectionIndex: (unsigned int)index
-{
-	ETDebugLog(@"Modify selection index from %d to %d of %@", [self selectionIndex], index, self);
-	
-	/* Check new selection validity */
-	NSAssert1(index >= 0, @"-setSelectionIndex: parameter must not be a negative value like %d", index);
-	
-	NSMutableIndexSet *indexes = [NSMutableIndexSet indexSet];
-	
-	if (index != NSNotFound)
-		[indexes addIndex: index];
-		
-	[self setSelectionIndexes: indexes];
-}
-
-/** Returns the index of the first selected item which is an immediate child of
-	the receiver. If there is none, returns NSNotFound. 
-	Calling this method is equivalent to [[self selectionIndexes] firstIndex].
-	Take note that -selectionIndexPaths may return one or multiple values when 
-	this method returns NSNotFound. See -selectionIndexes also. */
-- (unsigned int) selectionIndex
-{
-	return [[self selectionIndexes] firstIndex];
-}
 
 - (BOOL) allowsMultipleSelection
 {
@@ -1288,11 +831,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 {
 	_emptySelectionAllowed = empty;
 	[self syncDisplayViewWithContainer];
-}
-
-- (ETSelection *) selectionShape
-{
-	return _selectionShape;
 }
 
 /** point parameter must be expressed in receiver coordinates */
@@ -1332,17 +870,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	return hitSelection;
 #endif
 }
-
-/*
-- (ETSelection *) selection
-{
-	return _selection;
-}
-
-- (void) setSelection: (ETSelection *)
-{
-	_selection;
-} */
 
 /* Pick & Drop */
 
@@ -1394,80 +921,6 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 - (IBAction) cut: (id)sender
 {
 	[[[self layoutItem] eventHandler] cut: sender];
-}
-
-/* Layers */
-
-- (void) fixOwnerIfNeededForItem: (ETLayoutItem *)item
-{
-	/* Check the item to be now embedded in a new container (owned by the new 
-	   layer) isn't already owned by current container */
-	if ([[self items] containsObject: item])
-		[self removeItem: item];
-}
-
-- (void) addLayer: (ETLayoutItem *)item
-{
-	ETLayer *layer = [ETLayoutItem layerWithLayoutItem: item];
-	
-	/* Insert layer on top of the layout item stack */
-	if (layer != nil)
-		[self addItem: (ETLayoutItem *)layer];
-}
-
-- (void) insertLayer: (ETLayoutItem *)item atIndex: (int)layerIndex
-{
-	[self fixOwnerIfNeededForItem: item];
-	
-	ETLayer *layer = [ETLayoutItem layerWithLayoutItem: item];
-	
-	// FIXME: the insertion code is truly unefficient, it could prove to be
-	// a bottleneck when we have few hundreds of layout items.
-	if (layer != nil)
-	{
-		NSArray *layers = nil;
-		ETLayer *layerToMoveUp = nil;
-		int realIndex = 0;
-		
-		/*
-		           _layoutItems            by index (or z order)
-		     
-		               *****  <-- layer 2      4  <-- higher
-		   item          -                     3
-		   item          -                     2
-		               *****  <-- layer 1      1
-		   item          -                     0  <-- lower visual element (background)
-		   
-		   Take note that layout items embedded inside a layer have a 
-		   distinct z order. Rendering isn't impacted by this point.
-		   
-		  */
-		
-		/* Retrieve layers spread in _layoutItems */
-		layers = [[self items] objectsMatchingValue: [ETLayer class] forKey: @"class"];
-		/* Find the layer to be replaced in layers array */
-		layerToMoveUp = [layers objectAtIndex: layerIndex];
-		/* Retrieve the index in layoutItems array for this particular layer */
-		realIndex = [self indexOfItem: layerToMoveUp];
-		
-		/* Insertion will move replaced layer at index + 1 (to top) */
-		[self insertItem: layer atIndex: realIndex];
-	}
-}
-
-- (void) insertLayer: (ETLayoutItem *)item atZIndex: (int)z
-{
-
-}
-
-- (void) removeLayer: (ETLayoutItem *)item
-{
-
-}
-
-- (void) removeLayerAtIndex: (int)layerIndex
-{
-
 }
 
 /* Grouping and Stacking */
@@ -1565,7 +1018,7 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 	   as a display view, we simply return the subview provided by 
 	   -[NSView hitTest:]
 	   If hit test is turned on, everything should be handled as usual. */
-	if ([self displayView] || [self isHitTestEnabled] 
+	if ([self layoutView] || [self isHitTestEnabled] 
 	 || [subview isKindOfClass: [self class]])
 	{
 		return subview;
@@ -1679,44 +1132,220 @@ NSString *ETLayoutItemPboardType = @"ETLayoutItemPboardType"; // FIXME: replace 
 		[self updateLayout];
 }
 
-/* Collection Protocol */
+@end
 
-- (BOOL) isOrdered
+
+/* Deprecated (DO NOT USE, WILL BE REMOVED LATER) */
+
+@implementation ETContainer (Deprecated)
+
+- (id) delegate
 {
-	return [(ETLayoutItemGroup *)[self layoutItem] isOrdered];
+	return [[self layoutItem] delegate];
 }
 
-- (BOOL) isEmpty
+- (void) setDelegate: (id)delegate
 {
-	return [(ETLayoutItemGroup *)[self layoutItem] isEmpty];
+	[[self layoutItem] setDelegate: delegate];
 }
 
-- (id) content
+- (id) source
 {
-	return [(ETLayoutItemGroup *)[self layoutItem] content];
+	return [[self layoutItem] source];
 }
 
-- (NSArray *) contentArray
+- (void) setSource: (id)source
 {
-	return [(ETLayoutItemGroup *)[self layoutItem] contentArray];
+	[[self layoutItem] setSource: source];
 }
 
-- (void) addObject: (id)object
+- (NSString *) representedPath
 {
-	[(ETLayoutItemGroup *)[self layoutItem] addObject: object];
+	return [[self layoutItem] representedPathBase];
 }
 
-- (void) insertObject: (id)object atIndex: (unsigned int)index
+- (void) setRepresentedPath: (NSString *)path
 {
-	[(ETLayoutItemGroup *)[self layoutItem] insertObject: object atIndex: index];
+	[[self layoutItem] setRepresentedPathBase: path];
 }
 
-- (void) removeObject: (id)object
+/* Inspecting (WARNING CODE TO BE REPLACED BY THE NEW EVENT HANDLING) */
+
+- (IBAction) inspect: (id)sender
 {
-	[(ETLayoutItemGroup *)[self layoutItem] removeObject: object];
+	[[self layoutItem] inspect: sender];
+}
+
+- (IBAction) inspectSelection: (id)sender
+{
+	ETDebugLog(@"Inspect %@ selection", self);
+
+	id inspector = [[self layoutItem] inspector];
+
+	if (inspector == nil)
+		inspector = [[ETInspector alloc] init]; // NOTE: Leak
+	[inspector setInspectedObjects: [(id)[self layoutItem] selectedItemsInLayout]];
+	[[inspector panel] makeKeyAndOrderFront: self];
+}
+
+/* Layout */
+
+/** See -[ETLayoutItemGroup isAutolayout] */
+- (BOOL) isAutolayout
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] isAutolayout];
+}
+
+/** See -[ETLayoutItemGroup setAutolayout:] */
+- (void) setAutolayout: (BOOL)flag
+{
+	[(ETLayoutItemGroup *)[self layoutItem] setAutolayout: flag];
+}
+
+/** See -[ETLayoutItemGroup canUpdateLayout] */
+- (BOOL) canUpdateLayout
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] canUpdateLayout];
+}
+
+/** See -[ETLayoutItemGroup updateLayout] */
+- (void) updateLayout
+{
+	[[self layoutItem] updateLayout];
+}
+
+/** See -[ETLayoutItemGroup reloadAndUpdateLayout] */
+- (void) reloadAndUpdateLayout
+{
+	[(ETLayoutItemGroup *)[self layoutItem] reloadAndUpdateLayout];
+}
+
+/** See -[ETLayoutItemGroup layout] */
+- (ETLayout *) layout
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] layout];
+}
+
+/** See -[ETLayoutItemGroup setLayout] */
+- (void) setLayout: (ETLayout *)layout
+{
+	[(ETLayoutItemGroup *)[self layoutItem] setLayout: layout];
+}
+
+/*  Manipulating Layout Item Tree */
+
+/** See -[ETLayoutItemGroup addItem:] */
+- (void) addItem: (ETLayoutItem *)item
+{
+	[(ETLayoutItemGroup *)[self layoutItem] addItem: item];
+}
+
+/** See -[ETLayoutItemGroup insertItem:atIndex:] */
+- (void) insertItem: (ETLayoutItem *)item atIndex: (int)index
+{
+	[(ETLayoutItemGroup *)[self layoutItem] insertItem: item atIndex: index];
+}
+
+/** See -[ETLayoutItemGroup removeItem:] */
+- (void) removeItem: (ETLayoutItem *)item
+{
+	[(ETLayoutItemGroup *)[self layoutItem] removeItem: item];
+}
+
+/** See -[ETLayoutItemGroup removeItem:atIndex:] */
+- (void) removeItemAtIndex: (int)index
+{
+	[(ETLayoutItemGroup *)[self layoutItem] removeItemAtIndex: index];
+}
+
+/** See -[ETLayoutItemGroup itemAtIndex:] */
+- (ETLayoutItem *) itemAtIndex: (int)index
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] itemAtIndex: index];
+}
+
+/** See -[ETLayoutItemGroup addItems:] */
+- (void) addItems: (NSArray *)items
+{
+	[(ETLayoutItemGroup *)[self layoutItem] addItems: items];
+}
+
+/** See -[ETLayoutItemGroup removeItems] */
+- (void) removeItems: (NSArray *)items
+{
+	[(ETLayoutItemGroup *)[self layoutItem] removeItems: items];
+}
+
+/** See -[ETLayoutItemGroup removeAllItems] */
+- (void) removeAllItems
+{
+	[(ETLayoutItemGroup *)[self layoutItem] removeAllItems];
+}
+
+/** See -[ETLayoutItemGroup indexOfItem:] */
+- (int) indexOfItem: (ETLayoutItem *)item
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] indexOfItem: item];
+}
+
+/** See -[ETLayoutItemGroup containsItem:] */
+- (BOOL) containsItem: (ETLayoutItem *)item
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] containsItem: item];
+}
+
+/** See -[ETLayoutItemGroup numberOfItems] */
+- (int) numberOfItems
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] numberOfItems];
+}
+
+/** See -[ETLayoutItemGroup items] */
+- (NSArray *) items
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] items];
+}
+
+/** See -[ETLayoutItemGroup selectedItemsInLayout] */
+- (NSArray *) selectedItemsInLayout
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] selectedItemsInLayout];
+}
+
+/** See -[ETLayoutItemGroup selectionIndexPaths] */
+- (NSArray *) selectionIndexPaths
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] selectionIndexPaths];
+}
+
+/** See -[ETLayoutItemGroup setSelectionIndexPaths] */
+- (void) setSelectionIndexPaths: (NSArray *)indexPaths
+{
+	[(ETLayoutItemGroup *)[self layoutItem] setSelectionIndexPaths: indexPaths];
+}
+
+- (void) setSelectionIndexes: (NSIndexSet *)indexes
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] setSelectionIndexes: indexes];
+}
+
+- (NSMutableIndexSet *) selectionIndexes
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] selectionIndexes];
+}
+
+- (void) setSelectionIndex: (unsigned int)index
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] setSelectionIndex: index];
+}
+
+- (unsigned int) selectionIndex
+{
+	return [(ETLayoutItemGroup *)[self layoutItem] selectionIndex];
 }
 
 @end
+
 
 /* Selection Caching Code (not used currently) */
 

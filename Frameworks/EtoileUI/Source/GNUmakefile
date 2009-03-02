@@ -16,6 +16,7 @@ libEtoileUI_OBJC_FILES = \
 	ETEvent.m \
 	ETFlowLayout.m \
 	ETFreeLayout.m \
+	ETGeometry.m \
 	ETInspector.m \
 	ETLayer.m \
 	ETLayoutItemBuilder.m \
@@ -35,6 +36,7 @@ libEtoileUI_OBJC_FILES = \
 	ETPaneSwitcherLayout.m \
 	ETPersistencyController.m \
 	ETPickboard.m \
+	ETShape.m \
 	ETStackLayout.m \
 	ETStyle.m \
 	ETStyleRenderer.m \

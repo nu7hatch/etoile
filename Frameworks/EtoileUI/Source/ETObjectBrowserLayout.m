@@ -51,7 +51,7 @@
 #define itemGroupView (id)[self layoutView]
 
 @interface ETObjectBrowserLayout (Private)
-- (NSArray *) displayedItemPropertiesInContainer: (ETContainer *)container;
+- (NSArray *) displayedItemPropertiesInItemGroup: (ETLayoutItemGroup *)baseItem;
 @end
 
 
@@ -105,7 +105,7 @@
 {
 	[self setUpLayoutView];
 	// [itemGroupView setSource: [self browsedObject]];
-	[[(ETContainer *)itemGroupView layout] setDisplayedProperties: [self displayedItemPropertiesInContainer: (ETContainer *)[self layoutView]]];
+	[[(ETContainer *)itemGroupView layout] setDisplayedProperties: [self displayedItemPropertiesInItemGroup: [(ETContainer *)[self layoutView] layoutItem]]];
 	[[itemGroupView layoutItem] setRepresentedObject: [self browsedObject]];
 	[itemGroupView setSource: [itemGroupView layoutItem]];
 	if (isNewContent)
@@ -125,7 +125,7 @@
 	[item browse: self];
 }
 
-- (int) container: (ETContainer *)container numberOfItemsAtPath: (NSIndexPath *)path
+- (int) itemGroup: (ETLayoutItemGroup *)baseItem numberOfItemsAtPath: (NSIndexPath *)path
 {
 	int nbOfItems = 0;
 
@@ -156,7 +156,7 @@
 		nbOfItems = [[[itemGroup representedObject] contentArray] count];
 	}
 	
-	ETDebugLog(@"Returns %d as number of items in %@", nbOfItems, container);
+	ETDebugLog(@"Returns %d as number of items in %@", nbOfItems, [baseItem supervisorView]);
 	
 	/* Useful to debug data source and property editing
 	if (nbOfItems > 1)	
@@ -165,11 +165,11 @@
 	return nbOfItems;
 }
 
-- (ETLayoutItem *) container: (ETContainer *)container itemAtPath: (NSIndexPath *)path
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtPath: (NSIndexPath *)path
 {
 	id viewItem = [(id)[self layoutView] layoutItem];
 	id itemGroup = nil;
-	id contentArray = nil;
+	NSArray *contentArray = nil;
 	id object = nil;
 	id item = nil;
 	
@@ -229,12 +229,12 @@
 		[item setValue: [object description] forProperty: @"description"];*/
 	}
 	
-	ETDebugLog(@"Returns item %@ at path %@ in %@", item, path, container);
+	ETDebugLog(@"Returns item %@ at path %@ in %@", item, path, [baseItem supervisorView]);
 
 	return item;
 }
 
-- (NSArray *) displayedItemPropertiesInContainer: (ETContainer *)container
+- (NSArray *) displayedItemPropertiesInItemGroup: (ETLayoutItemGroup *)baseItem
 {
 	/* In case, the object browsed is refreshed before the browsed object is set */
 	if ([self browsedObject] == nil)

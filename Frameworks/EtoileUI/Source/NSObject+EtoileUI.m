@@ -34,13 +34,15 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#import <EtoileFoundation/Macros.h>
 #import <EtoileFoundation/NSObject+Model.h>
-#import <EtoileUI/NSObject+EtoileUI.h>
-#import <EtoileUI/ETObjectBrowserLayout.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-#import <EtoileUI/ETLayoutItem+Factory.h>
-#import <EtoileUI/ETInspector.h>
-#import <EtoileUI/ETCompatibility.h>
+#import "NSObject+EtoileUI.h"
+#import "ETObjectBrowserLayout.h"
+#import "ETLayoutItemGroup.h"
+#import "ETLayoutItem+Factory.h"
+#import "ETInspector.h"
+#import "ETViewModelLayout.h"
+#import "ETCompatibility.h"
 
 
 @implementation NSObject (EtoileUI)
@@ -97,11 +99,49 @@
 	or bring back the basic inspector. */
 - (IBAction) inspect: (id)sender
 {
-	ETInspector *inspector = [[ETInspector alloc] init];  // FIXME: Leak
+	id <ETInspector> inspector = nil;
+
+	if ([self conformsToProtocol: @protocol(ETObjectInspection)])
+		inspector = [self inspector];
+
+	if (inspector == nil)
+		inspector = [[ETInspector alloc] init]; // FIXME: Leak
 
 	ETDebugLog(@"inspect %@", self);
-	[inspector setInspectedObjects: [NSArray arrayWithObject: self]];
+	[inspector setInspectedObjects: A(self)];
 	[[inspector panel] makeKeyAndOrderFront: self];
+}
+
+/** Shows a developer-centric inspector based on ETViewModelLayout which 
+provides informations about the receiver object. This explorer inspector allows 
+to inspect properties, instances variables, methods and also the content when 
+the receiver is a collection (ETCollection protocol must be implemented).
+
+The inspector makes possible to edit the object state and behavior. 
+
+Unlike the inspector shown by -inspect:, this built-in inspector is not expected 
+to overriden by a third-party inspector. */
+- (IBAction) explore: (id)sender
+{
+	// TODO: Should be -itemGroupWithRepresentedObject: once ETLayoutItemGroup 
+	// is able to create a container as supervisor view by itself if needed.
+	ETLayoutItemGroup *item = [ETLayoutItem itemGroupWithContainer];
+	ETViewModelLayout *layout = [ETViewModelLayout layout];
+
+	[item setRepresentedObject: self];
+	if ([self isLayoutItem])
+	{
+		[layout setShouldInspectRepresentedObjectAsView: YES];
+		[layout setDisplayMode: ETLayoutDisplayModeViewObject];
+	}
+	else
+	{
+		[layout setDisplayMode: ETLayoutDisplayModeModelObject];
+	}
+	[item setLayout: layout];
+	[item setName: [NSString stringWithFormat: _(@"Explorer %@"), [self primitiveDescription]]];
+	[item setSize: NSMakeSize(350, 500)];
+	[[ETLayoutItem windowGroup] addItem: item];
 }
 
 @end

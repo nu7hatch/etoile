@@ -15,6 +15,7 @@ libEtoileFoundation_CFLAGS += -std=c99
 libEtoileFoundation_OBJC_FILES = \
 	NSArray+map.m \
 	NSObject+Mixins.m \
+	NSObject+Prototypes.m \
 	NSFileManager+TempFile.m\
 	UKMainThreadProxy.m \
 	UKPluginsRegistry.m \
@@ -24,11 +25,14 @@ libEtoileFoundation_OBJC_FILES = \
 	ETCollection.m \
 	ETFilter.m \
 	ETGetOptionsDictionary.m \
+	ETHistoryManager.m \
 	ETObjectChain.m \
 	ETObjectRegistry.m \
 	ETPropertyValueCoding.m \
+	ETTranscript.m \
 	ETTransform.m \
 	ETUUID.m \
+	ETUTI.m \
 	NSIndexPath+Etoile.m \
 	NSIndexSet+Etoile.m \
 	NSInvocation+Etoile.m \
@@ -36,10 +40,6 @@ libEtoileFoundation_OBJC_FILES = \
 	NSObject+Model.m \
 	NSString+Etoile.m \
 	NSURL+Etoile.m
-
-ifeq ($(custom_libobjc), yes)
-libEtoileFoundation_OBJC_FILES += ETPrototype.m
-endif
 
 libEtoileFoundation_C_FILES = \
 	ETCArray.c
@@ -49,7 +49,7 @@ libEtoileFoundation_OBJC_FILES += NSFileManager+NameForTempFile.m
 endif
 
 ifeq ($(test), yes)
-libEtoileFoundation_OBJC_FILES += TestUUID.m
+libEtoileFoundation_OBJC_FILES += TestUUID.m TestUTI.m
 endif
 
 -include GNUmakefile.preamble

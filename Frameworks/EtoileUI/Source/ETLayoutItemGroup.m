@@ -34,29 +34,31 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#import <EtoileFoundation/NSIndexSet+Etoile.h>
+#import <EtoileFoundation/NSIndexPath+Etoile.h>
 #import <EtoileFoundation/NSObject+Model.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-#import <EtoileUI/ETLayoutItemGroup+Mutation.h>
-#import <EtoileUI/ETLayoutItem+Factory.h>
-#import <EtoileUI/ETFlowLayout.h>
-#import <EtoileUI/ETLineLayout.h>
-#import <EtoileUI/ETContainer.h>
-#import <EtoileUI/ETContainer+Controller.h>
-#import <EtoileUI/NSView+Etoile.h>
-#import <EtoileUI/ETCompatibility.h>
+#import <EtoileFoundation/Macros.h>
+#import "ETLayoutItemGroup.h"
+#import "ETLayoutItemGroup+Mutation.h"
+#import "ETLayoutItem+Factory.h"
+#import "ETFlowLayout.h"
+#import "ETLineLayout.h"
+#import "ETContainer.h"
+#import "ETContainer+Controller.h"
+#import "NSView+Etoile.h"
+#import "ETCompatibility.h"
 
 #define DEFAULT_FRAME NSMakeRect(0, 0, 50, 50)
 
+/* Properties */
+NSString *kSourceProperty = @"source";
+NSString *kDelegateProperty = @"delegate";
+
+/* Notifications */
+NSString *ETItemGroupSelectionDidChangeNotification = @"ETItemGroupSelectionDidChangeNotification";
+
 @interface ETLayoutItem (SubclassVisibility)
 - (void) setDisplayView: (ETView *)view;
-@end
-
-@interface ETLayoutItemGroup (ETSource)
-- (ETContainer *) container;
-- (BOOL) isReloading;
-- (NSArray *) itemsFromSource;
-- (NSArray *) itemsFromFlatSource;
-- (NSArray *) itemsFromTreeSource;
 @end
 
 @interface ETContainer (PackageVisibility)
@@ -88,19 +90,21 @@
 
 /* Initialization */
 
-/** Designated initializer */
+/** <init /> Designated initializer */
 - (id) initWithItems: (NSArray *)layoutItems view: (NSView *)view value: (id)value representedObject: (id)repObject
 {
     self = [super initWithView: view value: value representedObject: repObject];
-    
+
     if (self != nil)
     {
 		_layoutItems = [[NSMutableArray alloc] init];
 		if (layoutItems != nil)
+		{
 			[self addItems: layoutItems];
+		}
 		_layout = nil;
-		[self setStackedItemLayout: AUTORELEASE([[ETFlowLayout alloc] init])];
-		[self setUnstackedItemLayout: AUTORELEASE([[ETLineLayout alloc] init])];
+		[self setStackedItemLayout: [ETFlowLayout layout]];
+		[self setUnstackedItemLayout:[ETLineLayout layout]];
 		_isStack = NO;
 		_autolayout = YES;
 		_usesLayoutBasedFrame = NO;
@@ -108,7 +112,7 @@
 		[self setHasNewContent: NO];
 		[self setShouldMutateRepresentedObject: YES];
     }
-    
+
     return self;
 }
 
@@ -134,17 +138,24 @@
 	DESTROY(_stackedLayout);
 	DESTROY(_unstackedLayout);
 	DESTROY(_layoutItems);
-	
+
 	[super dealloc];
 }
 
+/** Returns a copy of the receiver. See also -[ETLayoutItem copyWithZone:].
+
+All layouts from the receiver returned by -layout, -stackedItemLayout, 
+-unstackedItemLayout are also copied since a layout cannot be shared between 
+several item groups.
+
+The returned copy is mutable because ETLayoutItemGroup cannot be immutable. */ 
 - (id) copyWithZone: (NSZone *)zone
 {
 	ETLayoutItemGroup *item = (ETLayoutItemGroup *)[(id)super copyWithZone: zone];
 	
 	item->_layoutItems = [[NSMutableArray alloc] init];
 	
-	// NOTE: Layout objects must be copied because they support only one layout 
+	// TODO: Layout objects must be copied because they support only one layout 
 	// context. If you share a layout like that: 
 	// [item setLayout: [self layout]];
 	// -[ETLayoutItemGroup setLayout:] will set the item copy as the layout 
@@ -156,7 +167,8 @@
 	item->_isStack = [self isStack];
 	item->_autolayout = [self isAutolayout];
 	item->_usesLayoutBasedFrame = [self usesLayoutBasedFrame];
-			
+	item->_shouldMutateRepresentedObject = [self shouldMutateRepresentedObject];
+
 	return item;
 }
 
@@ -164,12 +176,12 @@
 {
 	ETLayoutItemGroup *item = [super deepCopy];
 	NSArray *copiedChildItems = [[self items] valueForKey: @"deepCopy"];
-	
+
 	[item addItems: copiedChildItems];
 	// TODO: Test if using -autorelease instead of -release results in a quicker 
 	// deep copy (when plenty of items are involved).
 	[copiedChildItems makeObjectsPerformSelector: @selector(release)];
-	
+
 	return item;
 }
 
@@ -177,13 +189,15 @@
 
 - (NSArray *) properties
 {
-	NSArray *properties = [NSArray arrayWithObjects: @"layout", nil];
-	
+	NSArray *properties = A(@"layout", kSourceProperty, kDelegateProperty);
+
 	return [[super properties] arrayByAddingObjectsFromArray: properties];
 }
 
 /* Finding Container */
 
+/** Returns YES. An ETLayoutItemGroup is always a group and a collection by 
+default. */
 - (BOOL) isGroup
 {
 	return YES;
@@ -194,48 +208,28 @@
 	return [[self view] isKindOfClass: [ETContainer class]];
 }
 
-/** Returns the first ancestor container that declares a represented path. The 
-	ancestor layout item that owns this container is known as the base item 
-	(see -baseItem). The base item is usually in charge of coordinating the 
-	event handling and the loading of layout items which are provided by a 
-	source. */
-- (ETContainer *) baseContainer
-{
-	if ([self isContainer] && [self hasValidRepresentedPathBase])
-	{
-		return (ETContainer *)[self view];
-	}
-	else
-	{
-		return [[self parentLayoutItem] baseContainer];
-	}
-}
-
-/* Overriden method */
-/*- (void) setDisplayView: (ETView *)view
-{
-
-}*/
-
 /* Traversing Layout Item Tree */
 
-/** Returns a normal path relative to the receiver by translating index path 
-	into a layout item sequence and concatenating the names of all layout items 
-	in the sequence. Each index in the index path references a child item by 
-	its index in the parent layout item. 
-	Resulting path uses '/' as path separator and always begins by '/'. If an 
-	item has no name (-name returns nil or an empty string), its index is used 
-	instead of the name as a path component.
-	For index path 3.4.8.0, a valid translation would be:
+/** Returns a normal path relative to the receiver, by translating indexPath
+into a layout item sequence and concatenating the names of all layout items in
+the sequence. Each index in the index path references a child item by its index
+in the parent item. 
+
+Resulting path uses '/' as path separator and always begins by '/'. If an item 
+has no name (-name returns nil or an empty string), its index is used instead of 
+the name as a path component.<br />
+For index path 3.4.8.0, a valid translation would be:
 	      3     .4 .8   .0
 	/BlackCircle/4/Tulip/Zone
-	Returns '/' if indexPath is nil or empty. */
+
+Returns '/' if indexPath is nil or empty. */
 - (NSString *) pathForIndexPath: (NSIndexPath *)indexPath
 {
 	NSString *path = @"/";
 	ETLayoutItem *item = self;
+	NSString *name = nil;
 	unsigned int index = NSNotFound;
-	
+
 	for (unsigned int i = 0; i < [indexPath length]; i++)
 	{
 		index = [indexPath indexAtPosition: i];
@@ -246,14 +240,15 @@
 		NSAssert2([item isGroup], @"Item %@ "
 			@"must be layout item group to resolve the index path %@", 
 			item, indexPath);
-		NSAssert3(index < [[(ETLayoutItemGroup *)item items] count], @"Index "
+		NSAssert3(index < [(ETLayoutItemGroup *)item numberOfItems], @"Index "
 			@"%d in path %@ position %d must be inferior to children item "
 			@"number", index + 1, indexPath, i);
-			
+
 		item = [(ETLayoutItemGroup *)item itemAtIndex: index];
-		if ([item name] != nil && [item isEqual: @""] == NO)
+		name = [item name];
+		if (name != nil && [name isEqualToString: @""] == NO)
 		{
-			path = [path stringByAppendingPathComponent: [item name]];
+			path = [path stringByAppendingPathComponent: name];
 		}
 		else
 		{
@@ -261,37 +256,40 @@
 				[NSString stringWithFormat: @"%d", index]];	
 		}
 	}
-	
+
 	return path;
 }
 
-/** Returns an index path relative to the receiver by translating normal path 
-	into a layout item sequence and pushing parent relative index of each 
-	layout item in the sequence into an index path. Each index in the index 
-	path references a child item by its index in the parent layout item. 
-	Resulting path uses internally '.' as path seperator and internally always 
-	begins by an index number and not a path seperator. 
-	For the translation, empty path component or component made of path 
-	separator '/' are skipped in path parameter.
-	For index path /BlackCircle/4/Tulip/Zone, a valid translation would be:
+/** Returns an index path relative to the receiver, by translating normal path
+into a layout item sequence and pushing parent relative index of each layout
+item in the sequence into an index path. Each index in the index path references
+a child item by its index in the parent item. 
+
+Resulting path uses internally '.' as path separator and internally always
+begins by an index number and not a path separator.
+
+For the translation, empty path component or component made of path separator 
+'/' are skipped in path parameter.<br />
+For index path /BlackCircle/4/Tulip/Zone, a valid translation would be:
 	/BlackCircle/4/Tulip/Zone
 	      3     .4 .8   .0
-	Take note 3.5.8.0 could be a valid translation too because a name could be 
-	a number which is unrelated to the item index used by its parent layout 
-	item to reference it. */
+
+Take note 3.5.8.0 could be a valid translation too, because a name could be a
+number which is unrelated to the item index used by its parent item to reference 
+it. */
 - (NSIndexPath *) indexPathForPath: (NSString *)path
 {
-	NSIndexPath *indexPath = AUTORELEASE([[NSIndexPath alloc] init]);
+	NSIndexPath *indexPath = [NSIndexPath indexPath];
 	NSArray *pathComponents = [path pathComponents];
 	NSString *pathComp = nil;
 	ETLayoutItem *item = self;
 	int index = -1;
-		
+
 	for (int position = 0; position < [pathComponents count]; position++)
 	{
 		pathComp = [pathComponents objectAtIndex: position];
-	
-		if ([pathComp isEqual: @"/"] || [pathComp isEqual: @""])
+
+		if ([pathComp isEqualToString: @"/"] || [pathComp isEqualToString: @""])
 			continue;
 
 		if ([item isGroup] == NO)
@@ -301,7 +299,7 @@
 			break;
 		}
 		item = [(ETLayoutItemGroup *)item itemAtPath: pathComp];
-		
+
 		/* If no item can be found by interpreting pathComp as an identifier, 
 		   try to interpret pathComp as a number */
 		if (item == nil)
@@ -309,27 +307,27 @@
 			index = [pathComp intValue];
 			/* -intValue returns 0 when no numeric value is present to be 
 			   converted */
-			if (index == 0 && [pathComp isEqual: @"0"] == NO)
+			if (index == 0 && [pathComp isEqualToString: @"0"] == NO)
 			{
 				/* path is invalid */
 				indexPath = nil;
 				break;
 			}
-			
+
 			/* Verify the index truly references a child item */
-			if (index >= [[(ETLayoutItemGroup *)item items] count])
+			if (index >= [(ETLayoutItemGroup *)item numberOfItems])
 			{
 				/* path is invalid */
 				indexPath = nil;
-				break;			
+				break;
 			}
 			item = [(ETLayoutItemGroup *)item itemAtIndex: index];
 		}
 		else
 		{
-			index = [[item parentLayoutItem] indexOfItem: item];
+			index = [[item parentItem] indexOfItem: item];
 		}
-		
+
 		/*NSAssert1(index == 0 && [pathComp isEqual: @"0"] == NO,
 			@"Path components must be indexes for path %@", path);
 		NSAssert2([item isGroup], @"Item %@ "
@@ -338,20 +336,20 @@
 		NSAssert3(index < [[(ETLayoutItemGroup *)item items] count], @"Index "
 			@"%d in path %@ position %d must be inferior to children item "
 			@"number", index + 1, position, path);*/
-		
+
 		indexPath = [indexPath indexPathByAddingIndex: index];
-	}	
-	
+	}
+
 	return indexPath;
 }
 
 /** Returns the layout item child identified by the index path paremeter 
-	interpreted as relative to the receiver. */
+interpreted as relative to the receiver. */
 - (ETLayoutItem *) itemAtIndexPath: (NSIndexPath *)path
 {
 	int length = [path length];
 	ETLayoutItem *item = self;
-	
+
 	for (unsigned int i = 0; i < length; i++)
 	{
 		if ([item isGroup])
@@ -364,28 +362,29 @@
 			break;
 		}
 	}
-	
+
 	return item;
 }
 
 /** Returns the layout item child identified by the path paremeter interpreted 
-	as relative to the receiver. 
-	Whether the path begins by '/' or not doesn't modify the result. */
+as relative to the receiver. 
+
+Whether the path begins by '/' or not doesn't modify the result. */
 - (ETLayoutItem *) itemAtPath: (NSString *)path
 {
 	NSArray *pathComponents = [path pathComponents];
-	NSEnumerator *e = [pathComponents objectEnumerator];
-	NSString *pathComp = nil;
 	ETLayoutItem *item = self;
 	
-	while ((pathComp = [e nextObject]) != nil)
+	FOREACH(pathComponents, pathComp, NSString *)
 	{
-		if (pathComp == nil || [pathComp isEqual: @"/"] || [pathComp isEqual: @""])
+		if (pathComp == nil || [pathComp isEqualToString: @"/"] || [pathComp isEqualToString: @""])
 			continue;
 	
 		if ([item isGroup])
 		{
-			item = [[(ETLayoutItemGroup *)item items] firstObjectMatchingValue: pathComp forKey: @"name"];
+			NSArray *childItems = [(ETLayoutItemGroup *)item items];
+			item = [childItems firstObjectMatchingValue: pathComp 
+			                                     forKey: @"name"];
 		}
 		else
 		{
@@ -393,43 +392,54 @@
 			break;
 		}
 	}
-	
+
 	return item;
 }
 
-- (NSString *) representedPathBase
+/** Sets the represented path base associated with the receiver. When a valid 
+represented base is set, the receiver becomes a base item. See also -isBaseItem, 
+-baseItem, -representedPath and -representedPathBase in ETLayoutItem.
+
+The represented path base should be a navigational path into the model whose 
+content is currently presented by the receiver. In that way, it is useful to 
+keep track of your location inside the model currently browsed. Tree-related 
+methods implemented by a data source are passed paths which are subpaths of this 
+path base.
+
+A path base is only critical when a source is used, otherwise it's up to the 
+developer to track the level of navigation inside the tree structure. 
+
+You should use paths like '/', '/blabla/myModelObjectName'. You cannot pass an 
+empty string to this method or it will throw an invalid argument exception. If 
+you want no represented path base, use nil. 
+
+Without a source, you can use -setRepresentedPathBase: as a conveniency to 
+remember the represented object location within the model graph that is 
+presented by the receiver. */
+- (void) setRepresentedPathBase: (NSString *)aPath
 {
-	NSString *pathBase = nil;
-	
-	if ([self isContainer])
-		pathBase = [(ETContainer *)[self view] representedPath];
+	if ([aPath isEqual: @""])
+	{
+		[NSException raise: NSInvalidArgumentException format: @"For %@ "
+			@"-setRepresentedPathBase: argument must never be an empty string", self];
 		
-	return pathBase;
+	}
+
+	SET_PROPERTY(aPath, kRepresentedPathBaseProperty);
 }
 
 /* Manipulating Layout Item Tree */
 
-/** Returns existing subviews of the receiver as layout items. 
-	First checks whether the receiver responds to -layoutItem and in such case 
-	doesn't already include child items for these subviews. 
-	If no, either the subview is an ETView or an NSView 
-	instance. When the subview is NSView-based, a new layout item is 
-	instantiated by calling +layoutItemWithView: with subview as parameter. 
-	Then the new item is automatically inserted as a child item in the layout 
-	item representing the receiver. If the subview is ETView-based, the item
-	reprensenting the subview is immediately inserted in the receiver item. */
-- (NSArray *) itemsWithSubviewsOfView: (NSView *)view
-{
-	// FIXME: Implement
-	return nil;
-}
+/** Handles the view visibility of child items with a role similar to 
+-setVisibleItems: that is called by layouts. 
 
-/** This method handles the view visibility of child items with a role similar 
-	to -setVisibleItems: that is called by layouts. It is used when you insert 
-	an item on an item group without layout, otherwise the view insertion is 
-	managed by requesting a layout update which ultimately calls back 
-	-setVisibleItems:. 
-	Having a null layout class may be a solution to get rid of this. */
+This method is called when you insert an item in an item group with a layout 
+which doesn't require an update in that case, otherwise the view insertion is 
+managed by requesting a layout update which ultimately calls back 
+-setVisibleItems:. 
+
+NOTE: Having a null layout class may be a solution to get rid of 
+-handleAttachViewOfItem: and -handleDetachViewOfItem:. */
 - (void) handleAttachViewOfItem: (ETLayoutItem *)item
 {
 	/* Typically needed if your item has no view and gets added to an item 
@@ -453,29 +463,52 @@
 	if ([item displayView] == nil) /* No view to detach */
 		return;
 
-  	[[item displayView] removeFromSuperview];
+	[[item displayView] removeFromSuperview];
 }
 
+/** <override-dummy />Handles any necessary adjustments to be done right before
+item is made a child item of the receiver. This method is available to be
+overriden in subclasses that want to extend or modify the item insertion
+behavior.
+
+The default implementation takes to care to remove item from any existing parent 
+item, then updates the parent item reference to be the receiver.<br />
+You must always call the superclass implementation.
+
+Symetric method to -handleDetachItem: */
 - (void) handleAttachItem: (ETLayoutItem *)item
 {
 	RETAIN(item);
-	if ([item parentLayoutItem] != nil)
-		[[item parentLayoutItem] removeItem: item];
-	[item setParentLayoutItem: self];
+	if ([item parentItem] != nil)
+	{
+		[[item parentItem] removeItem: item];
+	}
+	[item setParentItem: self];
 	RELEASE(item);
 	[self handleAttachViewOfItem: item];
 }
 
+/** <override-dummy />Handles any necessary adjustments to be done right before
+item is removed as a child item from the receiver. This method is available to
+be overriden in subclasses that want to extend or modify the item removal
+behavior.
+
+The default implementation only updates the parent item reference to be nil. <br />
+You must always call the superclass implementation.
+
+Symetric method to -handleAttachItem: */
 - (void) handleDetachItem: (ETLayoutItem *)item
 {
-	[item setParentLayoutItem: nil];
+	[item setParentItem: nil];
 	[self handleDetachViewOfItem: item];
 }
 
-/* Marks if needed the receiver as having new content to be layouted, otherwise 
-   the layout is told the layout item tree hasn't been mutated. 
-   Only valid when the layout item tree is built directly from the represented 
-   object by the mean of ETCollection protocol. */
+/** See -[ETLayoutItemGroup setRepresentedObject:].
+
+If necessary, marks the receiver as having new content to be layouted, otherwise
+the layout is told the layout item tree hasn't been mutated. Although this only
+holds when the layout item tree is built directly from the represented object by
+the mean of ETCollection protocol. */
 - (void) setRepresentedObject: (id)model
 {
 	[super setRepresentedObject: model];
@@ -483,43 +516,125 @@
 		[self setHasNewContent: YES];
 }
 
-/** Returns YES when the item tree mutation are propagated to the represented 
-	object, otherwise returns NO if it's up to you to reflect structural changes
-	of the layout item tree onto the model object graph. By default, this method 
-	returns YES.
-	Mutations are triggered by calling children or collection related 
-	methods like -addItem:, -insertItem:atIndex:, removeItem:, addObject: etc. 
-	WARNING: The returned value is meaningful only if the receiver is a base 
-	item. In this case, the value applies to all related descendant items (by
-	being inherited through ETLayoutItem and ETLayoutItemGroup implementation). */
+/** Returns YES when the item tree mutation are propagated to the represented
+object, otherwise returns NO if it's up to you to reflect structural changes of
+the layout item tree onto the model object graph. By default, this method
+returns YES.
+
+Mutations are triggered by calling children or collection related methods
+like -addItem:, -insertItem:atIndex:, removeItem:, addObject: etc. 
+
+<strong>The returned value is meaningful only if the receiver is a base item.
+In this case, the value applies to all related descendant items (by being
+looked up by descendant items).</strong> */
 - (BOOL) shouldMutateRepresentedObject
 {
 	return _shouldMutateRepresentedObject;
 }
 
-/** Sets whether the layout item tree mutation are propagated to the represented 
-	object or not. 
-	WARNING: This value set is meaningful only if the receiver is a base item, 
-	otherwise the value is simply ignored by ETLayoutItem and ETLayoutItemGroup 
-	implementation.  */
+/** Sets whether the layout item tree mutation are propagated to the represented
+object or not. 
+
+<strong>The value set is meaningful only if the receiver is a base item, 
+otherwise the value is simply ignored.</strong>  */
 - (void) setShouldMutateRepresentedObject: (BOOL)flag
 {
 	_shouldMutateRepresentedObject = flag;
 }
 
-/** Returns YES when the child items are automatically generated by wrapping
-	the elements of the represented object collection into ETLayoutItem or 
-	ETLayoutItemGroup instances. 
-	To use represented objects as providers, you have to set the source of a 
-	container to be the layout item bound to it. This item is returned by 
-	-[ETContainer layoutItem]. The code would be something like 
-	[container setSource: [container layoutItem]].
-	WARNING: This value set is meaningful only if the receiver is a base item, 
-	otherwise the value is simply ignored by ETLayoutItem and ETLayoutItemGroup 
-	implementation. */
+/** Returns YES when the child items are automatically generated by wrapping the
+elements of the represented object collection into ETLayoutItem or
+ETLayoutItemGroup instances.
+
+To use represented objects as providers in the layout item tree connected to 
+the receiver, you have to set the source of the receiver to be the receiver 
+itself. The code would be something like <example>
+[itemGroupsetSource: itemGroup]</example>. */
 - (BOOL) usesRepresentedObjectAsProvider
 {
-	return ([[[self baseContainer] source] isEqual: [self baseItem]]);
+	return ([[[self baseItem] source] isEqual: [self baseItem]]);
+}
+
+/** Returns the source which provides the content presented by the receiver.
+
+A source implements either ETIndexSource or ETPathSource protocols. If the
+receiver handles the layout item tree directly without the help of a source
+object, then this method returns nil. */
+- (id) source
+{
+	return GET_PROPERTY(kSourceProperty);
+}
+
+/** Sets the source which provides the content displayed by the receiver. A
+source can be any objects conforming to ETIndexSource or ETPathSource protocol.
+
+So you can write you own data source object by implementing either:
+<enum>
+<item><list>
+<item>-numberOfItemsInItemGroup:</item>
+<item>-itemGroup:itemAtIndex:</item>
+</list></item>
+<item><list>
+<item>-itemGroup:numberOfItemsAtPath:</item>
+<item>-itemGroup:itemAtPath:</item>
+</list></item>
+</enum>
+
+Another common solution is to use the receiver itself as a source, in that 
+case -usesRepresentedObjectAsProvider returns YES. And the receiver will 
+generate the layout item tree bound to it by retrieving any child objects of the 
+represented object (through ETCollection protocol) and wrapping them into 
+ETLayoutItem or ETLayoutItemGroup objects based on whether these childs 
+implements ETCollection or not.
+
+You can also combine these abilities with an off-the-shelf controller object like
+ETController. See -setController to do so. This brings extra flexibility such as:
+<list>
+<item>template item and item group for the generated layout items</item>
+<item>easy to use add, insert and remove actions with template model object and 
+model group for the represented objects to insert wrapped in layout items</item>
+<item>sorting</item>
+<item>searching</item>
+</list>
+
+Finally when -source returns nil, it's always possible to build and manage a 
+layout item tree structure in a static fashion by yourself.
+
+Take note that modifying a source is followed by a layout update, the new
+content is immediately loaded and displayed. By setting a source, the receiver
+represented path base is automatically set to '/' unless another path was set
+previously. If you pass nil to get rid of a source, the represented path base 
+isn't reset to nil but keeps its actual value in order to maintain it as a base
+item and avoid unpredictable changes to the event handling logic. */
+- (void) setSource: (id)source
+{
+	/* By safety, avoids to trigger extra updates */
+	if ([GET_PROPERTY(kSourceProperty) isEqual: source])
+		return;
+
+	[self removeAllItems]; 	/* Resets any particular state like selection */
+	SET_PROPERTY(source, kSourceProperty);
+
+	/* Make base item if needed */
+	if (source != nil && [self isBaseItem] == NO)
+		[self setRepresentedPathBase: @"/"];
+}
+
+/** Returns the delegate associated with the receiver. 
+
+See also -setDelegate:. */
+- (id) delegate
+{
+	return GET_PROPERTY(kDelegateProperty);
+}
+
+/** Sets the delegate associated with the receiver. 
+
+A delegate is only useful if the receiver is a base item, otherwise it will  
+be ignored. */
+- (void) setDelegate: (id)delegate
+{
+	SET_PROPERTY(delegate, kDelegateProperty);
 }
 
 /*	Alternatively, if you have a relatively small and static tree structure,
@@ -624,73 +739,75 @@
 	return [NSArray arrayWithArray: _layoutItems];
 }
 
-/** Returns all children items under the control of the receiver. An item is 
-	said to be under the control of an item group when you can traverse the
-	branch leading to the item without crossing a parent item which is declared
-	as a base item.
-	An item group becomes a base item when a represented path base is set, in 
-	other words when -representedPathBase doesn't return nil. 
-	This method collects every items the layout item subtree (excluding the 
-	receiver) by doing a preorder traversal, the resulting collection is a flat
-	list of every items in the tree. 
-	If you are interested by collecting descendant items in another traversal
-	order, you have to implement your own version of this method. */
+/** Returns all children items under the control of the receiver. 
+
+An item is said to be under the control of an item group, when you can traverse
+the branch leading to the item without crossing a parent item declared as a base 
+item. An item group becomes a base item when a represented path base is set, in
+other words when -representedPathBase doesn't return nil. See also -isBaseItem.
+
+This method collects every items the layout item subtree (excluding the
+receiver) by doing a preorder traversal, the resulting collection is a flat list
+of every items in the tree.
+
+If you are interested by collecting descendant items in another traversal order, 
+you have to implement your own version of this method. */
 - (NSArray *) itemsIncludingRelatedDescendants
 {
 	// TODO: This code is probably quite slow by being written in a recursive 
 	// style and allocating/resizing many arrays instead of using a single 
 	// linked list. Test whether optimization are needed or not really...
-	NSEnumerator *e = [[self items] objectEnumerator];
-	id item = nil;
 	NSMutableArray *collectedItems = [NSMutableArray array];
-	
-	while ((item = [e nextObject]) != nil)
+
+	FOREACHI([self items], item)
 	{
 		[collectedItems addObject: item];
-			
+
 		if ([item isGroup] && [item hasValidRepresentedPathBase] == NO)
 			[collectedItems addObjectsFromArray: [item itemsIncludingRelatedDescendants]];
 	}
-	
+
 	return collectedItems;
 }
 
 /** Returns all descendant items of the receiver, including immediate children.
-	This method collects every items the layout item subtree (excluding the 
-	receiver) by doing a preorder traversal, the resulting collection is a flat
-	list of every items in the tree. 
-	If you are interested by collecting descendant items in another traversal
-	order, you have to implement your own version of this method. */
+
+This method collects every items the layout item subtree (excluding the
+receiver) by doing a preorder traversal, the resulting collection is a flat list
+of every items in the tree. 
+
+If you are interested in collecting descendant items in another traversal order,
+you have to implement your own version of this method. */
 - (NSArray *) itemsIncludingAllDescendants
 {
 	// TODO: This code is probably quite slow by being written in a recursive 
 	// style and allocating/resizing many arrays instead of using a single 
 	// linked list. Test whether optimization are needed or not really ...
-	NSEnumerator *e = [[self items] objectEnumerator];
-	id item = nil;
 	NSMutableArray *collectedItems = [NSMutableArray array];
-	
-	while ((item = [e nextObject]) != nil)
+
+	FOREACHI([self items], item)
 	{
 		[collectedItems addObject: item];
-			
+
 		if ([item isGroup])
 			[collectedItems addObjectsFromArray: [item itemsIncludingAllDescendants]];
 	}
-	
+
 	return collectedItems;
 }
 
+/** Returns whether the receiver can be reloaded presently with -reload. */
 - (BOOL) canReload
 {
-	ETContainer *container = [self baseContainer];
-	BOOL hasSource = ([container source] != nil);
+	BOOL hasSource = ([[self baseItem] source] != nil);
 
 	return hasSource && ![self isReloading];
 }
 
-/** This method can be safely called even if the receiver has no source or 
-	doesn't inherit a source from an ancestor. */
+/** Tries to reload the content of the receiver, but only if it can be reloaded. 
+
+This method can be safely called even if the receiver has no source or doesn't 
+inherit a source from a base item. */
 - (void) reloadIfNeeded
 {
 	if ([self canReload])
@@ -698,13 +815,12 @@
 }
 
 /** Reloads the content by removing all existing childrens and requesting all
-	the receiver immediate children to the source. */
+the receiver immediate children to the source. */
 - (void) reload
 {
 	_reloading = YES;
-	
-	ETContainer *container = [self baseContainer];
-	BOOL hasSource = ([container source] != nil);
+
+	BOOL hasSource = ([[self baseItem] source] != nil);
 
 	/* Retrieve layout items provided by source */
 	if (hasSource)
@@ -715,8 +831,8 @@
 	}
 	else
 	{
-		ETLog(@"Impossible to reload %@ because the layout item miss either "
-			@"a container %@ or a source %@", self, container, [container source]);
+		ETLog(@"WARNING: Impossible to reload %@ because the layout item miss " 
+			@"a source %@", self, [[self baseItem] source]);
 	}
 	
 	_reloading = NO;
@@ -746,7 +862,7 @@
 	   view/container frame modification on layout view insertion */
 	[self setAutolayout: NO];
 	
-	[_layout setLayoutContext: nil];
+	[_layout setLayoutContext: nil]; /* Ensures -[ETLayout tearDown] is called */
 	ASSIGN(_layout, layout);
 	[self setHasNewLayout: YES];
 	[layout setLayoutContext: self];
@@ -941,6 +1057,14 @@
 		NSRect realDirtyRect = NSIntersectionRect(dirtyRect, [self drawingFrame]);
 		[super render: inputValues dirtyRect: realDirtyRect inView: view];
 		
+		/* Render the layout-specific tree if needed */
+		
+		id layout = [self layout];
+		if ([layout respondsToSelector: @selector(rootItem)])
+		{
+			[self display: inputValues item: [layout rootItem] dirtyRect: dirtyRect inView: view];
+		}
+
 		/* Render child items (if the layout doesn't handle it) */
 		
 		if (usesLayoutView)
@@ -1015,7 +1139,7 @@
 		[transform translateXBy: [item x] yBy: [item y]];
 	}
 	/* Flip if needed */
-	if ([renderView isFlipped])
+	if ([self isFlipped] != [item isFlipped]) /* != [NSGraphicContext/renderView isFlipped] */
 	{
 		[transform translateXBy:0.0 yBy: [item height]];
 		[transform scaleXBy:1.0 yBy:-1.0];
@@ -1029,53 +1153,47 @@
 	[transform concat];
 }
 
-/** Returns the visible child items of the receiver. 
-    This is a shortcut method for -visibleItemsForItems:. */
+/** Returns the visible child items of the receiver.
+
+This is a shortcut method for -visibleItemsForItems:. */
 - (NSArray *) visibleItems
 {
 	return [self visibleItemsForItems: [self items]];
 }
 
 /** Sets the visible child items of the receiver, by taking care of inserting
-    and removing the item display views based on the visibility of the layout 
-    items.
-    This is a shortcut method for -visibleItemsForItems:. */
+and removing the item display views based on the visibility of the layout items.
+
+This is a shortcut method for -visibleItemsForItems:. */
 - (void) setVisibleItems: (NSArray *)visibleItems
 {
 	return [self setVisibleItems: visibleItems forItems: [self items]];
 }
-/** Returns the visible child items of the receiver. 
-    You shouldn't need to call this method by yourself unless you write an 
-    ETCompositeLayout subclass which usually requires the receiver displays 
-    layout items which doesn't belong to it, as children, but to another item 
-    group. */
+/** Returns the visible child items of the receiver.
+
+You shouldn't need to call this method by yourself, unless you write an
+ETCompositeLayout subclass which usually requires the receiver displays layout
+items, that don't belong to it, as children. */
 - (NSArray *) visibleItemsForItems: (NSArray *)items
 {
-	ETContainer *container = nil;
 	NSMutableArray *visibleItems = [NSMutableArray array];
-	NSEnumerator  *e = [items objectEnumerator];
-	ETLayoutItem *item = nil;
-	
-	if ([self isContainer])
-		container = (ETContainer *)[self view];
-	
-	while ((item = [e nextObject]) != nil)
+
+	FOREACH(items, item, ETLayoutItem *)
 	{
 		if ([item isVisible])
 			[visibleItems addObject: item];
 	}
-	
+
 	return visibleItems;
 }
 
 /** Sets the visible child items of the receiver, by taking care of inserting
-    and removing the item display views based on the visibility of the layout 
-    items.
-    This method is typically called by the layout of the receiver once the 
-    layout rendering is finished in order to adjust the visibility of views and 
-    update the visible property of the child items. 
-    You shouldn't need to call this method by yourself 
-    (see -visibleItemsForItems:). */
+and removing the item display views based on the visibility of the layout items.
+
+This method is typically called by the layout of the receiver once the layout 
+rendering is finished, in order to adjust the visibility of views and update the 
+visible property of the child items. You shouldn't need to call this method by 
+yourself (see -visibleItemsForItems:). */
 - (void) setVisibleItems: (NSArray *)visibleItems forItems: (NSArray *)items
 {
 // FIXME: Make a bottom top traversal to find the first view which can be used 
@@ -1083,21 +1201,20 @@
 // or supported because all ETLayoutItemGroup instances must embed a container.
 // This last point is going to become purely optional.
 	ETContainer *container = nil;
-	NSEnumerator  *e = [items objectEnumerator];
-	ETLayoutItem *item = nil;
-	
+
 	if ([self isContainer])
 		container = (ETContainer *)[self view];
-	
-	while ((item = [e nextObject]) != nil)
+
+	FOREACH(items, item, ETLayoutItem *)
 	{
 		if ([visibleItems containsObject: item])
 		{
 			[item setVisible: YES];
-			if (container != nil && [[container subviews] containsObject: [item displayView]] == NO)
+			if (container != nil && [[container subviews] containsObject: [item displayView]] == NO
+			     && [item displayView] != nil )
 			{
 				[container addSubview: [item displayView]];
-				//ETDebugLog(@"Inserted view at %@", NSStringFromRect([[item displayView] frame]));
+				ETDebugLog(@"Inserted view at %@", NSStringFromRect([[item displayView] frame]));
 			}
 		}
 		else
@@ -1106,7 +1223,7 @@
 			if (container != nil && [[container subviews] containsObject: [item displayView]])
 			{
 				[[item displayView] removeFromSuperview];
-				//ETDebugLog(@"Removed view at %@", NSStringFromRect([[item displayView] frame]));
+				ETDebugLog(@"Removed view at %@", NSStringFromRect([[item displayView] frame]));
 			}
 		}
 	}
@@ -1152,18 +1269,20 @@
 /** Dismantles the receiver layout item group. If all items owned by the item */
 - (NSArray *) unmakeGroup
 {
-	ETLayoutItemGroup *parent = [self parentLayoutItem];
 	NSArray *items = [self items];
-	//int itemGroupIndex = [parent indexOfItem: self];
+	int itemGroupIndex = [_parentItem indexOfItem: self];
 	
 	RETAIN(self);
-	[parent removeItem: self];
+	[_parentItem removeItem: self];
 	/* Delay release the receiver until we fully step out of receiver's 
 	   instance methods (like this method). */
 	AUTORELEASE(self);
 
-	// FIXME: Implement -insertItems:atIndex:
-	//[parent insertItems: items atIndex: itemGroupIndex];		
+	// TODO: Use a reverse object enumerator or eventually implement -insertItems:atIndex:
+	FOREACH([self items], item, ETLayoutItem *)
+	{
+		[_parentItem insertItem: item atIndex: itemGroupIndex];		
+	}
 	
 	return items;
 }
@@ -1241,47 +1360,114 @@
 
 /* Selection */
 
+/** Returns the index of the first selected item which is an immediate child of 
+the receiver. If there is none, returns NSNotFound. 
+
+Calling this method is equivalent to [[self selectionIndexes] firstIndex].
+
+Take note that -selectionIndexPaths may return one or multiple values when this
+method returns NSNotFound. See -selectionIndexes also. */
+- (unsigned int) selectionIndex
+{
+	return [[self selectionIndexes] firstIndex];
+}
+
+/** Sets the selected item identified by index in the receiver and discards any 
+existing selection index paths previously set.
+
+Posts an ETItemGroupSelectionDidChangeNotification. */
+- (void) setSelectionIndex: (unsigned int)index
+{
+	ETDebugLog(@"Modify selection index from %d to %d of %@", [self selectionIndex], index, self);
+
+	/* Check new selection validity */
+	NSAssert1(index >= 0, @"-setSelectionIndex: parameter must not be a negative value like %d", index);
+
+	NSMutableIndexSet *indexes = [NSMutableIndexSet indexSet];
+	
+	if (index != NSNotFound)
+		[indexes addIndex: index];
+
+	[self setSelectionIndexes: indexes];
+}
+
+/** Returns all indexes matching selected items which are immediate children of 
+the receiver.
+
+Put in another way, the method returns the first index of all index paths with a 
+length equal one. */
+- (NSMutableIndexSet *) selectionIndexes
+{
+	NSMutableIndexSet *indexes = [NSMutableIndexSet indexSet];
+
+	FOREACH([self selectionIndexPaths], indexPath, NSIndexPath *)
+	{
+		if ([indexPath length] == 1)
+			[indexes addIndex: [indexPath firstIndex]];
+	}
+
+	return indexes;
+}
+
+/** Sets the selected items identified by indexes in the receiver and discards 
+any existing selection index paths previously set.
+
+Posts an ETItemGroupSelectionDidChangeNotification. */
+- (void) setSelectionIndexes: (NSIndexSet *)indexes
+{
+	int numberOfItems = [[self items] count];
+	int lastSelectionIndex = [[self selectionIndexes] lastIndex];
+
+	ETDebugLog(@"Set selection indexes to %@ in %@", indexes, self);
+
+	if (lastSelectionIndex > (numberOfItems - 1) && lastSelectionIndex != NSNotFound) /* NSNotFound is a big value and not -1 */
+	{
+		ETLog(@"WARNING: Try to set selection index %d when %@ only contains %d items",
+			  lastSelectionIndex, self, numberOfItems);
+		return;
+	}
+
+	/* Update selection */
+	[self setSelectionIndexPaths: [indexes indexPaths]];
+}
+
 - (void) collectSelectionIndexPaths: (NSMutableArray *)indexPaths
                      relativeToItem: (ETLayoutItemGroup *)pathBaseItem
 {
-	NSEnumerator *e = [[self items] objectEnumerator];
-	id item = nil;
-		
-	while ((item = [e nextObject]) != nil)
+	FOREACHI([self items], item)
 	{
 		if ([item isSelected])
 			[indexPaths addObject: [item indexPathFromItem: pathBaseItem]];
+
 		if ([item isGroup])
 			[item collectSelectionIndexPaths: indexPaths relativeToItem: pathBaseItem];
 	}
 }
 
-/** Returns the index paths of selected items in layout item subtree of the the receiver. */
+
+/** Returns the index paths of selected items in layout item subtree of the the 
+receiver. */
 - (NSArray *) selectionIndexPaths
 {
 	NSMutableArray *indexPaths = [NSMutableArray array];
-	
+
 	[self collectSelectionIndexPaths: indexPaths relativeToItem: self];
-	
+
 	return indexPaths;
 }
 
 /** Selects every descendant items which match the index paths passed in 
-    parameter and deselects all other descendant items of the receiver.
-	
-	TODO: This is crude because we deselect everything without taking care of 
-	base items we encounter during the recursive traversal of the subtree... 
-	See -[ETLayout setSelectionIndexPaths:] to understand the issue more 
-	thoroughly. Moreover the method is surely extremly slow if called many times 
-	within a short time interval on a subtree that consists of thousand items or 
-	more. */
+parameter and deselects all other descendant items of the receiver.
+
+TODO: This is crude because we deselect everything without taking care of base 
+items we encounter during the recursive traversal of the subtree... See
+-[ETLayout setSelectionIndexPaths:] to understand the issue more thoroughly.
+Moreover the method is surely extremly slow if called many times within a short
+time interval on a subtree that consists of thousand items or more. */
 - (void) applySelectionIndexPaths: (NSMutableArray *)indexPaths 
                    relativeToItem: (ETLayoutItemGroup *)pathBaseItem
 {
-	NSEnumerator *e = [[self items] objectEnumerator];
-	id item = nil;
-		
-	while ((item = [e nextObject]) != nil)
+	FOREACHI([self items], item)
 	{
 		NSIndexPath *itemIndexPath = [item indexPathFromItem: pathBaseItem];
 		if ([indexPaths containsObject: itemIndexPath])
@@ -1299,34 +1485,49 @@
 }
 
 /** Sets the selected items in the layout item subtree attached to the receiver. 
-	TODO: See [ETLayout selectionIndexPaths].*/
+
+Posts an ETItemGroupSelectionDidChangeNotification. */
 - (void) setSelectionIndexPaths: (NSArray *)indexPaths
 {
 	[self applySelectionIndexPaths: [NSMutableArray arrayWithArray: indexPaths] 
 	                relativeToItem: self];
+
+	/* Finally propagate changes by posting notification */
+	NSNotification *notif = [NSNotification 
+		notificationWithName: ETItemGroupSelectionDidChangeNotification object: self];
 	
+	if ([[self delegate] respondsToSelector: @selector(itemGroupSelectionDidChange:)])
+		[[self delegate] itemGroupSelectionDidChange: notif];
+	
+	[[NSNotificationCenter defaultCenter] postNotification: notif];
+
 	/* For opaque layouts that may need to keep in sync the selection state of 
 	   their custom UI. */
 	[[self layout] selectionDidChangeInLayoutContext];
+
+	/* Reflect selection change immediately */
+	[[self supervisorView] display]; // TODO: supervisorView is probably not the best choice...
 }
 
 /** Returns the selected child items belonging to the receiver. 
-	The returned collection only includes immediate children, other selected 
-	descendant items below these childrens in the layout item subtree are 
-	excluded. */
+
+The returned collection only includes immediate children, other selected 
+descendant items below these childrens in the layout item subtree are excluded. */
 - (NSArray *) selectedItems
 {
-	return [[self items] objectsMatchingValue: [NSNumber numberWithBool: YES] forKey: @"isSelected"];
+	return [[self items] objectsMatchingValue: [NSNumber numberWithBool: YES] 
+	                                   forKey: @"isSelected"];
 }
 
 /** Returns selected descendant items reported by the active layout through 
-	-[ETLayout selectedItems]. 
-	You should call this method to obtain the selection in most cases and not
-	-selectedItems. */
+-[ETLayout selectedItems].
+
+You should call this method to obtain the selection in most cases and not
+-selectedItems. */
 - (NSArray *) selectedItemsInLayout
 {
 	NSArray *layoutSelectedItems = [[self layout] selectedItems];
-	
+
 	if (layoutSelectedItems != nil)
 	{
 		return layoutSelectedItems;
@@ -1341,16 +1542,18 @@
 - (NSArray *) selectedItemsIncludingRelatedDescendants
 {
 	NSArray *descendantItems = [self itemsIncludingRelatedDescendants];
-	
-	return [descendantItems objectsMatchingValue: [NSNumber numberWithBool: YES] forKey: @"isSelected"];
+
+	return [descendantItems objectsMatchingValue: [NSNumber numberWithBool: YES] 
+	                                      forKey: @"isSelected"];
 }
 
 /** You should rarely need to invoke this method. */
 - (NSArray *) selectedItemsIncludingAllDescendants
 {
 	NSArray *descendantItems = [self itemsIncludingAllDescendants];
-	
-	return [descendantItems objectsMatchingValue: [NSNumber numberWithBool: YES] forKey: @"isSelected"];
+
+	return [descendantItems objectsMatchingValue: [NSNumber numberWithBool: YES] 
+	                                      forKey: @"isSelected"];
 }
 
 /* Collection Protocol */
@@ -1437,83 +1640,6 @@
 			objectsMatchingValue: object forKey: @"value"];
 		[self removeItems: itemsMatchedByRepObject];
 	}
-}
-
-- (id) newItem
-{
-	id item = nil;
-
-	if ([self container] != nil)
-	{
-		item = [[self container] templateItem];
-	}
-	else
-	{
-		item = [[[self baseItem] container] templateItem];
-	}
-
-	if (item != nil)
-	{
-		item = AUTORELEASE([item deepCopy]);
-	}
-	else
-	{
-		item = [ETLayoutItem layoutItem];
-	}
-
-	return item;
-}
-
-- (id) newItemGroup
-{
-	id item = nil;
-
-	if ([self container] != nil)
-	{
-		item = [[self container] templateItemGroup];
-	}
-	else
-	{
-		item = [[[self baseItem] container] templateItemGroup];
-	}
-
-	if (item != nil)
-	{
-		item = AUTORELEASE([item deepCopy]);
-	}
-	else
-	{
-		item = [ETLayoutItemGroup layoutItem];
-	}
-
-	return item;
-}
-
-
-- (id) itemWithObject: (id)object isValue: (BOOL)isValue
-{
-	id item = [object isCollection] ? [self newItemGroup] : [self newItem];
-
-	/* We don't set the object as model when it is nil, so any existing value 
-	   or represented object already provided with the item template won't be 
-	   overwritten in such case. 
-	   Value and represented object are copied when -deepCopy is called on the 
-	   template items in -newItem and -newItemGroup. */
-	if (object != nil)
-	{
-		/* If the object is a simple value object rather than a true model object
-		we don't set it as represented object but as a value. */
-		if (isValue)
-		{
-			[item setValue: object];
-		}
-		else
-		{
-			[item  setRepresentedObject: object];
-		}
-	}
-
-	return item;
 }
 
 /* ETLayoutingContext */
@@ -1626,109 +1752,6 @@
 - (id) initWithLayoutItems: (NSArray *)layoutItems view: (NSView *)view
 {
 	return [self initWithItems: layoutItems view: view];
-}
-
-@end
-
-/* Helper methods to retrieve layout items provided by data sources */
-
-@implementation ETLayoutItemGroup (ETSource)
-
-- (ETContainer *) container
-{
-	if ([self isContainer])
-	{
-		return (ETContainer *)[self view];
-	}
-	else
-	{
-		return nil;
-	}
-}
-
-- (BOOL) isReloading
-{
-	return _reloading;
-}
-
-- (NSArray *) itemsFromSource
-{
-	ETContainer *container = [self baseContainer];
-
-	switch ([container checkSourceProtocolConformance])
-	{
-		case 1:
-			//ETDebugLog(@"Will -reloadFromFlatSource");
-			return [self itemsFromFlatSource];
-			break;
-		case 2:
-			//ETDebugLog(@"Will -reloadFromTreeSource");
-			return [self itemsFromTreeSource];
-			break;
-		case 3:
-			ETDebugLog(@"Will -reloadFromRepresentedObject");
-			return [self itemsFromRepresentedObject];
-			break;
-		default:
-			ETLog(@"WARNING: source protocol is incorrectly supported by %@.", [[self container] source]);
-	}
-	
-	return nil;
-}
-
-- (NSArray *) itemsFromFlatSource
-{
-	NSMutableArray *itemsFromSource = [NSMutableArray array];
-	ETLayoutItem *layoutItem = nil;
-	ETContainer *container = [self baseContainer];
-	int nbOfItems = [[container source] numberOfItemsInContainer: container];
-	
-	for (int i = 0; i < nbOfItems; i++)
-	{
-		layoutItem = [[container source] container: container itemAtIndex: i];
-		[itemsFromSource addObject: layoutItem];
-	}
-	
-	return itemsFromSource;
-}
-
-- (NSArray *) itemsFromTreeSource
-{
-	NSMutableArray *itemsFromSource = [NSMutableArray array];
-	ETLayoutItem *layoutItem = nil;
-	ETContainer *baseContainer = [self baseContainer];
-	// NOTE: [self indexPathFromItem: [container layoutItem]] is equal to [[container layoutItem] indexPathFortem: self]
-	NSIndexPath *indexPath = [self indexPathFromItem: [baseContainer layoutItem]];
-	int nbOfItems = 0;
-	
-	//ETDebugLog(@"-itemsFromTreeSource in %@", self);
-	
-	/* Request number of items to the source by passing receiver index path 
-	   expressed in a way relative to the base container */
-	nbOfItems = [[baseContainer source] container: baseContainer numberOfItemsAtPath: indexPath];
-
-	for (int i = 0; i < nbOfItems; i++)
-	{
-		NSIndexPath *indexSubpath = nil;
-		
-		indexSubpath = [indexPath indexPathByAddingIndex: i];
-		/* Request item to the source by passing item index path expressed in a
-		   way relative to the base container */
-		layoutItem = [[baseContainer source] container: baseContainer itemAtPath: indexSubpath];
-		//ETDebugLog(@"Retrieved item %@ known by path %@", layoutItem, indexSubpath);
-		if (layoutItem != nil)
-		{
-			[itemsFromSource addObject: layoutItem];
-		}
-		else
-		{
-			[NSException raise: @"ETInvalidReturnValueException" 
-				format: @"Item at path %@ returned by source %@ must not be "
-				@"nil", indexSubpath, [baseContainer source]];
-		}
-	}
-	
-	return itemsFromSource;
 }
 
 @end

@@ -141,7 +141,7 @@
 
 	[propertyView setLayout: AUTORELEASE([[ETTableLayout alloc] init])];
 	[propertyView setSource: self];
-	// NOTE: If this next line is uncommented, -containerSelectionDidChange:
+	// NOTE: If this next line is uncommented, -itemGroupSelectionDidChange:
 	// must be updated to filter out property view related notifications.
 	//[propertyView setDelegate: self];
 	// NOTE: The following code is commented out to enable property editing
@@ -150,7 +150,7 @@
 	//[propertyView setTarget: self];
 }
 
-- (void) containerSelectionDidChange: (NSNotification *)notif
+- (void) itemGroupSelectionDidChange: (NSNotification *)notif
 {
 	ETDebugLog(@"Selection did change for %@ received in %@", [notif object], self);
 	
@@ -164,20 +164,20 @@
 	[[[item inspector] window] makeKeyAndOrderFront: self];
 }
 
-- (int) container: (ETContainer *)container numberOfItemsAtPath: (NSIndexPath *)path
+- (int) itemGroup: (ETLayoutItemGroup *)baseItem numberOfItemsAtPath: (NSIndexPath *)path
 {
-	NSAssert([container isEqual: propertyView], @"Inspector must only receive"
+	NSAssert([[baseItem supervisorView] isEqual: propertyView], @"Inspector must only receive"
 		@"propertyView as first parameter in source methods");
 	
-	return [self propertyView: container numberOfItemsAtPath: path];
+	return [self propertyView: [baseItem supervisorView] numberOfItemsAtPath: path];
 }
 
-- (ETLayoutItem *) container: (ETContainer *)container itemAtPath: (NSIndexPath *)path
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtPath: (NSIndexPath *)path
 {
-	NSAssert([container isEqual: propertyView], @"Inspector must only receive"
+	NSAssert([[baseItem supervisorView] isEqual: propertyView], @"Inspector must only receive"
 		@"propertyView as first parameter in source methods");
 
-	return [self propertyView: container itemAtPath: path];
+	return [self propertyView: [baseItem supervisorView] itemAtPath: path];
 }
 
 - (int) propertyView: (ETContainer *)container numberOfItemsAtPath: (NSIndexPath *)path
@@ -258,12 +258,12 @@
 	return propertyItem;
 }
 
-- (NSArray *) displayedItemPropertiesInContainer: (ETContainer *)container
+- (NSArray *) displayedItemPropertiesInItemGroup: (ETLayoutItemGroup *)baseItem
 {
-	NSAssert([container isEqual: propertyView], @"Inspector must only receive"
-		@"propertyView as first parameter in source methods");
+	NSAssert([[baseItem supervisorView] isEqual: propertyView], @"Inspector "
+		@"must only receive propertyView as first parameter in source methods");
 
-	return [NSArray arrayWithObjects: @"property", @"value", nil];
+	return A(@"property", @"value");
 }
 
 - (IBAction) changeLayout: (id)sender
@@ -360,18 +360,6 @@
 			}
 		}
 	}
-}
-
-/* Deprecated (DO NOT USE, WILL BE REMOVED LATER) */
-
-- (NSArray *) inspectedItems
-{
-	return [self inspectedObjects];
-}
-
-- (void) setInspectedItems: (NSArray *)items
-{
-	[self setInspectedObjects: items];
 }
 
 @end

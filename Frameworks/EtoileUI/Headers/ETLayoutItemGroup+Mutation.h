@@ -42,8 +42,12 @@
 /* Private Header
    Don't use or override methods exposed here. */
    
-#define PROVIDER_SOURCE [[self baseContainer] source]
-#define PROVIDER_CONTAINER [self baseContainer]
+#define PROVIDER_SOURCE [[self baseItem] source]
+#define PROVIDER_CONTAINER [[self baseItem] container]
+
+/* Properties */
+
+extern NSString *kETControllerProperty; // controller
 
 /* All model mutations are triggered by implicit or explicit remove/insert/add 
    in the layout item tree. Implicit mutations are done by the framework unlike 
@@ -88,9 +92,18 @@
 	
 /* Providing */
 
-- (NSArray *) itemsFromRepresentedObject;
-/*- (NSArray *) itemsFromSource;
+- (ETContainer *) container;
+- (BOOL) isReloading;
+- (NSArray *) itemsFromSource;
 - (NSArray *) itemsFromFlatSource;
-- (NSArray *) itemsFromTreeSource;*/
+- (NSArray *) itemsFromTreeSource;
+- (NSArray *) itemsFromRepresentedObject;
+- (int) checkSourceProtocolConformance;
+
+/* Controller Coordination */
+
+- (id) newItem;
+- (id) newItemGroup;
+- (id) itemWithObject: (id)object isValue: (BOOL)isValue;
 
 @end

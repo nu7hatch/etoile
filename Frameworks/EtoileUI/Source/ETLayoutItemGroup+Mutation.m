@@ -36,14 +36,18 @@
 
 #import <EtoileFoundation/NSObject+Model.h>
 #import <EtoileFoundation/ETCollection.h>
-#import <EtoileUI/ETLayoutItemGroup+Mutation.h>
-#import <EtoileUI/ETEvent.h>
-#import <EtoileUI/ETContainer.h>
-#import <EtoileUI/ETCompatibility.h>
+#import "ETLayoutItemGroup+Mutation.h"
+#import "ETLayoutItem+Factory.h"
+#import "ETEvent.h"
+#import "ETContainer.h"
+#import "ETContainer+Controller.h"
+#import "ETCompatibility.h"
 
 @interface ETLayoutItemGroup (ETSource)
 - (BOOL) isReloading;
 @end
+
+NSString *kETControllerProperty = @"controller";
 
 
 @implementation ETLayoutItemGroup (ETMutationHandler)
@@ -418,6 +422,113 @@ static 	BOOL _coalescingMutation = NO;
 
 /* Providing */
 
+// TODO: Get rid of that once the source protocols are based on ETLayoutItemGroup
+// rather than ETContainer
+- (ETContainer *) container
+{
+	if ([self isContainer])
+	{
+		return (ETContainer *)[self view];
+	}
+	else
+	{
+		return nil;
+	}
+}
+
+- (BOOL) isReloading
+{
+	return _reloading;
+}
+
+- (NSArray *) itemsFromSource
+{
+	switch ([self checkSourceProtocolConformance])
+	{
+		case 1:
+			ETDebugLog(@"Will -reloadFromFlatSource");
+			/* We allow the flat source protocol to return item groups that 
+			   will load their child items based on their represented object 
+			   content. */
+			if ([self isEqual: [self baseItem]])
+			{
+				return [self itemsFromFlatSource];
+			}
+			else
+			{
+				return [self itemsFromRepresentedObject];
+			}
+			break;
+		case 2:
+			ETDebugLog(@"Will -reloadFromTreeSource");
+			return [self itemsFromTreeSource];
+			break;
+		case 3:
+			ETDebugLog(@"Will -reloadFromRepresentedObject");
+			return [self itemsFromRepresentedObject];
+			break;
+		default:
+			ETLog(@"WARNING: source protocol is incorrectly supported by %@.", [[self container] source]);
+	}
+	
+	return nil;
+}
+
+- (NSArray *) itemsFromFlatSource
+{
+	NSMutableArray *itemsFromSource = [NSMutableArray array];
+	ETLayoutItem *layoutItem = nil;
+	ETLayoutItemGroup *baseItem = [self baseItem];
+	int nbOfItems = [[baseItem source] numberOfItemsInItemGroup: baseItem];
+	
+	for (int i = 0; i < nbOfItems; i++)
+	{
+		layoutItem = [[baseItem source] itemGroup: baseItem itemAtIndex: i];
+		[itemsFromSource addObject: layoutItem];
+	}
+	
+	return itemsFromSource;
+}
+
+- (NSArray *) itemsFromTreeSource
+{
+	NSMutableArray *itemsFromSource = [NSMutableArray array];
+	ETLayoutItem *layoutItem = nil;
+	ETContainer *baseContainer = [[self baseItem] supervisorView];
+	// NOTE: [self indexPathFromItem: [container layoutItem]] is equal to [[container layoutItem] indexPathFortem: self]
+	NSIndexPath *indexPath = [self indexPathFromItem: [baseContainer layoutItem]];
+	int nbOfItems = 0;
+	
+	//ETDebugLog(@"-itemsFromTreeSource in %@", self);
+	
+	/* Request number of items to the source by passing receiver index path 
+	   expressed in a way relative to the base container */
+	nbOfItems = [[baseContainer source] itemGroup: [self baseItem] numberOfItemsAtPath: indexPath];
+
+	for (int i = 0; i < nbOfItems; i++)
+	{
+		NSIndexPath *indexSubpath = nil;
+		
+		indexSubpath = [indexPath indexPathByAddingIndex: i];
+		/* Request item to the source by passing item index path expressed in a
+		   way relative to the base container */
+		layoutItem = [[baseContainer source] itemGroup: [self baseItem] itemAtPath: indexSubpath];
+		//ETDebugLog(@"Retrieved item %@ known by path %@", layoutItem, indexSubpath);
+		if (layoutItem != nil)
+		{
+			[itemsFromSource addObject: layoutItem];
+		}
+		else
+		{
+			[NSException raise: @"ETInvalidReturnValueException" 
+				format: @"Item at path %@ returned by source %@ must not be "
+				@"nil", indexSubpath, [baseContainer source]];
+		}
+	}
+	
+	return itemsFromSource;
+}
+
 /* Makes the represented object returns layout items as a source would but only
    turning immediate children into ETLayoutItem or ETLayoutItemGroup instances. 
    An empty array of items is returned when the represented object isn't a 
@@ -452,6 +563,157 @@ static 	BOOL _coalescingMutation = NO;
 	}
 	
 	return childItems;
+}
+
+/** Returns 0 when source doesn't conform to any parts of ETContainerSource 
+informal protocol.
+
+Returns 1 when source conform to protocol for flat collections and display of 
+items in a linear style.
+
+Returns 2 when source conform to protocol for tree collections and display of 
+items in a hiearchical style.
+
+If tree collection part of the protocol is implemented through 
+-itemGroup:numberOfItemsAtPath: , ETContainer by default ignores flat collection 
+part of protocol like -numberOfItemsInContainer. */
+- (int) checkSourceProtocolConformance
+{
+	id source = [[self baseItem] source];
+
+	if ([source isEqual: [self baseItem]])
+	{
+		return 3;
+	}
+	else if ([source respondsToSelector: @selector(itemGroup:numberOfItemsAtPath:)])
+	{
+		if ([source respondsToSelector: @selector(itemGroup:itemAtPath:)])
+		{
+			return 2;
+		}
+		else
+		{
+			ETLog(@"%@ implements itemGroup:numberOfItemsAtPath: but misses "
+				  @"itemGroup:itemAtPath: as requested by ETContainerSource "
+				  @"protocol.", source);
+			return 0;
+		}
+	}
+	else if ([source respondsToSelector: @selector(numberOfItemsInItemGroup:)])
+	{
+		if ([source respondsToSelector: @selector(itemGroup:itemAtIndex:)])
+		{
+			return 1;
+		}
+		else
+		{
+			ETLog(@"%@ implements numberOfItemsInItemGroup: but misses "
+				  @"container:itemAtIndex as  requested by "
+				  @"ETContainerSource protocol.", source);
+			return 0;
+		}
+	}
+	else
+	{
+		ETLog(@"%@ implements neither numberOfItemsInItemGroup: nor "
+			  @"itemGroup:numberOfItemsAtPath: as requested by "
+			  @"ETContainerSource protocol.", source);
+		return 0;
+	}
+}
+
+/* Controller Coordination */
+
+/** Creates a new ETLayoutItem object based on a template if possible. 
+ 
+A template can be provided by a controller whose content is set to ancestor item 
+of the receiver. If such a template can be found, then the returned item is 
+created by cloning it, otherwise by simply instantiating ETLayoutItem. See also  
+-[ETController setTemplateItem:]. */
+- (id) newItem
+{
+	id item = nil;
+	
+	if ([self valueForProperty: kETControllerProperty] != nil)
+	{
+		item = [[self valueForProperty: kETControllerProperty] templateItem];
+	}
+	else
+	{
+		item = [[[self baseItem] valueForProperty: kETControllerProperty] templateItem];
+	}
+	
+	if (item != nil)
+	{
+		item = AUTORELEASE([item deepCopy]);
+	}
+	else
+	{
+		item = [ETLayoutItem item];
+	}
+	
+	return item;
+}
+
+/** Creates a new ETLayoutItemGroup object based on a template if possible. 
+ 
+A template can be provided by a controller whose content is set to ancestor item 
+of the receiver. If such a template can be found, then the returned item is 
+created by cloning it, otherwise by simply instantiating ETLayoutItem. See also 
+-[ETController setTemplateItemGroup:]. */
+- (id) newItemGroup
+{
+	id item = nil;
+
+	if ([self valueForProperty: kETControllerProperty] != nil)
+	{
+		item = [[self valueForProperty: kETControllerProperty] templateItemGroup];
+	}
+	else
+	{
+		item = [[[self baseItem] valueForProperty: kETControllerProperty] templateItemGroup];
+	}
+	
+	if (item != nil)
+	{
+		item = AUTORELEASE([item deepCopy]);
+	}
+	else
+	{
+		item = [ETLayoutItem itemGroup];
+	}
+	
+	return item;
+}
+
+/** Creates a new ETLayoutItem or ETLayoutItemGroup object based on whether 
+object return NO or YES to -isCollection and by calling then either -newItem 
+or -newItemGroup. If isValue is equal to YES, object is bound to the item by 
+calling -setValue: rather than -setRepresentedObject:. */
+- (id) itemWithObject: (id)object isValue: (BOOL)isValue
+{
+	id item = [object isCollection] ? [self newItemGroup] : [self newItem];
+	
+	/* We don't set the object as model when it is nil, so any existing value 
+	 or represented object already provided with the item template won't be 
+	 overwritten in such case. 
+	 Value and represented object are copied when -deepCopy is called on the 
+	 template items in -newItem and -newItemGroup. */
+	if (object != nil)
+	{
+		/* If the object is a simple value object rather than a true model object
+		 we don't set it as represented object but as a value. */
+		if (isValue)
+		{
+			[item setValue: object];
+		}
+		else
+		{
+			[item  setRepresentedObject: object];
+		}
+	}
+	
+	return item;
 }
 
 @end

@@ -35,6 +35,9 @@
 
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
+#ifndef GNUSTEP
+#import <objc/runtime.h>
+#endif
 
 /* Runtime Checks */
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_5
@@ -47,9 +50,7 @@
 #import <GNUstepBase/GSObjCRuntime.h>
 #endif
 
-#define ETUTI NSString
-
-@class ETMethod;
+@class ETMethod, ETUTI;
 
 /** Protocol which can be adopted by other object hierachy than NSObject rooted hierarchy */
 @protocol ETInspectableObject
@@ -62,9 +63,6 @@
 
 + (NSArray *) allSubclasses;
 + (NSArray *) directSubclasses;
-
-- (id) clone;
-- (BOOL) isPrototype;
 
 /** Returns a object representing the receiver. Useful when sucblasses override
     root class methods and make them unavailable to introspection. For example,
@@ -94,7 +92,7 @@
 - (id) typeForInstanceVariable: (NSString *)ivar;
 
 - (NSArray *) protocolNames;
-//- (NSArray *) protocols;
+- (NSArray *) protocols;
 
 - (NSArray *) methods;
 - (NSArray *) methodNames;
@@ -114,23 +112,26 @@
 
 @end
 
-@interface ETInstanceVariable : NSObject 
+@interface ETInstanceVariable : NSObject
 {
 	@public
 	id _possessor;
 #ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	GSIVar _ivar;
+#elif defined(NEXT_RUNTIME_2)
+	Ivar _ivar;
 #endif
 }
 
 - (id) possessor;
-
 - (NSString *) name;
-// FIXME: Replace by ETUTI class later
+
 - (ETUTI *) type;
 - (NSString *) typeName;
+- (const char *) typeEncoding;
+- (BOOL) isObjectType;
+
 - (id) value;
-/** Pass NSValue to set primitive types */
 - (void) setValue: (id)value;
 
 @end
@@ -170,4 +171,16 @@
 - (NSArray *) protocolNames;
 - (NSArray *) protocols;
 
+@end
+
+/**
+ * Provides some introspection on Class objects.
+ */
+@interface ETClass : NSObject
+/**
+ * Returns an array of the Protocol objects which aClass explicitly conforms
+ * to. (i.e., does not include protocols conformed to by aClass's superclasses
+ * or protocols which the returned protocols conform to themselves.)
+ */
++ (NSArray *) protocolsForClass: (Class)aClass;
 @end

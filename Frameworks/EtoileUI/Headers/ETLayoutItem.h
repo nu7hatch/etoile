@@ -37,41 +37,59 @@
 
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
-#import <EtoileUI/ETStyleRenderer.h>
+#import <EtoileUI/ETStyle.h>
 #import <EtoileUI/ETInspecting.h>
 #import <EtoileFoundation/ETPropertyValueCoding.h>
 
-// TODO: Remove once ETUTI is part of EtoileFoundation.
-#define ETUTI NSString
+@class ETUTI;
+@class ETView, ETContainer, ETLayoutItemGroup, ETWindowItem, ETActionHandler;
+@protocol ETEventHandler, ETInspector;
 
-@class ETView, ETContainer, ETLayoutItemGroup, ETWindowItem;
-@protocol ETEventHandler;
+
+/* Properties */
+
+extern NSString *kAnchorPointProperty; /** anchorPoint property name */
+extern NSString *kETActionHandlerProperty; /** actionHandler property name */
+extern NSString *kETAutoresizingMask; /** autoresizingMask property name */
+extern NSString *kETDefaultFrameProperty; /** defaultFrame property name */
+extern NSString *kETFlippedProperty; /** flipped property name */
+extern NSString *kETFrameProperty; /** frame property name */  
+extern NSString *kETIconProperty; /** icon property name */
+extern NSString *kETImageProperty; /** image property name */
+extern NSString *kETInspectorProperty; /** inspector property name */
+extern NSString *kETNameProperty; /** name property name */
+extern NSString *kETNeedsDisplayProperty; /** needsDisplay property name */
+extern NSString *kETParentItemProperty; /** parentItem property name */
+extern NSString *kETPersistentFrameProperty; /** persistentFrame property name */
+extern NSString *kETRepresentedObjectProperty; /** representedObject property name */
+extern NSString *kRepresentedPathBaseProperty; /** representedPathBase property name */
+extern NSString *kETSelectedProperty; /** selected property name */
+extern NSString *kETStyleProperty; /** style property name */
+extern NSString *kETValueProperty; /** value property name */
+extern NSString *kETVisibleProperty; /** visible property name */
 
 // FIXME: Use less memory per instance. Name and value are somehow duplicates.
 // _cells and _view could be moved in a helper object. Pack booleans in a struct.
 @interface ETLayoutItem : ETStyle <ETPropertyValueCoding, ETObjectInspection>
 {
-	ETLayoutItemGroup *_parentLayoutItem;
-	
-	id _value;
+	ETLayoutItemGroup *_parentItem;
+
 	id _modelObject;
 	NSMutableDictionary *_variableProperties;
-	NSString *_name;
-	ETStyle *_renderer;
 	ETLayoutItem *_decoratorItem; // previous decorator
 	ETLayoutItem *_decoratedItem; // next decorator
 
 	IBOutlet ETView *_view;
-	NSArray *_cells; /* NSCell compatibility */
 	
 	/* Model object stores a persistent frame when the layout is non-computed */
-	NSRect _defaultFrame; /* Frame without item scaling */
 	NSRect _frame; /* Frame with item scaling */
 	
+	BOOL _flipped;
 	BOOL _selected;
 	BOOL _visible;
 	BOOL _resizeBounds; /* Scale view content by resizing bounds */
 	BOOL _needsUpdateLayout;
+	// TODO: Implement... BOOL _needsDisplay;
 	
 	id _reserved;
 }
@@ -89,11 +107,13 @@
 
 - (id) rootItem;
 - (id) baseItem;
+- (BOOL) isBaseItem;
 - (ETLayoutItemGroup *) parentItem;
 - (void) setParentItem: (ETLayoutItemGroup *)parent;
 - (void ) removeFromParent;
 - (ETContainer *) closestAncestorContainer;
 - (ETView *) closestAncestorDisplayView;
+- (ETLayoutItem *) closestAncestorItemWithDisplayView;
 
 - (NSIndexPath *) indexPathFromItem: (ETLayoutItem *)item;
 - (NSIndexPath *) indexPathForItem: (ETLayoutItem *)item;
@@ -192,15 +212,35 @@ shape*/
 - (void) updateLayout;
 - (void) apply: (NSMutableDictionary *)inputValues;
 - (NSRect) drawingFrame;
-- (void) render: (NSMutableDictionary *)inputValues dirtyRect: (NSRect)dirtyRect inView: (NSView *)view;
+- (void) render: (NSMutableDictionary *)inputValues 
+      dirtyRect: (NSRect)dirtyRect 
+         inView: (NSView *)view;
 - (void) render;
-- (ETStyle *) renderer;
-- (void) setStyleRenderer: (ETStyle *)renderer;
+- (ETStyle *) style;
+- (void) setStyle: (ETStyle *)aStyle;
 
-- (void) setNeedsDisplay: (BOOL)now;
+- (void) setNeedsDisplay: (BOOL)flag;
+- (void) display;
+- (NSRect) convertDisplayRect: (NSRect)rect 
+		toAncestorDisplayView: (NSView **)aView;
+
+/* Geometry */
 
 - (NSRect) convertRectToParent: (NSRect)rect;
 - (NSRect) convertRectFromParent: (NSRect)rect;
+- (NSPoint) convertPointToParent: (NSPoint)point;
+- (NSPoint) convertPointFromParent: (NSPoint)point;
+- (NSRect) convertRect: (NSRect)rect fromItem: (ETLayoutItemGroup *)ancestor;
+- (NSRect) convertRect: (NSRect)rect toItem: (ETLayoutItemGroup *)ancestor;
+/*- (NSPoint) convertPoint: (NSPoint)point fromItem: (ETLayoutItemGroup *)ancestor;
+- (NSPoint) convertPoint: (NSPoint)point toItem: (ETLayoutItemGroup *)ancestor;*/
+- (BOOL) containsPoint: (NSPoint)point;
+- (BOOL) pointInside: (NSPoint)point;
+- (BOOL) isFlipped;
+- (void) setFlipped: (BOOL)flip;
+
+//- (ETLayoutItem *) decoratorItemAtPoint: (NSPoint *)point;
+//- (NSRect) contentRect;
 
 /* Decoration */
 
@@ -230,22 +270,17 @@ shape*/
 /*- (void) beginLayoutComputation;
 - (void) endLayoutComputation;*/
 
-/** The persistent frame is only valid and used in non-computed layout like
-	ETFreeLayout. */
 - (NSRect) persistentFrame;
 - (void) setPersistentFrame: (NSRect) frame;
 
-/** Returns always the current frame. This value is always in sync with 
-	persistent frame in non-computed layout but is usually different when
-	the layout is computed */
 - (NSRect) frame;
-/** Sets the current frame and also the persistent frame if the layout
-	is a non-computed one. 
-	The layout is found by looking up in the layout tree for the closest
-	layout item group which has a layout defined. */
 - (void) setFrame: (NSRect)rect;
 - (NSPoint) origin;
 - (void) setOrigin: (NSPoint)origin;
+- (NSPoint) anchorPoint;
+- (void) setAnchorPoint: (NSPoint)center;
+- (NSPoint) position;
+- (void) setPosition: (NSPoint)position;
 - (NSSize) size;
 - (void) setSize: (NSSize)size;
 - (float) x;
@@ -257,6 +292,8 @@ shape*/
 - (float) width;
 - (void) setWidth: (float)width;
 
+- (NSRect) boundingBox;
+//- (void) setBoundingBox: (NSRect)extent;
 - (NSRect) defaultFrame;
 - (void) setDefaultFrame: (NSRect)frame;
 - (void) restoreDefaultFrame;
@@ -267,12 +304,13 @@ shape*/
 
 /* Events & Actions */
 
-- (id <ETEventHandler>) eventHandler;
+- (id) actionHandler;
+- (void) setActionHandler: (id)anHandler;
+- (BOOL) acceptsActions;
+- (BOOL) validateUserInterfaceItem: (id <NSValidatedUserInterfaceItem>)anItem;
 
-- (void) doubleClick;
-
-- (void) showInspectorPanel;
 - (id <ETInspector>) inspector;
+- (void) setInspector: (id <ETInspector>)inspector;
 
 /* Live Development */
 
@@ -284,6 +322,7 @@ shape*/
 
 - (ETLayoutItemGroup *) parentLayoutItem;
 - (void) setParentLayoutItem: (ETLayoutItemGroup *)parent;
+- (id <ETEventHandler>) eventHandler;
 
 @end
 

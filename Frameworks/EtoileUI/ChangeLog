@@ -1,3 +1,369 @@
+2009-02-17  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItem:
+	(-initWithView:value:representedObject:): Turned flipped coordinates on by 
+	default.
+	(-setSupervisorView:): Modified to sync the new supervisor view with the 
+	flipped property of the layout item.
+	(-setFrame:): Modified to notify the style object about bounds change.
+
+2009-02-15  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETView:
+	(-release): Rewritten retain cycle management code/doc a bit to be easier to 
+	understand.
+	(-_recursiveDisplayAllDirtyWithLockFocus:visRect:): Modified to mark 
+	_wasJustRedrawn.
+	(_recursiveDisplayRectIfNeededIgnoringOpacity:isVisibleRect:rectIsVisibleRectForView:):
+	Added to truly redraw properly on Mac OS X in all cases.
+	(-[ETScrollView initWithFrame:layoutItem:]): Modified to use no scrollers 
+	by default, otherwise -[ETContainer hasVerticalScroller] wrongly starts to 
+	return YES once the layout is switched, because -setLayoutView: causes the 
+	scroll view decorator to be created like that:
+	-[ETContainer createScrollViewDecoratorItem]
+	-[ETContainer scrollView]
+	-[ETContainer hasVerticalScroller]
+	-[ETContainer syncDisplayViewWithContainer]
+	-[ETContainer setLayoutView:]
+	* ETContainer:
+	(-setHasVerticalScroller:, -setHasHorizontalScoller:): Imrproved to only 
+	insert the scroll view decorator when a scroller becomes a visible.
+	(-createScrollViewDecoratorItem): Added an assertion to check the scroller 
+	visibility meet our expectations.
+
+2009-02-14  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETStyle:
+	(-[ETStyle didChangeItemBounds:]): Added.
+	ETBasicItemStyle
+	(-render:layoutItem:dirtyRect:): Updated.
+	(-drawImage:flipped:inRect:): Modified to draw properly even if the item is 
+	flipped.
+	(-drawStackIndicatorInRect:): Added.
+
+2009-01-30  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItemGroup:
+	(-render:dirtyRect:inView:): Modified to draw the layout item tree 
+	encapsulated in the layout, this way we can really support arbitrary UI 
+	composition.
+	(-display:item:dirtyRect:inView:): Fixed to check the flipping correctly. 
+	(-unmakeGroup): Rewritten to be usable.
+
+2009-01-30  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItemGroup:
+	For clarity, splitted the index and path based informal source protocol into 
+	two distinct protocols.
+	(-itemsWithSubviewsOfView:): Moved to ETLayoutItemBuilder.
+	(-handleAttachViewOfItem:, -handleDetachViewOfItem:, -handleAttachItem:, 
+	-handleDetachItem:): Improved the documentation and tidied the code a bit.
+	Improved and reformatted the documentation of methods related to the 
+	represented object or source object.
+	* ETLayoutItemBuilder:
+	(-renderView:): Improved to set the persistent frame on each built item. 
+	Thereby the existing view frames are never lost when we set a layout 
+	(by default the layout of each built item group is nil here).
+
+2009-01-30  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayer:
+	Added an experimental ETWindowLayout with the possibility to switch the 
+	layout of the window layer from a WM-based layout to a layout such as 
+	outline, table, flow etc.
+	ETWindowLayer
+	Added _visibleWindows and _rootWindow ivar.
+	(-init, -dealloc): Updated.
+	(-_createRetainedRootWindow, -hideHardWindows, -showHardWindows): Added.
+	(-setLayout:): Overriden to use the previous two methods.
+	
+2009-01-29  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayout:
+	(-setLayoutContext:): Documented new display view removal code in details.
+	(-render:isNewContent): Moved layout context check to -canRender. Moved 
+	code incorrectly disabled that removes display views to -setLayoutContext:.
+
+2009-01-28  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETContainer:
+	Removed ETContainerSelectionDidChangeNotification.
+	* ETLayoutItemGroup:
+	Added ETItemGroupSelectionDidChangeNotification. Updated and reformatted 
+	selection related method documentation. Removed some unecessary extra tabs 
+	in the methods.
+	(-setSelectionIndexPaths:): Updated to send the new notification to the 
+	delegate.
+	* ETPaneLayout, ETPaneSwitcherLayout, ETInspector, ETTableLayout:  Updated 
+	to use the new notification.
+
+2009-01-28  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETTableLayout:
+	Rewritten a bit various methods to be shorter by using more syntatic sugar.
+	(-setLayoutView:): Modified to use FOREACH, A, ETLayoutItemPboardType 
+	constant and -tableView.
+	(-setDisplayedProperties:, -selectedItems): Modified to use FOREACH.
+
+2009-01-28  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETPickboard:
+	Corrected header import statements and removed extra tab or unecessary 
+	spacing in various methods.
+	(-layoutItemWithObject:): Rewritten with FOREACH and documented.
+	(-[ETPickCollection initWithCollection:]): Rewritten with SUPERINIT.
+
+2009-01-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItemGroup:
+	(-displayedItemPropertiesInItemGroup:): Added. Moved ETContainer equivalent 
+	declaration to ETLayoutItemGroup source protocol.
+	* ETContainer:
+	(-displayedItemPropertiesInContainer:): Removed.
+	* ETInspector, ETViewModelLayout, ETTableLayout, ETObjectBrowserLayout, 
+	ObjectManagerExample, PhotoViewExample:
+	Updated to use the new method.
+
+2009-01-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItemGroup:
+	Moved ETContainer index path-based source protocol to ETLayoutItemGroup, in 
+	that way it is centered around the base item.
+	(-itemGroup:numberOfItemsAtPath:, itemGroup:itemAtPath:): Added.
+	* ETContainer:
+	(-numberOfItemsInContainer:, container:itemAtIndex:):
+	(-container:numberOfItemsAtPath::, container:itemAtPath:):
+	Removed.
+	* ETLayoutItemGroup+Mutation, ETInspector, ETBrowserLayout, 
+	ETObjectBrowserLayout, ObjectManagerExample:
+	Updated to use the new index path-based source protocol.
+
+2009-01-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItemGroup:
+	Moved ETContainer index-based source protocol to ETLayoutItemGroup, in that 
+	way it is centered around the base item.
+	(-numberOfItemsInItemGroup:, itemGroup:itemAtIndex:): Added.
+	* ETContainer:
+	(-numberOfItemsInContainer:, container:itemAtIndex:): Deprecated
+	* ETLayoutItemGroup+Mutation, ETViewModelLayout, ObjectManagerExample, 
+	  PhotoViewExample, PaneExample:
+	Updated to use the new index-based source protocol.
+	Also improved PhotoViewExample to take in account composite layout when the 
+	positional constraints are altered.
+
+2009-01-27  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItemGroup:
+	(-source):
+	(-setSource:):
+	New methods moved out of ETContainer.
+	* ETContainer:
+	Removed _dataSource ivar (now declared as a property on ETLayoutItemGroup).
+	(-source, -setSource:): Deprecated.
+
+2009-01-26  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItem:
+	Added kETRepresentedPathProperty. Moved property access macros to 
+	ETCompatibility.h
+	(-representedPathBase): Modified to return the property rather than nil 
+	by default.
+	* ETLayoutItemGroup:
+	(-representedPathBase): Removed this overriden method version.
+	(-setRepresentedPathBase:): New method based on the old 
+	-[ETContainer representedPath].
+	* ETContainer:
+	Removed _path ivar (now declared as a property on ETLayoutItem).
+	(-representedPath, -setRepresentedPath:): Deprecated.
+
+2009-01-24  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETContainer (-dealloc): Fixed a nasty double release error by removing 
+	DESTROY(_layoutView). This ivar is weak reference, hence this line results 
+	in an extra release that translates in more or less random crashes when a 
+	view-based layout is released. Here is the sequence that leads to the crash:
+	- an item group is deallocated and it releases its layout
+	- the layout is deallocated and releases its layout view	
+	At this point the layout view is still retained by the container as a subview
+	... but later:
+	- the container is deallocated and wrongly releases its layout view (which 
+	was not retained in -setLayoutView:)
+	- the layout view is deallocated
+	- the container deallocation code terminates with [super dealloc] which 
+	tries to release its subviews and thereby crashes when trying to send 
+	-removeFromSuperview to the deallocated layout view.
+	The crash happens very often on a window close which releases the layout 
+	item tree it decorates. This fix should also solve random crashes that were 
+	reported when the application terminates (and closes its windows).
+	
+2009-01-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETViewModelLayout:
+	Corrected header import statements.
+	New ivar _shouldInspectRepresentedObjectAsView. Documented API.
+	(-awakeFromNib): Replaced the table layout by an outline one. Improved the 
+	the column header readability and look by providing property display names. 
+	Increased how much content can be viewed without scrolling or resizing by 
+	setting the property view content font size to small.
+	(-shouldInspectRepresentedObjectAsView, 
+	-setShouldInspectRepresentedObjectAsView:, -inspectedItem): Added.
+	Added a category to ETInstanceVariable to make each ivar object traversable 
+	by explosing it as a collection of ivars if the ivar value is an object.
+	(-doubleClickInPropertyView:): Rewritten to use -explore:.
+	(-setLayoutContext:): Removed.
+	(-object:itemRepresentingSlotAtIndex:, -numberOfSlotsInObject:): Rewritten 
+	to better leverage EtoileFoundation reflection layer. Temporarily disabled 
+	the listing of methods.
+	(-numberOfItemsInContainer:): Tweaked to make use of 
+	-shouldInspectRepresentedObjectAsView.
+	* NSObject+EtoileUI: 
+	Added -explore: to inspect objects with developer-centric inspector based 
+	on ETViewModelLayout. Still a bit rough...
+
+2009-01-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETLayoutItem+Factory:
+	Corrected header import statements.
+	(+itemGroupWithRepresentedObject:): Added.
+	(+itemGroupWithContainer): Added a temporary hack to make autoresizing work.
+	(+itemWithBezierPath:, +rectangleWithRect:, +rectangle, +ovalWithRect:, 
+	+oval): Added various shape-based item factory methods.
+
+2009-01-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	* Headers/ETShape.h:
+	* Source/ETShape.m:
+	Removed previous code and added new class ETShape.
+
+2009-01-19  Quentin Mathe <qmathe@club-internet.fr>
+
+	Rewritten the basic inspector support to be entirely handled outside of 
+	ETContainer.
+	* ETContainer:
+	Corrected EtoileUI header import statements to be local.
+	Removed _inspector ivar and related code in -initWithFrame:layoutItem: and 
+	-dealloc.
+	Removed ETObjectInspection conformance.
+	(-inspect:, -inspectSelection:): Deprecated and rewritten to rely on 
+	NSObject+EtoileUI and ETLayoutItem.
+	(-setInspector:, -inspector, -inspectorForItems:): Removed.
+	* ETLayoutItem:
+	New property kETInspectorProperty.
+	(-validateUserInterfaceItem:): Added. This will be used by the new event 
+	handling model.
+	(-showInspectorPanel): Removed.
+	(-inspector): Rewritten.
+	(-setInspector:): Added.
+	* NSObject+EtoileUI (-inspect:): Modified to use the inspector provided by 
+	the receiver when a custom one is available.
+	* ETInspecting: Renamed inspectedItems property of ETInspector protocol to 
+	inspectedObjects.
+	* ETInspector: Removed the deprecated inspectedItems accessors.
+
+2009-01-18  Quentin Mathe <qmathe@club-internet.fr>
+
+	* ETApplication (-finishLaunching): Fixed the missing title of the 
+	application menu on GNUstep and the repeated logging of 'Services menu not 
+	in main menu!'. This bug was recently introduced with r4188.
+
+2009-01-09  Quentin Mathe <qmathe@club-internet.fr>
+
+	Optimized drawing to only redraw dirty portion of the layout item tree. 
+	More documentation. 
+	Few new utility methods related to the drawing or the geometry.
+	* ETLayoutItem:
+	Documented various methods.
+	(-initWithView:value:representedObject:): Modified to set a default frame 
+	if no view is provided.
+	(-isBaseItem, -closestAncestorItemWithDisplayView, 
+	-convertDisplayRect:toAncestorDisplayView:, -boundingBox, 
+	-convertRectToParent:fromItem:, -convertRect:toItem:, -acceptsActions): 
+	Added.
+	(-setSelected:): Made KVO compliant.
+	(-setNeedsDisplay:, -display): Rewritten to only trigger the redraw of the 
+	receiver area in the view hierarchy. The dirty rect is computed with 
+	-convertDisplayRect:toAncestorDisplayView:.
+
+2008-12-30  Quentin Mathe <qmathe@club-internet.fr>
+
+	Extended ETApplication with a new Arrange built-in menu and the possibility 
+	to instantiate a main controller specified in the info plist of the 
+	application bundle.
+	Corrected header import statements.
+	* ETApplication:
+	Added ETApp macro. Documented the class a bit more. New enum for menu item
+	tags.
+	(-finishLaunching): Reworked to set up the menu bar as soon as possible.
+	(-_instantiateAppDelegateIfSpecified): Added.
+	(-developmentMenuItem:): Updated to use +menuItemWithTitle:tag:action: 
+	category and ETDevelopmentMenuTag.
+	(-arrangeMenuItem): Added.
+	(+[NSMenuItem(Etoile) menuItemWithTitle:tag:action:]): Added.
+
+2008-12-26  Quentin Mathe <qmathe@club-internet.fr>
+
+	Some work to clean and improve the geometry support.
+	* ETLayoutItem:
+	Removed _defaultFrame ivar. Declared kETDefaultFrameProperty, 
+	kETFlippedProperty, kETAnchorPointProperty and kETNeedsDisplay. Added 
+	HAS_PROPERTY macro.
+	(-display, -bounds, -centeredAnchorPoint, -anchorPoint, -setAnchorPoint:
+	-position, -setPosition:): Added.
+	(-setFlipped:): Modified to adjust the anchor point if needed.
+	(-isFlipped): Added a check to ensure -isFlipped is consistent between 
+	the supervisor view and the item.
+	(-defaultFrame, -setDefaultFrame:): Modified to store its value in the 
+	variable properties and returns a null rect by default.
+
+2008-12-15  Quentin Mathe <qmathe@club-internet.fr>
+
+	New event handling model - part 2
+	Added an ETActionHandler skeleton that will replace the event handler 
+	logic located in ETLayoutItem+Events.
+	Added new geometry methods to ETLayoutItem that will be used to dispatch 
+	events in the layout item tree.
+	* ETLayoutItem:
+	(-eventHandler): Deprecated.
+	(-actionHandler, -setActionHandler): Added. Thought to replace -eventHandler.
+	(-convertRectToParent:, -convertRectFromParent:): Rewritten to work properly.
+	(-convertPointToParent:, -convertPointFromParent:, -containsPoint:, 
+	-pointInside:, -isFlipped): Added.
+	(-copyWithZone:, -dealloc): Updated to take in account the action handler.
+	(-init): Ditto. Also modified to initialize the property dictionary
+	immediately rather than lazily in -variableProperties.
+	* ETLayoutItem+Events:
+	Added an ETActionHandler skeleton.
+	
+2008-12-12  Quentin Mathe <qmathe@club-internet.fr>
+
+	Turned ETContainer(ETController) into a standalone ETController class.
+	* ETContainer:
+	Moved _objectClass, _groupClass, _templateItem and _templateItemGroup ivars 
+	to ETController.
+	* ETController:
+	Added _content ivar.
+	(-init, -dealloc, -setContent:, -selectionIndex, -setSelectionIndex:, 
+	-selectionIndexes, -setSelectionIndexes:): Added.
+	(-content): Modified to return the ivar value now.
+	(-newObject, -newGroup): Modified to use the new content property.
+	* ETLayoutItemGroup.m:
+	(-newItem, -newItemGroup, itemWithObject:isValue:): Moved to 
+	ETLayoutItemGroup+Mutation category.
+	* ETLayoutItemGroup+Mutation:
+	Declared kETControllerProperty.
+	* test_ETController.m: Updated.
+
+2008-12-08  Quentin Mathe <qmathe@club-internet.fr>
+
+	New event handling model - part 1
+	* ETEvent:
+	Rewritten ETEvent to be a standalone event class that wraps backend events 
+	rather than an NSEvent subclass. NSEvent initializers don't expose all 
+	the initialization, so the subclass choice was troublesome.
+	* ETLayoutItem+Events (-beginDrag:forItem:image:layout:): Updated to pass a 
+	backend event to an AppKit drag related method.
+
 2008-09-04  Quentin Mathe <qmathe@club-internet.fr>
 
 	* ETLayout 

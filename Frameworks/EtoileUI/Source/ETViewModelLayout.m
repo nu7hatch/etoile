@@ -35,25 +35,76 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#import <EtoileFoundation/Macros.h>
 #import <EtoileFoundation/ETCollection.h>
 #import <EtoileFoundation/NSObject+Model.h>
-#import <EtoileFoundation/NSObject+Etoile.h>
-#import <EtoileUI/ETViewModelLayout.h>
-#import <EtoileUI/ETLayoutItem+Reflection.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-#import <EtoileUI/ETContainer.h>
-#import <EtoileUI/ETTableLayout.h>
-#import <EtoileUI/ETCompatibility.h>
+#import "ETViewModelLayout.h"
+#import "ETLayoutItem+Factory.h"
+#import "ETLayoutItem+Reflection.h"
+#import "ETLayoutItemGroup.h"
+#import "ETContainer.h"
+#import "ETOutlineLayout.h"
+#import "ETCompatibility.h"
+#import "NSObject+EtoileUI.h"
+
+@implementation ETInstanceVariable (TraversableIvars)
+
+- (BOOL) isCollection
+{
+	return [self isObjectType];
+}
+
+/* Collection protocol */
+
+- (BOOL) isOrdered
+{
+	return NO;
+}
+
+- (BOOL) isEmpty
+{
+	if ([self isObjectType] == NO)
+		return NO;
+
+	return ([[[self value] instanceVariables] count] == 0);
+}
+
+- (id) content
+{
+	return [[self value] instanceVariables];
+}
+
+- (NSArray *) contentArray
+{
+	return [[self value] instanceVariables];
+}
+
+- (NSEnumerator *) objectEnumerator
+{
+	return [[self contentArray] objectEnumerator];
+}
+
+@end
 
 
 @implementation ETViewModelLayout
 
 - (void) awakeFromNib
 {
-	ETLog(@"Awaking from nib for %@", self);
+	ETDebugLog(@"Awaking from nib for %@", self);
 
 	/* Configure propertyView outlet */
-	[propertyView setLayout: AUTORELEASE([[ETTableLayout alloc] init])];	
+	ETOutlineLayout *layout = [ETOutlineLayout layout];
+	
+	[layout setContentFont: [NSFont controlContentFontOfSize: [NSFont smallSystemFontSize]]];
+	[layout setDisplayName: @"Value" forProperty: @"value"];
+	[layout setDisplayName: @"Property" forProperty: @"property"];
+	[layout setDisplayName: @"Content" forProperty: @"content"];
+	[layout setDisplayName: @"Name" forProperty: @"name"];
+	[layout setDisplayName: @"Type" forProperty: @"typeName"];
+	[layout setEditable: YES forProperty: @"value"];
+
+	[propertyView setLayout: layout];
 	[propertyView setSource: self];
 	[propertyView setDelegate: self];
 	[propertyView setDoubleAction: @selector(doubleClickInPropertyView:)];
@@ -79,28 +130,83 @@
 	//[[self layoutView] setFlipped: NO];
 }
 
+/** Returns the item inspected as a view and whose represented object is 
+inspected as model. */
+- (ETLayoutItem *) inspectedItem
+{
+	ETLayoutItem *contextItem = (ETLayoutItem *)[self layoutContext];
+
+	if ([self shouldInspectRepresentedObjectAsView] 
+	 && [contextItem isMetaLayoutItem])
+	{
+		contextItem = [contextItem representedObject];
+	}
+
+	return contextItem;
+}
+
+/** Returns whether the receiver should try to inspect the represented object of 
+the layout context item as view; this is only possible if the represented object 
+is a layout item, otherwise the value returned by this method is ignored. 
+
+By default, NO is returned and the layout context item itself is inspected as 
+view.
+
+If YES is returned, [[[self layoutContext] representedObject] representedObject]
+will be inspected as model. */
+- (BOOL) shouldInspectRepresentedObjectAsView
+{
+	return _shouldInspectRepresentedObjectAsView;
+}
+
+/** Sets whether the receiver should try to inspect the represented object of 
+the layout context item as view; this is only possible if the represented object 
+is a layout item, otherwise the value returned by this method is ignored. 
+
+See also -shouldInspectRepresentedObjectAsView. */
+- (void) setShouldInspectRepresentedObjectAsView: (BOOL)flag
+{
+	_shouldInspectRepresentedObjectAsView = flag;
+}
+
+/** Returns the active display mode. */ 
 - (ETLayoutDisplayMode) displayMode
 {
 	return _displayMode;
 }
 
+/** Sets the active display mode and update the receiver layout to use it 
+immediately.
+
+The display mode describes what is currently inspected: 
+<list>
+<item>view</item>
+<item>model</item>
+</list>. 
+And which perspective is taken to inspect it: 
+<list>
+<item>properties</item>
+<item>raw object (ivars, methods)</item>
+<item>structured content(in case the object is a collection)</item>
+</list> */
 - (void) setDisplayMode: (ETLayoutDisplayMode)mode
 {
 	_displayMode = mode;
+	// TODO: Implement -selectItemItemWithTag: in GNUstep
+	[popup selectItemAtIndex: [popup indexOfItemWithTag: mode]];
 	[propertyView reloadAndUpdateLayout];
 }
 
+/** Action used by the receiver to switch the display mode when the user changes 
+the selection in the display mode popup menu. 
+
+You must never use this method. */
 - (void) switchDisplayMode: (id)sender
 {
 	NSAssert1([sender isKindOfClass: [NSPopUpButton class]], 
 		@"-switchDisplayMode: must be sent by an instance of NSPopUpButton class "
 		@"kind unlike %@", sender);
 	[self setDisplayMode: [[sender selectedItem] tag]];
-}
-
-- (void) setLayoutContext: (id <ETLayoutingContext>)context
-{
-	[super setLayoutContext: context];
 }
 
 - (void) renderWithLayoutItems: (NSArray *)items isNewContent: (BOOL)isNewContent
@@ -118,42 +224,31 @@
 
 - (void) doubleClickInPropertyView: (id)sender
 {
-	ETLayoutItem *item = [[[self container] items] objectAtIndex: [propertyView selectionIndex]];
-	
-	[[[item inspector] window] makeKeyAndOrderFront: self];
+	ETLayoutItem *item = [[[propertyView layoutItem] items] objectAtIndex: [propertyView selectionIndex]];
+	[[[item representedObject] value] explore: nil];
 }
 
 /* Object Inspection */
 
 - (ETLayoutItem *) object: (id)inspectedObject itemRepresentingSlotAtIndex: (int)index
 {
-	ETLayoutItem *propertyItem = AUTORELEASE([[ETLayoutItem alloc] init]);
-	
-	if (inspectedObject != nil)
+	if (inspectedObject == nil)
+		return nil;
+
+	NSArray *ivars = [inspectedObject instanceVariables];
+	NSArray *methods = [NSArray array]; // FIXME: This is very slow: [inspectedObject methods];
+	NSArray *slots = [[NSArray arrayWithArray: ivars] 
+				arrayByAddingObjectsFromArray: methods];
+	id slot = [slots objectAtIndex: index];
+	ETLayoutItem *propertyItem = nil;
+
+	if ([slot isKindOfClass: [ETInstanceVariable class]] && [slot isObjectType])
 	{
-		NSArray *ivars = [inspectedObject instanceVariables];
-		NSArray *methods = [inspectedObject methods];
-		NSArray *slots = [[NSArray arrayWithArray: ivars] 
-					arrayByAddingObjectsFromArray: methods];
-		id slot = [slots objectAtIndex: index];
-	
-		[propertyItem setValue: [slot name] forProperty: @"slot"];
-		if ([slot isKindOfClass: [ETInstanceVariable class]])
-		{
-			id ivarValue = [slot value];
-			NSString *ivarType = [ivarValue typeName];
-			
-			if (ivarValue == nil)
-				ivarValue = @"nil";
-			[propertyItem setValue: [ivarValue description] forProperty: @"value"];
-			if (ivarType == nil)
-				ivarType = @"";
-			[propertyItem setValue: ivarType forProperty: @"type"];
-		}
-		else if ([slot isKindOfClass: [ETMethod class]])
-		{
-			[propertyItem setValue: @"method (objc)" forProperty: @"value"];
-		}
+		propertyItem = [ETLayoutItem itemGroupWithRepresentedObject: slot];
+	}
+	else
+	{
+		propertyItem = [ETLayoutItem itemWithRepresentedObject: slot];
 	}
 	
 	return propertyItem;
@@ -161,31 +256,27 @@
 
 - (int) numberOfSlotsInObject: (id)inspectedObject
 {
-	int nbOfSlots = 0;
+	if (inspectedObject == nil)
+		return 0;
+		
+	NSArray *ivars = [inspectedObject instanceVariables];
+	NSArray *methods = [NSArray array];// FIXME: This is very slow: [inspectedObject methods];
+	NSArray *slots = [[NSArray arrayWithArray: ivars] 
+				arrayByAddingObjectsFromArray: methods];
 	
-	if (inspectedObject != nil)
-	{
-		NSArray *ivars = [inspectedObject instanceVariables];
-		NSArray *methods = [inspectedObject methods];
-		NSArray *slots = [[NSArray arrayWithArray: ivars] 
-					arrayByAddingObjectsFromArray: methods];
-	
-		nbOfSlots = [slots count];
-	}
-	
-	return nbOfSlots;
+	return [slots count];
 }
 
-- (int) numberOfItemsInContainer: (ETContainer *)container
+- (int) numberOfItemsInItemGroup: (ETLayoutItemGroup *)baseItem
 {
 	/* Verify the layout is currently bound to a layout context like a container */
 	if ([self layoutContext] == nil)
 	{
-		ETLog(@"WARNING: Layout context is missing for -numberOfItemsInContainer: in %@", self);
+		ETLog(@"WARNING: Layout context is missing for -numberOfItemsInItemGroup: in %@", self);
 		return 0;
 	}
 
-	id inspectedItem = [self layoutContext];
+	id inspectedItem = [self inspectedItem];
 	id inspectedModel = [inspectedItem representedObject];
 	/* Always generate a meta layout item to simplify introspection code */
 	ETLayoutItem *metaItem = 
@@ -226,7 +317,7 @@
 	}
 	else
 	{
-		ETLog(@"WARNING: Unknown display mode %d in -numberOfItemsInContainer: "
+		ETLog(@"WARNING: Unknown display mode %d in -numberOfItemsInItemGroup: "
 			"of %@", [self displayMode], self);
 	}
 	
@@ -235,13 +326,13 @@
 	return nbOfItems;
 }
 
-- (ETLayoutItem *) container: (ETContainer *)container itemAtIndex: (int)index
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtIndex: (int)index
 {
 	id inspectedItem = [self layoutContext];
 	id inspectedModel = [inspectedItem representedObject];
 	/* Always generate a meta layout item to simplify introspection code */
 	// FIXME: Regenerating a meta layout item for the same layout context/item 
-	// on each -container:itemAtIndex: call is expansive (see 
+	// on each -itemGroup:itemAtIndex: call is expansive (see 
 	// -[ETLayoutItemGroup copyWithZone:]. ... Caching the meta layout item is
 	// probably worth to do.
 	ETLayoutItem *metaItem =
@@ -278,7 +369,7 @@
 	{
 		NSAssert2([inspectedItem isCollection], 
 			@"Inspected item %@ must conform to protocol ETCollection "
-			@"since -numberOfItemsInContainer: returned a non-zero value in %@",
+			@"since -numberOfItemsInItemGroup: returned a non-zero value in %@",
 			inspectedItem, self);
 
 		ETLayoutItem *child = [[(id <ETCollection>)inspectedItem contentArray] objectAtIndex: index];
@@ -290,7 +381,7 @@
 	{
 		NSAssert2([inspectedModel isCollection], 
 			@"Inspected model %@ must conform to protocol ETCollection "
-			@"since -numberOfItemsInContainer: returned a non-zero value in %@",
+			@"since -numberOfItemsInItemGroup: returned a non-zero value in %@",
 			inspectedModel, self);
 			
 		id child = [[(id <ETCollection>)inspectedModel contentArray] objectAtIndex: index];
@@ -308,7 +399,7 @@
 	}
 	else
 	{
-		ETLog(@"WARNING: Unknown display mode %d in -container:itemAtIndex: "
+		ETLog(@"WARNING: Unknown display mode %d in -itemGroup:itemAtIndex: "
 			"of %@", [self displayMode], self);
 	}
 
@@ -317,7 +408,7 @@
 	return propertyItem;
 }
 
-- (NSArray *) displayedItemPropertiesInContainer: (ETContainer *)container
+- (NSArray *) displayedItemPropertiesInItemGroup: (ETLayoutItemGroup *)baseItem
 {
 	NSArray *displayedProperties = nil;
 
@@ -325,15 +416,15 @@
 	{
 		case ETLayoutDisplayModeViewProperties:
 		case ETLayoutDisplayModeModelProperties:
-			displayedProperties = [NSArray arrayWithObjects: @"property", @"value", nil];
+			displayedProperties = A(@"property", @"value");
 			break;
 		case ETLayoutDisplayModeViewContent:
 		case ETLayoutDisplayModeModelContent:
-			displayedProperties = [NSArray arrayWithObjects: @"content", @"value", nil];
+			displayedProperties = A(@"content", @"value");
 			break;
 		case ETLayoutDisplayModeViewObject:
 		case ETLayoutDisplayModeModelObject:
-			displayedProperties = [NSArray arrayWithObjects: @"slot", @"type", @"value", nil];
+			displayedProperties = A(@"name", @"typeName", @"value");
 			break;
 	}
 	

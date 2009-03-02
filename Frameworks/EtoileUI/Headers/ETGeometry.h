@@ -1,13 +1,12 @@
-/*  <title>ETRenderer</title>
-
-	ETRenderer.m
+/*
+	ETGeometry.h
 	
-	<abstract>Description forthcoming.</abstract>
+	Geometry utility functions and constants.
  
-	Copyright (C) 2007 Quentin Mathe
+	Copyright (C) 2008 Quentin Mathe
  
 	Author:  Quentin Mathe <qmathe@club-internet.fr>
-	Date:  July 2007
+	Date:  December 2008
  
 	Redistribution and use in source and binary forms, with or without
 	modification, are permitted provided that the following conditions are met:
@@ -34,37 +33,47 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "ETRenderer.h"
+#import <Foundation/Foundation.h>
+#import <AppKit/AppKit.h>
 
-/* 
-   ETComponent : ETFilter
-   ETRenderer : ETFilter
+/** The null point which is not equal to NSZeroPoint. It can be returned 
+when a point value is undefined and is a nil-like marker for NSPoint primitive. */
+extern const NSPoint ETNullPoint;
+/** The null size which is not equal to NSZeroSize. It can be returned 
+when a size value is undefined and is a nil-like marker for NSSize primitive. */
+extern const NSSize ETNullSize;
+/** The null rectangle which is not equal to NSZeroRect. It can be returned 
+when a rect value is undefined and is a nil-like marker for NSRect primitive. */
+extern const NSRect ETNullRect;
 
-   ETEtoileUIRender: ETRenderer
-   ETMetaRender : ETRenderer
-   SSWebRender (Render as Seaside components)
-   ETPropertyListRender
-   ETDocumentRender : ETPropertyListRender
-   Probably better to have ETDocumentRender not a subclass of ETPropertyListRender
-   but rather the first element of a render chain where ETPropertyListRender is
-   the second one. ETDocumentRender would eliminate all nodes which are children 
-   document parts and produces a document part tree it pass to ETPropertyListRender.
-   ETHTMLRender
-   ETPDFRender 
-   
-   ETStyle : ETRenderer
-   ETBrush : ETStyle (or ETRenderer don't yet know)
-*/
-
-/* [style renderContentOn: webRender]
-
-- renderContentOn: 
+/** Returns whether rect is equal to ETNullRect. */
+static inline BOOL ETIsNullRect(NSRect rect)
 {
-	webTable = [webRender styleForIdentifier: kTableLayout]
-	
-	[web render: inputValue]; // input values or context object
-} */
+	return NSEqualRects(rect, ETNullRect);
+}
 
-@implementation ETRenderer
+/** Returns a rect with a positive width and height by shifting the origin as 
+needed. */
+static inline NSRect ETStandardizeRect(NSRect rect)
+{
+	float minX = NSMinX(rect);
+	float minY = NSMinY(rect);
+	float width = NSWidth(rect);
+	float height = NSHeight(rect);
 
-@end
+	if (width < 0)
+	{
+		minX += width;
+		width = -width;
+	}
+	if (height < 0)
+	{
+		minY += height;
+		height = -height;
+	}
+
+	return NSMakeRect(minX, minY, width, height);
+}
+
+extern NSRect ETUnionRectWithObjectsAndSelector(NSArray *itemArray, SEL rectSelector);
+

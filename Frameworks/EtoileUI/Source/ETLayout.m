@@ -37,16 +37,15 @@
 
 #import <EtoileFoundation/Macros.h>
 #import <EtoileFoundation/NSObject+Etoile.h>
-#import <EtoileUI/ETLayoutItemGroup.h>
-
-#import <EtoileUI/ETLayout.h>
-#import <EtoileUI/ETLayoutLine.h>
-#import <EtoileUI/ETContainer.h>
-#import <EtoileUI/ETTableLayout.h>
-#import <EtoileUI/ETOutlineLayout.h>
-#import <EtoileUI/ETBrowserLayout.h>
-#import <EtoileUI/NSView+Etoile.h>
-#import <EtoileUI/ETCompatibility.h>
+#import "ETLayout.h"
+#import "ETLayoutItemGroup.h"
+#import "ETLayoutLine.h"
+#import "ETContainer.h"
+#import "ETTableLayout.h"
+#import "ETOutlineLayout.h"
+#import "ETBrowserLayout.h"
+#import "NSView+Etoile.h"
+#import "ETCompatibility.h"
 
 @interface ETContainer (PackageVisibility)
 - (BOOL) isScrollViewShown;
@@ -410,40 +409,64 @@ static NSMutableSet *layoutClasses = nil;
 }
 
 /** Sets the context where the layout should happen. 
-	When a layout context is set, on next layout update the receiver will 
-	arrange the layout items in a specific style and order.
-	context isn't retained, but it is expected context has already
-	retained the receiver. */
+
+When a layout context is set, with the next layout update the receiver will 
+arrange the layout items in a specific style and order. 
+
+The layout context is expected to retain its layout, hence the receiver doesn't 
+retain context. */
 - (void) setLayoutContext: (id <ETLayoutingContext>)context
 {
-	//ETDebugLog(@"Modify layout context from %@ to %@ in %@", _layoutContext, context, self);
-	
+	ETDebugLog(@"Modify layout context from %@ to %@ in %@", _layoutContext, context, self);
+
 	if (context == nil)
 		[self tearDown];
-		
+
+	/* We remove the display views of layout items.
+	   Take note they may be invisible by being located outside of the container 
+	   bounds.	
+	   If we don't and we switch from a computed layout to a view-based layout,
+	   they might remain visible as subviews (think ETBrowserLayout on GNUstep 
+	   which has transparent areas) because view-based layout are not required 
+	   to call -setVisibleItems: when they override -renderWithLayoutItems:XXX:. 
+	   By introducing a null layout, we would be able to move that in -tearDown. 
+	   That doesn't work presently when we switch from a nil layout to a non-nil 
+	   layout, because -setLayoutContext: nil isn't called, hence -tearDown 
+	   neither. */
+	ETDebugLog(@"Remove views of layout items currently displayed");
+	[context setVisibleItems: [NSArray array]];	
+
 	// NOTE: Avoids retain cycle by weak referencing the context
 	_layoutContext = context;
+
+	// TODO: May be safer to restore the default frame here rather than relying 
+	// on the next layout update and -resizeItems:toScaleFactor:... 
 	//[[_layoutContext items] makeObjectsPerformSelector: @selector(restoreDefaultFrame)];
 }
 
+/** Returns the context where the layout happens. */
 - (id <ETLayoutingContext>) layoutContext
 {
 	return _layoutContext;
 }
 
-/** Overrides if your subclass requires special clean up when a layout gets 
-    unbound from its layout context.
-	The layout context hasn't yet been touched when this method is called. */
+/** <override-dummy />Overrides if your subclass requires extra cleanup when the 
+layout context is switched to another layout (the receiver stops to be used and 
+visible).
+
+The layout context hasn't yet been touched when this method is called.
+
+You must call the superclass implementation if you override this method. */
 - (void) tearDown
 {
-	/* Don't forget to remove existing display view if we switch from a layout 
+	/* Don't forget to remove existing layout view if we switch from a layout 
 	   which reuses a native AppKit control like table layout. */
 	// NOTE: Be careful of layout objects which can share a common class but 
 	// all differs by their unique display view prototype.
 	// May be we should move it into -[layout setContainer:]...
 	// Triggers scroll view display which triggers layout render in turn to 
 	// compute the content size
-	[[self container] setDisplayView: nil]; 
+	[[self container] setLayoutView: nil]; 
 }
 
 // TODO: Pick better names for the following methods:
@@ -639,32 +662,23 @@ static NSMutableSet *layoutClasses = nil;
 	-[ETContainer updateLayout]. */
 - (void) render: (NSDictionary *)inputValues isNewContent: (BOOL)isNewContent
 {
-	// TODO: Move after -canRender call or remove.
 	if ([self layoutContext] == nil)
-	{
-		ETLog(@"WARNING: No layout context available");	
-		return;
-	}
-	
+		ETLog(@"WARNING: No layout context available with %@", self);
+
 	/* Prevent reentrancy. In a threaded environment, it isn't perfectly safe 
 	   because _isLayouting test and _isLayouting assignement doesn't occur in
 	   an atomic way. */
 	if ([self canRender] == NO)
 		return;
-	
+
 	_isLayouting = YES;
 
-	/* We remove the display views of layout items. Note they may be invisible 
-	   by being located outside of container bounds. */
-	//ETDebugLog(@"Remove views of layout items currently displayed from their container");
-	//[[self layoutContext] setVisibleItems: [NSArray array]];
-	
 	/* When the number of layout items is zero and doesn't vary, no layout 
 	   update is necessary */
 	// TODO: Try some optimizations, in the vein of...
 	// if ([[[self layoutContext] items] count] == 0 && _nbOfItemCache != [[[self layoutContext] items] count])
 	//	return;
-	
+
 	[self renderWithLayoutItems: [[self layoutContext] items] isNewContent: isNewContent];
 
 	_isLayouting = NO;
@@ -702,7 +716,7 @@ static NSMutableSet *layoutClasses = nil;
 /** <override-dummy /> */
 - (void) renderWithLayoutItems: (NSArray *)items isNewContent: (BOOL)isNewContent
 {	
-	//ETDebugLog(@"Render layout items: %@", items);
+	ETDebugLog(@"Render layout items: %@", items);
 
 	float scale = [[self layoutContext] itemScaleFactor];
 
@@ -739,10 +753,7 @@ static NSMutableSet *layoutClasses = nil;
 	otherwise it won't. */
 - (void) resizeLayoutItems: (NSArray *)items toScaleFactor: (float)factor
 {
-	NSEnumerator *e = [items objectEnumerator];
-	ETLayoutItem *item = nil;
-	
-	while ((item = [e nextObject]) != nil)
+	FOREACH(items, item, ETLayoutItem *)
 	{
 		/* Scaling is always computed from item default frame rather than
 		   current item view size (or  item display area size) in order to
@@ -824,7 +835,7 @@ static NSMutableSet *layoutClasses = nil;
 	See ETUIComponent to understand how an aggregate layout can be wrapped in
 	standalone and self-sufficient component which may act as live filter in 
 	the continous model object flows. */
-- (ETLayoutItem *) layoutItem
+- (ETLayoutItem *) rootItem
 {
 	// FIXME: Implement
 	return nil;
@@ -889,7 +900,7 @@ static NSMutableSet *layoutClasses = nil;
 		// test on it in order subviews can receive events like mouse click.
 		if ([layoutView respondsToSelector: @selector(setEnablesHitTest:)])
 			[layoutView setEnablesHitTest: YES];
-		[[self container] setDisplayView: layoutView];
+		[[self container] setLayoutView: layoutView];
 	}
 	else if ([[layoutView superview] isEqual: [self container]] == NO)
 	{
@@ -983,11 +994,7 @@ static NSMutableSet *layoutClasses = nil;
 	beyond the layout size, nil is returned. */
 - (ETLayoutItem *) itemAtLocation: (NSPoint)location
 {
-	NSArray *layoutItems = [[self layoutContext] visibleItems];
-	NSEnumerator *e = [layoutItems objectEnumerator];
-	ETLayoutItem *item = nil;
-	
-	while ((item = [e nextObject]) != nil)
+	FOREACH([[self layoutContext] visibleItems], item, ETLayoutItem *)
 	{
 		if ([item displayView] != nil)
 		{

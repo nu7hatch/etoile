@@ -15,8 +15,8 @@
 @interface ObjectManagerController (Private)
 - (void) moveToItem: (ETLayoutItem *)item;
 - (NSString *) textualPathForMixedPath: (NSString *)mixedPath;
-- (int) numberOfItemsInContainer: (ETContainer *)container;
-- (ETLayoutItem *) container: (ETContainer *)container itemAtIndex: (int)index;
+- (int) numberOfItemsInItemGroup: (ETLayoutItemGroup *)baseItem;
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtIndex: (int)index;
 @end
 
 
@@ -70,7 +70,7 @@ static NSFileManager *objectManager = nil;
 	[viewContainer setDoubleAction: @selector(doubleClickInViewContainer:)];
 	[viewContainer setHasVerticalScroller: YES];
 	[viewContainer setHasHorizontalScroller: YES];
-	[viewContainer setLayout: AUTORELEASE([[ETStackLayout alloc] init])];
+	[viewContainer setLayout: AUTORELEASE([[ETIconLayout alloc] init])];
 	[viewContainer reloadAndUpdateLayout];
 
 	[pathContainer setLayout: [ETLineLayout layout]];
@@ -79,6 +79,8 @@ static NSFileManager *objectManager = nil;
 	[pathContainer setTarget: self];
 	[pathContainer setDoubleAction: @selector(doubleClickInPathContainer:)];
 	[pathContainer reloadAndUpdateLayout];
+	
+	[[viewContainer window] setAcceptsMouseMovedEvents: YES];
 }
 
 - (void) viewContainerDidResize: (NSNotification *)notif
@@ -258,8 +260,9 @@ static NSFileManager *objectManager = nil;
 
 /* Tree protocol used by TreeContainer */
 
-- (int) container: (ETContainer *)container numberOfItemsAtPath: (NSIndexPath *)indexPath
+- (int) itemGroup: (ETLayoutItemGroup *)baseItem numberOfItemsAtPath: (NSIndexPath *)indexPath
 {
+	ETContainer *container = [baseItem supervisorView];
 	//NSString *textualPath = [self textualPathForMixedPath: newPath];
 	/* Next line is equal to [[[container layoutItem] representedPath] 
 	   stringByAppendingPath: [[container layoutItem] pathForIndexPath: indexPath]]; */
@@ -280,21 +283,22 @@ static NSFileManager *objectManager = nil;
 	}
 	else if ([container isEqual: pathContainer]) /* Path Container */
 	{
-		return [self numberOfItemsInContainer: container];
+		return [self numberOfItemsInItemGroup: [container layoutItem]];
 	}
 	
 	return 0;
 }
 
-- (ETLayoutItem *) container: (ETContainer *)container itemAtPath: (NSIndexPath *)indexPath
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtPath: (NSIndexPath *)indexPath
 {
 	NSWorkspace *wk = [NSWorkspace sharedWorkspace];
 	ETLayoutItem *fileItem = nil;
-	
+	ETContainer *container = [baseItem supervisorView];
+
 	if ([container isEqual: viewContainer]) /* Browsing Container */
 	{
 		NSString *subpath = [indexPath stringByJoiningIndexPathWithSeparator: @"/"];
-		NSString *filePath = [[[container layoutItem] representedPath] stringByAppendingPathComponent: subpath];
+		NSString *filePath = [[baseItem representedPath] stringByAppendingPathComponent: subpath];
 	
 		/* Standardize path by replacing indexes by file names */
 		filePath = [self textualPathForMixedPath: filePath];
@@ -330,13 +334,13 @@ static NSFileManager *objectManager = nil;
 	else if ([container isEqual: pathContainer]) /* Path Container */
 	{
 		int flatIndex = [indexPath indexAtPosition: [indexPath length] - 1];
-		return [self container: container itemAtIndex: flatIndex];
+		return [self itemGroup: baseItem itemAtIndex: flatIndex];
 	}
 
 	return fileItem;
 }
 
-- (NSArray *) displayedItemPropertiesInContainer: (ETContainer *)container
+- (NSArray *) displayedItemPropertiesInItemGroup: (ETLayoutItemGroup *)baseItem
 {
 	return [NSArray arrayWithObjects: @"icon", @"name", @"fileSize", @"fileType", @"fileModificationDate", nil];
 }
@@ -346,8 +350,10 @@ static NSFileManager *objectManager = nil;
    NOTE: only present for demonstrating purpose. It could be rewritten as part
    of tree protocol methods implemented above. */
 
-- (int) numberOfItemsInContainer: (ETContainer *)container
+- (int) numberOfItemsInItemGroup: (ETLayoutItemGroup *)baseItem
 {
+	ETContainer *container = [baseItem supervisorView];
+
 	if ([container isEqual: viewContainer]) /* Browsing Container */
 	{
 		NSArray *fileObjects = [objectManager directoryContentsAtPath: path];
@@ -368,11 +374,12 @@ static NSFileManager *objectManager = nil;
 	return 0;
 }
 
-- (ETLayoutItem *) container: (ETContainer *)container itemAtIndex: (int)index
+- (ETLayoutItem *) itemGroup: (ETLayoutItemGroup *)baseItem itemAtIndex: (int)index
 {
 	NSWorkspace *wk = [NSWorkspace sharedWorkspace];
 	ETLayoutItem *fileItem = nil;
-	
+	ETContainer *container = [baseItem supervisorView];
+
 	if ([container isEqual: viewContainer]) /* Browsing Container */
 	{
 		NSArray *fileObjects = [objectManager directoryContentsAtPath: path];

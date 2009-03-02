@@ -34,6 +34,7 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#import <EtoileFoundation/Macros.h>
 #import <EtoileUI/ETTableLayout.h>
 #import <EtoileUI/ETContainer.h>
 #import <EtoileUI/ETLayoutItem.h>
@@ -69,7 +70,7 @@
 {
 	/* ivar lazily initialized in -setLayoutView: */
 	DESTROY(_propertyColumns);
-		
+	DESTROY(_contentFont);
 	[super dealloc];
 }
 
@@ -92,17 +93,15 @@
 {
 	[super setLayoutView: protoView];
 
-	NSTableView *tv = [(NSScrollView *)[self layoutView] documentView];
-	NSEnumerator *e = [[tv tableColumns] objectEnumerator];
-	NSTableColumn *column = nil;
+	NSTableView *tv = [self tableView];
 	
 	/* ivar cannot be initialized by overriding -initWithLayoutView: because 
 	   superclass initializer called -loadNibNamed: before returning, moreover
-	   the ivar must reset for each new layout view. */
+	   the ivar must be reset for each new layout view. */
 	ASSIGN(_propertyColumns, [NSMutableDictionary dictionary]);
 
 	/* Retain initial columns to be able to restore exactly identical columns later */	
-	while ((column = [e nextObject]) != nil)
+	FOREACH([tv tableColumns], column, NSTableColumn *)
 	{
 		NSString *colId = [column identifier];
 		
@@ -114,10 +113,11 @@
 		[_propertyColumns setObject: column forKey: colId];
 	}
 	/* Set up a list view using a single column without identifier */
-	[tv registerForDraggedTypes: [NSArray arrayWithObject: @"ETLayoutItemPboardType"]];
+	[tv registerForDraggedTypes: A(ETLayoutItemPboardType)];
 
 	if ([tv dataSource] == nil)
 		[tv setDataSource: self];
+
 	if ([tv delegate] == nil)
 		[tv setDelegate: self];
 }
@@ -145,15 +145,22 @@
 
 /* Item Property Display */
 
+/** Returns the property names associated with the visible columns. 
+
+The property names are used as the column identifiers. */
 - (NSArray *) displayedProperties
 {
 	return [[[self tableView] tableColumns] valueForKey: @"identifier"];
 }
 
-/* Update column visibility */
+/** Makes visible the columns associated with the given property names. If a 
+column doesn't exist as an invisible column for a property, then it is created 
+and inserted immediately.
+
+The property names are used as the column identifiers. */
 - (void) setDisplayedProperties: (NSArray *)properties
 {
-	//ETDebugLog(@"Set displayed properties %@ of layout %@", properties, self);
+	ETDebugLog(@"Set displayed properties %@ of layout %@", properties, self);
 
 	if (properties == nil)
 	{
@@ -161,25 +168,19 @@
 			@"-setDisplayedProperties argument must never be nil", self];
 	}
 
-	NSMutableArray *displayedProperties = [properties mutableCopy];
 	NSTableView *tv = [self tableView];
-	/* We cannot enumerate [tv tableColumns] directly because we remove columns */
-	NSEnumerator *e = [[NSArray arrayWithArray: [tv tableColumns]] objectEnumerator];
-	NSTableColumn *column = nil;
-	NSString *property = nil;
 	
-	/* Remove all existing columns */
-	while ((column = [e nextObject]) != nil)
-		[tv removeTableColumn: column];
-	
-	/* Add all columns to be displayed */
-	e = [displayedProperties objectEnumerator];
-	property = nil;
-	column = nil;
-	
-	while ((property = [e nextObject]) != nil)
+	/* Remove all existing columns
+	   NOTE: We cannot enumerate [tv tableColumns] directly because we remove columns */
+	FOREACH([NSArray arrayWithArray: [tv tableColumns]], column, NSTableColumn *)
 	{
-		column = [_propertyColumns objectForKey: property];
+		[tv removeTableColumn: column];
+	}
+
+	/* Add all columns to be displayed */	
+	FOREACH(properties, property, NSString *)
+	{
+		NSTableColumn *column = [_propertyColumns objectForKey: property];
 		
 		if (column == nil)
 			column = [self _createTableColumnWithIdentifier: property];
@@ -190,58 +191,113 @@
 
 - (void) _updateDisplayedPropertiesFromSource
 {
-	if ([[[self container] source] respondsToSelector: @selector(displayedItemPropertiesInContainer:)])
+	if ([[[self container] source] respondsToSelector: @selector(displayedItemPropertiesInItemGroup:)])
 	{
 		NSArray *properties = [[[self container] source] 
-			displayedItemPropertiesInContainer: [self container]];		
+			displayedItemPropertiesInItemGroup: [[self container] layoutItem]];		
 			
 		[self setDisplayedProperties: properties];
 	}
 }
 
+/** Returns the column header title associated with the given property. */
 - (NSString *) displayNameForProperty: (NSString *)property
 {
 	return [[[_propertyColumns objectForKey: property] headerCell] stringValue];
 }
 
-/** Override */
+/** Sets the column header title associated with the given property. The 
+property display name should usually be passed as argument. */
 - (void) setDisplayName: (NSString *)displayName forProperty: (NSString *)property
 {
-	NSTableColumn *column = [_propertyColumns objectForKey: property];
-	
-	if (column == nil)
-	{
-		column = [self _createTableColumnWithIdentifier: property];
-		[_propertyColumns setObject: column forKey: property];
-	}
-
+	NSTableColumn *column = [self tableColumnWithIdentifierAndCreateIfAbsent: property];
 	[[column headerCell] setStringValue: displayName];
 }
 
+/** Returns whether the column associated with the given property is editable.
+
+By default, columns are not editable and NO is returned. */
+- (BOOL) isEditableForProperty: (NSString *)property
+{
+	return [[_propertyColumns objectForKey: property] isEditable];
+}
+
+/** Sets whether the column associated with the given property is editable. */
+- (void) setEditable: (BOOL)flag forProperty: (NSString *)property
+{
+	NSTableColumn *column = [self tableColumnWithIdentifierAndCreateIfAbsent: property];
+	[[column dataCell] setEditable: flag]; // FIXME: why column setEditable: isn't enough
+	[column setEditable: flag];	
+}
+
+/** Returns the data cell of the column associated with the given property, but 
+this is temporary.
+
+TODO: Return a layout item built dynamically by determining the cell subclass 
+kind. May be add +[ETLayoutItem(Factory) itemWithCell:]. */
 - (id) styleForProperty: (NSString *)property
 {
 	return [[_propertyColumns objectForKey: property] dataCell];
-
-//	return [[[self tableView] tableColumnWithIdentifier: property] dataCell];
 }
 
+/** Sets the widget style used by the column associated with the given property.
+You must pass a layout item bound a view that responds to -cell, otherwise style 
+will be ignored. The view is typically an NSControl subclass instance.
+
+NOTE: The documented behavior is subject to further changes in future to become 
+more widget backend agnostic. */
 - (void) setStyle: (id)style forProperty: (NSString *)property
 {
+	NSTableColumn *column = [self tableColumnWithIdentifierAndCreateIfAbsent: property];
+	NSCell *cell = nil;
+
+	if ([style isLayoutItem] && [[style view] respondsToSelector: @selector(cell)])
+	{
+		cell = [(id)[style view] cell];	
+
+		[column setDataCell: cell];
+		// NOTE: For cell editability, -[NSTableColumn isEditable] takes over the 
+		// the NSCell method of the data cell (at least for GNUstep, may be 
+		// different for Cocoa).
+		[column setEditable: [cell isEditable]];
+	}
+}
+
+/** Returns the font used to display each row/column cell value. 
+
+By default, returns nil and uses the font set individually on each column. */
+- (NSFont *) contentFont
+{
+	return _contentFont;
+}
+
+/** Sets the font used to display each row/column cell value.
+
+This overrides any specific font you might have set individually on colums 
+returned by -allTableColumns. */
+- (void) setContentFont: (NSFont *)aFont
+{
+	ASSIGN(_contentFont, aFont);
+	FOREACH([self allTableColumns], column, NSTableColumn *)
+	{
+		[[column dataCell] setFont: _contentFont];
+	}
+}
+
+/** Returns the column associated with the given property, the column might be 
+visible or not depending on -displayedProperties. If the column doesn't exist 
+yet, it is created. */
+- (NSTableColumn *) tableColumnWithIdentifierAndCreateIfAbsent: (NSString *)property
+{
 	NSTableColumn *column = [_propertyColumns objectForKey: property];
-	
+
 	if (column == nil)
 	{
 		column = [self _createTableColumnWithIdentifier: property];
 		[_propertyColumns setObject: column forKey: property];
 	}
 
-	[column setDataCell: style];
-	// NOTE: For cell editability, -[NSTableColumn isEditable] takes over the 
-	// the NSCell method of the data cell (at least for GNUstep, may be 
-	// different for Cocoa).
-	[column setEditable: [style isEditable]];
-
-//	[[[self tableView] tableColumnWithIdentifier: property] setDataCell: style];
+	return column;
 }
 
 - (NSTableColumn *) _createTableColumnWithIdentifier: (NSString *)property
@@ -252,10 +308,10 @@
 
 	[column setHeaderCell: headerCell];
 	RELEASE(headerCell);
-	[dataCell setEditable: YES]; // FIXME: why column setEditable: isn't enough
+	[dataCell setFont: [self contentFont]];
 	[column setDataCell: dataCell];
 	RELEASE(dataCell);
-	[column setEditable: YES];
+	[column setEditable: NO];
 	
 	return AUTORELEASE(column);
 }
@@ -295,6 +351,7 @@
 	/* Enforce a minimal row height to avoid redisplay crashes especially */
 	if (rowHeight < 1.0)
 		rowHeight = 1.0;
+
 	[[self tableView] setRowHeight: rowHeight];
 }
 
@@ -314,23 +371,20 @@
 - (NSRect) displayRectOfItem: (ETLayoutItem *)item
 {
 	int row = [[[self layoutContext] items] indexOfObject: item];
-	
+
 	return [[self tableView] rectOfRow: row];
 }
 
 - (NSArray *) selectedItems
 {
 	NSIndexSet *indexes = [[self tableView] selectedRowIndexes];
-	NSEnumerator *e = [indexes objectEnumerator];
-	NSNumber *index = nil;
+	NSArray *items = [[self layoutContext] items];
 	NSMutableArray *selectedItems = 
 		[NSMutableArray arrayWithCapacity: [indexes count]];
 	
-	while ((index = [e nextObject]) != nil)
+	FOREACH(indexes, index, NSNumber *)
 	{
-		id item = [[[self layoutContext] items] objectAtIndex: [index intValue]];
-		
-		[selectedItems addObject: item];
+		[selectedItems addObject: [items objectAtIndex: [index intValue]]];
 	}
 	
 	return selectedItems;
@@ -345,22 +399,13 @@
 
 	id delegate = [[self container] delegate];
 	
-	/* Update selection state in the layout item tree */
+	/* Update selection state in the layout item tree and post a notification */
 	[[self container] setSelectionIndexPaths: [self selectionIndexPaths]];
 
 	if ([delegate respondsToSelector: @selector(tableViewSelectionDidChange:)])
 	{
 		[delegate tableViewSelectionDidChange: notif];
 	}
-	/*if ([delegate respondsToSelector: @selector(containerSelectionDidChange:)])
-	{
-		NSNotification *containerNotif =
-			[NSNotification notificationWithName: [notif name] 
-			                              object: [self container] 
-										userInfo: [notif userInfo]];
-		
-		[delegate containerSelectionDidChange: containerNotif];
-	}*/
 }
 
 // TODO: Implement forwarding of all delegate methods to ETContainer delegate by

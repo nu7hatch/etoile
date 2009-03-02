@@ -21,11 +21,44 @@
 		</dict>
 		<dict>
 			<key>CLASS</key>
+			<string>NSControl</string>
+			<key>LANGUAGE</key>
+			<string>ObjC</string>
+			<key>SUPERCLASS</key>
+			<string>NSView</string>
+		</dict>
+		<dict>
+			<key>ACTIONS</key>
+			<dict>
+				<key>browse</key>
+				<string>id</string>
+				<key>explore</key>
+				<string>id</string>
+				<key>inspect</key>
+				<string>id</string>
+				<key>view</key>
+				<string>id</string>
+			</dict>
+			<key>CLASS</key>
+			<string>NSObject</string>
+			<key>LANGUAGE</key>
+			<string>ObjC</string>
+		</dict>
+		<dict>
+			<key>CLASS</key>
 			<string>NSView</string>
 			<key>LANGUAGE</key>
 			<string>ObjC</string>
 			<key>SUPERCLASS</key>
 			<string>NSResponder</string>
+		</dict>
+		<dict>
+			<key>CLASS</key>
+			<string>NSMenuItem</string>
+			<key>LANGUAGE</key>
+			<string>ObjC</string>
+			<key>SUPERCLASS</key>
+			<string>NSObject</string>
 		</dict>
 		<dict>
 			<key>ACTIONS</key>
@@ -41,26 +74,13 @@
 			<dict>
 				<key>enclosingView</key>
 				<string>id</string>
+				<key>popup</key>
+				<string>NSPopUpButton</string>
 				<key>propertyView</key>
 				<string>ETContainer</string>
 			</dict>
 			<key>SUPERCLASS</key>
 			<string>ETLayout</string>
-		</dict>
-		<dict>
-			<key>ACTIONS</key>
-			<dict>
-				<key>browse</key>
-				<string>id</string>
-				<key>inspect</key>
-				<string>id</string>
-				<key>view</key>
-				<string>id</string>
-			</dict>
-			<key>CLASS</key>
-			<string>NSObject</string>
-			<key>LANGUAGE</key>
-			<string>ObjC</string>
 		</dict>
 		<dict>
 			<key>CLASS</key>

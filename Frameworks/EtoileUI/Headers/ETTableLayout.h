@@ -43,22 +43,32 @@
 @interface ETTableLayout : ETLayout
 {
 	NSMutableDictionary *_propertyColumns;
+	NSFont *_contentFont;
 	NSEvent *_lastDragEvent;
 	int _lastChildDropIndex;
 }
 
-- (NSArray *) allTableColumns;
-- (void) setAllTableColumns: (NSArray *)columns;
-
+- (NSArray *) displayedProperties;
+- (void) setDisplayedProperties: (NSArray *)properties;
 - (NSString *) displayNameForProperty: (NSString *)property;
 - (void) setDisplayName: (NSString *)displayName forProperty: (NSString *)property;
+- (BOOL) isEditableForProperty: (NSString *)property;
+- (void) setEditable: (BOOL)flag forProperty: (NSString *)property;
+- (id) styleForProperty: (NSString *)property;
+- (void) setStyle: (id)style forProperty: (NSString *)property;
 
-/*- (id) listStyle;
-- (void) setListStyle: (id)style;*/
+- (NSFont *) contentFont;
+- (void) setContentFont: (NSFont *)aFont;
 
+/* Widget Backend Access */
+
+- (NSArray *) allTableColumns;
+- (void) setAllTableColumns: (NSArray *)columns;
 - (NSTableView *) tableView;
 
 /* Subclassing */
+
+- (NSTableColumn *) tableColumnWithIdentifierAndCreateIfAbsent: (NSString *)identifier;
 
 // TODO: Moves this method into an NSTableColumn category
 - (NSTableColumn *) _createTableColumnWithIdentifier: (NSString *)property;

@@ -33,12 +33,11 @@
 	THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import <EtoileFoundation/NSObject+Etoile.h>
-#import <EtoileFoundation/ETPrototype.h>
-#import <EtoileFoundation/EtoileCompatibility.h>
-#ifndef GNUSTEP
-#import <objc/runtime.h>
-#endif
+#import "NSObject+Etoile.h"
+#import "EtoileCompatibility.h"
+#import "ETUTI.h"
+#import "Macros.h"
+
 
 @interface NSObject (PrivateEtoile)
 - (ETInstanceVariable *) instanceVariableForName: (NSString *)ivarName;
@@ -90,13 +89,11 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 {
 	#if 0
 	//#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
-	/* Fast because it uses the sibling class facility of GNU runtime */
+	/* Fast because it uses the sibling class facility of GNU runtime
+	   NOTE: Not used, because it is broken for classes that have not yet 
+	   received their first message. */
+	return GSObjCAllSubclassesOfClass(self);
 
-	/* 
-	 * Not used, because it is broken for classes that have not yet received
-	 * their first message.
-	 */
-	return GSObjCAllSubclassesOfClass(self); 
 	#elif defined(GNU_RUNTIME)
 	NSMutableArray *subclasses = [NSMutableArray arrayWithCapacity: 300];
 	void *state = NULL;
@@ -110,8 +107,7 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 	}
 	return subclasses;
 
-	#else
-	
+	#else /* NEXT_RUNTIME and NEXT_RUNTIME_2 */	
 	NSMutableArray *subclasses = [NSMutableArray arrayWithCapacity: 300];
 	Class *allClasses = NULL;
 	int numberOfClasses;
@@ -134,7 +130,6 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 	}
 
 	return subclasses;
-
 	#endif
 }
 
@@ -146,8 +141,8 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 {
 	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	return GSObjCDirectSubclassesOfClass(self);
-	#else
-	
+
+	#else /* NEXT_RUNTIME and NEXT_RUNTIME_2 */
 	NSMutableArray *subclasses = [NSMutableArray arrayWithCapacity: 30];
 	Class *allClasses = NULL;
 	int numberOfClasses;
@@ -170,25 +165,7 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 	}
 	
 	return subclasses;
-	
 	#endif
-}
-
-/** Returns a cloned instance of the receiver by calling -cloneWithZone: 
-	declared by ETPrototype protocol. 
-	If the receiver doesn't implement -cloneWithZone:, an exception is raised. */
-- (id) clone
-{
-	return [(id)self cloneWithZone: NSDefaultMallocZone()];
-}
-
-/** Returns whether the receiver is a prototype object that conforms to 
-	ETPrototype protocol.
-	A prototype object can be cloned and can declare new methods unlike usual
-	instances that returns NO. */
-- (BOOL) isPrototype
-{
-	return ([self conformsToProtocol: @protocol(ETPrototype)]);
 }
 
 /** Returns a object representing the receiver. Useful when sucblasses override
@@ -209,8 +186,7 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 	do it by overriding this method. */
 - (ETUTI *) type
 {
-	
-	return [self className];
+	return [ETUTI typeWithClass: [self class]];
 }
 
 /** Returns the type name which is the last component of type string returned 
@@ -218,9 +194,7 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 	This method is a shortcut for [[self type] typeName]. */
 - (NSString *) typeName
 {
-	unsigned int prefixLength = [[[self class] typePrefix] length];
-	
-	return [[self type] substringFromIndex: prefixLength];
+	return nil;
 }
 
 /** Returns the type prefix, usually the prefix part of the type name returned
@@ -287,13 +261,15 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 - (ETInstanceVariable *) instanceVariableForName: (NSString *)ivarName
 {
 	ETInstanceVariable *ivarObject = [[ETInstanceVariable alloc] init];
-	
+	ASSIGN(ivarObject->_possessor, self);
+
 	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	GSIVar ivar = GSObjCGetInstanceVariableDefinition([self class], ivarName);
-	ASSIGN(ivarObject->_possessor, self);
 	ivarObject->_ivar = ivar;
-	#else
-	
+
+	#elif defined(NEXT_RUNTIME_2)
+	Ivar ivar = object_getInstanceVariable(self, [ivarName UTF8String], NULL);
+	ivarObject->_ivar = ivar;	
 	#endif
 	
 	return AUTORELEASE(ivarObject);
@@ -302,9 +278,26 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 - (NSArray *) instanceVariableNames
 {
 	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
-	return GSObjCVariableNames(self);
-	#else
-	return nil;
+	return GSObjCVariableNames(self);	
+
+	#elif defined(NEXT_RUNTIME_2)
+	NSMutableArray *ivars = [NSMutableArray array];
+	Class class = [self class];
+
+	while (class != nil)
+	{
+		unsigned int nbOfIvars = 0;
+		Ivar *ivarList = class_copyIvarList(class, &nbOfIvars);
+
+		for (int i = 0; i < nbOfIvars; i++)
+		{
+			[ivars addObject: [NSString stringWithUTF8String: ivar_getName(ivarList[i])]];
+		}
+
+		class = ETGetSuperclass(class);
+	}
+	
+	return ivars;
 	#endif
 }
 
@@ -333,25 +326,41 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 
 - (NSArray *) protocolNames
 {
-	return nil;
+	NSMutableArray *protocolNames = [NSMutableArray array];
+	FOREACH([self protocols], protocol, Protocol *)
+	{
+		[protocolNames addObject: [NSString stringWithUTF8String: [protocol name]]];
+	}
+	return protocolNames;
 }
 
-#if 0
+// FIXME: Not sure if this is the right interpretation for -protocols,
+//        currently it returns all protocols explicitly conformed to by the
+//        object's class, or its superclass, or superclasses's class, etc.,
+//        but not the ancestor protocols of those protocols.
+//        
+//        We also need a -allProtocols method which adds all the ancestors 
+//        to the protocols returned by this method.
 - (NSArray *) protocols
 {
+	#if defined(GNU_RUNTIME)
 	NSMutableArray *protocols = [NSMutableArray array];
-	NSEnumerator *e = [[self protocolNames] objectEnumerator];
-	NSString *protocolName = nil;
-	
-	while ((protocolName = [e nextObject]) != nil)
+
+	Class class = [self class];
+	while (YES)
 	{
-		[protocols addObject: [self protocolForName: protocolName]];
+		[protocols addObjectsFromArray: [ETClass protocolsForClass: class]];
+		if (class == [NSObject class])
+			break;
+		class = ETGetSuperclass(class);
 	}
-	
+
 	// FIXME: Return immutable array
 	return protocols;
+	#else
+	return nil;
+	#endif
 }
-#endif
 
 - (NSArray *) methods
 {
@@ -397,74 +406,201 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 
 @implementation ETInstanceVariable
 
+/** Returns the object where the instance variable is located and its value 
+stored. */
 - (id) possessor
 {
 	return _possessor;
 }
 
+/** Returns the name that was used to declare the instance variable. */
 - (NSString *) name
 {
 	const char *ivarName = NULL;
 	
 	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	ivarName = _ivar->ivar_name;
-	#else
-	
+	#elif defined(NEXT_RUNTIME_2)
+	ivarName = ivar_getName(_ivar);
 	#endif
 		
 	return [NSString stringWithCString: ivarName];
 }
 
-// FIXME: Replace by ETUTI class later
+/** Returns the object type of the instance variable as an UTI. */
 - (ETUTI *) type
+{
+	// TODO: Implement
+	return nil;
+}
+
+/** Returns either class name or the type encoding name of the instance 
+variable. The class name is returned when the value is an object, otherwise the 
+the type encoding name is returned.
+
+If -value returns nil and the type encoding denotes an object, take note the 
+type encoding name is returned since the object type can only be looked up 
+dynamically (by querying the object referenced by the instance variable). */
+- (NSString *) typeName
+{
+	const char *ivarType = [self typeEncoding];
+
+	if (ivarType[0] == '@')
+	{
+		id value = [self value];
+		
+		if (value != nil)
+			return NSStringFromClass([value class]);
+	}
+
+	return [NSString stringWithCString: ivarType];
+}
+
+/** Returns the underlying runtime basic type (object, int, char, struct etc.) 
+associated with the instance variable. 
+
+These runtime basic types are encoded as character sequences. To interpret the 
+returned value, see the runtime documentation. */
+- (const char *) typeEncoding
 {
 	const char *ivarType = NULL;
 	
 	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	ivarType = _ivar->ivar_type;
-	#else
-	
+	#elif defined(NEXT_RUNTIME_2)
+	ivarType = ivar_getTypeEncoding(_ivar);
 	#endif
-		
-	return [NSString stringWithCString: ivarType];
+
+	return ivarType;
 }
 
-- (NSString *) typeName
+/** Returns whether the instance variable value is an object or not. */
+- (BOOL) isObjectType
 {
-	return [self type];
+	const char *ivarType = [self typeEncoding];
+	return (ivarType[0] == '@');
 }
 
+/** Returns the value stored in the instance variable. 
+
+If the instance variable type is a primitive type, nil is returned, unless the 
+type encoding corresponds to a number or a structure such as NSRect, NSSize, 
+NSPoint and NSRange. In this case, the returned value is respectively an 
+NSNumber or NSValue object that boxes the primitive value. */
 - (id) value
 {
-	id ivarValue = nil;
-	
-	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
+#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	const char *ivarType = _ivar->ivar_type;
-	int ivarOffset = _ivar->ivar_offset;
-	
-	// FIXME: More type support
-	if(ivarType[0] == '@')
-		GSObjCGetVariable([self possessor], ivarOffset, sizeof(id), (void **)&ivarValue);
-	#else
-	
-	#endif
-			
-	return ivarValue;
+
+	/* Check the encoding types supported by GSObjCGetVal() and defined in 
+	   objc-api.h, otherwise this function raises an exception when the type is 
+	   not supported. */
+	switch (ivarType[0])
+	{
+		case _C_STRUCT_B:
+			if (strcmp(@encode(NSPoint), ivarType) != 0
+			 && strcmp(@encode(NSRect), ivarType) != 0
+			 && strcmp(@encode(NSSize), ivarType) != 0
+			 && strcmp(@encode(NSRange), ivarType) != 0)
+			{
+				return nil; /* Unsupported struct type */
+			}
+		case _C_ID:
+		case _C_CLASS:
+		case _C_CHR:
+		case _C_UCHR:
+		case _C_SHT:
+		case _C_USHT:
+		case _C_INT:
+		case _C_UINT:
+		case _C_LNG:
+		case _C_ULNG:
+		case _C_LNG_LNG:
+		case _C_ULNG_LNG:
+		case _C_FLT:
+		case _C_DBL:
+		case _C_VOID:
+
+			return GSObjCGetVal(_possessor, _ivar->ivar_name, NULL, ivarType, 0,
+				_ivar->ivar_offset);
+
+		default: /* Unsupported type */
+			return nil;
+	}
+
+#elif defined(NEXT_RUNTIME_2)
+	const char *ivarType = ivar_getTypeEncoding(_ivar);
+
+	// TODO: More type support
+	switch (ivarType[0])
+	{
+		case '@':
+			return object_getIvar(_possessor, _ivar);
+		default: /* Unsupported type */
+			return nil;
+	}
+#endif
 }
 
-/** Pass NSValue to set primitive types */
+/** Sets the value stored in the instance variable. 
+
+If the instance variable type is a primitive type, the value cannot be set, 
+unless the type encoding corresponds to a number or a structure such as NSRect, 
+NSSize, NSPoint and NSRange. In this case, you can pass the primitive value 
+boxed respectively in an NSNumber or NSValue object.
+
+If value is an object and the instance variable type is a primitive type, in 
+case no primitive value matching the expected type can be unboxed, an 
+NSInvalidArgumentException is raised. <br />
+For example, if value is a NSString and the instance variable is a NSRect, the 
+exception reason will be: NSString does not recognize the selector -rectValue. */
 - (void) setValue: (id)value
 {
-	#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
+#ifdef GNUSTEP_RUNTIME_COMPATIBILITY
 	const char *ivarType = _ivar->ivar_type;
-	int ivarOffset = _ivar->ivar_offset;
+
+	/* Check the encoding types supported by GSObjCSetVal() and defined in 
+	   objc-api.h, otherwise this function raises an exception when the type is 
+	   not supported. */
+	switch (ivarType[0])
+	{
+		case _C_STRUCT_B:
+			if (strcmp(@encode(NSPoint), ivarType) != 0
+			 && strcmp(@encode(NSRect), ivarType) != 0
+			 && strcmp(@encode(NSSize), ivarType) != 0
+			 && strcmp(@encode(NSRange), ivarType) != 0)
+			{
+				return; /* Unsupported struct type */
+			}
+		case _C_ID:
+		case _C_CLASS:
+		case _C_CHR:
+		case _C_UCHR:
+		case _C_SHT:
+		case _C_USHT:
+		case _C_INT:
+		case _C_UINT:
+		case _C_LNG:
+		case _C_ULNG:
+		case _C_LNG_LNG:
+		case _C_ULNG_LNG:
+		case _C_FLT:
+		case _C_DBL:
+		case _C_VOID:
+
+			GSObjCSetVal(_possessor, _ivar->ivar_name, value, NULL, 
+				_ivar->ivar_type, 0, _ivar->ivar_offset);
+	}
+
+#elif defined(NEXT_RUNTIME_2)
 	
-	// FIXME: More type support
-	if(strcmp(ivarType, "@"))
-		GSObjCSetVariable([self possessor], ivarOffset, sizeof(id), (void **)&value);
-	#else
-	
-	#endif
+#endif
+}
+
+- (NSArray *) properties
+{
+	return A(@"possessor", @"name", @"type", @"typeName", @"typeEncoding", 
+		@"isObjectType", @"value");
 }
 
 @end
@@ -524,7 +660,7 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 
 - (ETUTI *) type
 {
-	return [self name];
+	return nil;
 }
 
 - (NSString *) typeName
@@ -564,4 +700,30 @@ static inline BOOL ETIsSubclassOfClass(Class subclass, Class aClass)
 	return nil;
 }
 
+@end
+
+@implementation ETClass
++ (NSArray *) protocolsForClass: (Class)aClass
+{
+#if defined(GNU_RUNTIME)
+	if (aClass == Nil)
+	{
+		return nil;
+	}
+	NSMutableArray *protocols = [NSMutableArray array];
+
+	for (struct objc_protocol_list* iter = aClass->protocols; iter != NULL; iter = iter->next)
+	{
+		for (size_t i = 0; i < iter->count; i++)
+		{
+			Protocol *protocol = iter->list[i];
+			[protocols addObject: protocol];
+		}
+	}
+	return protocols;
+#else
+#warning +protocolsForClass not supported on your ObjC runtime.
+	return nil;
+#endif
+}
 @end
