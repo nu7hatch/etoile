@@ -1,0 +1,19 @@
+TODO
+----
+
+- Fix next/previous controls
+- verify gapless song switching. Make sure libavcodec is respecting the lame gapless tag in mp3's
+- Finish getting playlists working
+- Fix searching
+- Last.fm cover art fetching
+
+Eventually:
+
+- Tag writing. Make sure a song can be playing while its tags are changed without problems.
+- Last.fm login, reporting songs played.
+- Other lastfm features
+- CD playback, ripping (Maybe a separate app?)
+- Musicbrainz lookup to fix tags of improperly tagged files, or get tags of CD's
+- iPod / other portable player support
+- (MediaKit) Replaygain support
+- format transcoding

@@ -6,11 +6,19 @@
   
 NSObject subclass: MelodieController
 [
-	| window  mainContainer  playlistContainer search  musicPlayerController URLTextField addURLWindow 
-	  mainModel  playlistModel smartGroup ctxt |
+	| window search musicPlayerController knownExtensions
+	  URLTextField addURLWindow smartGroup ctxt
+	  mainContainer  playlistContainer
+	  mainLayoutItemGroup playlistLayoutItemGroup
+	  mainModel playlistModel |
 
-	KnownExtensions	[
-		^ {'mp3'. 'ogg'. 'aac'. 'm4a'}.
+	knownExtensions	[
+		knownExtensions == nil ifTrue: [
+			knownExtensions := NSMutableArray array.
+			(ETUTI typeWithString: 'public.audio') allSubtypes
+				foreach: [ :type | knownExtensions addObjectsFromArray: (type fileExtensions) ].
+		].
+		^ knownExtensions.
 	]
 
 	newContext [
@@ -27,52 +35,59 @@ NSObject subclass: MelodieController
 		ctxt registeredObjects log.    
 
 		defaults := NSUserDefaults standardUserDefaults.
-		defaults setObject: (ctxt UUID stringValue) forKey: 'MellodieObjectContextUUID'.
-		defaults setObject: (mainModel UUID stringValue) forKey: 'MellodieMainModelUUID'. 
-		defaults setObject: (playlistModel UUID stringValue) forKey: 'MellodiePlaylistModelUUID'. 
+		defaults setUUID: (ctxt UUID) forKey: 'MellodieObjectContextUUID'.
+		defaults setUUID: (mainModel UUID) forKey: 'MellodieMainModelUUID'. 
+		defaults setUUID: (playlistModel UUID) forKey: 'MellodiePlaylistModelUUID'. 
 	]
 
 	reloadModelVariablesFromContext [
 		| defaults |
 		
 		defaults := NSUserDefaults standardUserDefaults.
-		mainModel := ctxt objectForUUID: (ETUUID UUIDWithString:
-		                    (defaults stringForKey: 'MellodieMainModelUUID')).
-		playlistModel := ctxt objectForUUID: (ETUUID UUIDWithString:
-		                    (defaults stringForKey: 'MellodiePlaylistModelUUID')).
+		mainModel := ctxt objectForUUID: (defaults UUIDForKey: 'MellodieMainModelUUID').
+		playlistModel := ctxt objectForUUID: (defaults UUIDForKey: 'MellodiePlaylistModelUUID').
 	]
 
 	loadContextWithUUID: uuid [
 		'Requesting object context with UUID:' log.
 		uuid log.
 
-		ctxt := COObjectContext alloc initWithUUID: (ETUUID UUIDWithString: uuid).
+		ctxt := COObjectContext alloc initWithUUID: uuid.
 		COObjectContext setCurrentContext: ctxt.
 	
-		self reloadModelVariablesFromContext.		
+		self reloadModelVariablesFromContext.
 			
 		'Deserialized main model:' log.
 		mainModel log.
 		'Deserialized playlist model:' log.
 		playlistModel log.
+
+		" If loading the model objects from the context failed / the context was
+		  invalid, make a new context. This happens if the user default exists
+		  (maybe from a previous install of Melodie) but the CoreObjectLibrary
+		  doesn't exist. This should probably be given more thought, but for now
+		  should prevent confusion. "
+		mainModel == nil ifTrue: [ self newContext ].
 	]
 
 
 	init [
 		| uuid |
 		'EtoileTunesController init' log.
-		ETPlaylist setAutomaticallyMakeNewInstancesPersistent: 1.
-		ETMusicFile setAutomaticallyMakeNewInstancesPersistent: 1.
+		ETPlaylist setAutomaticallyMakeNewInstancesPersistent: true.
+		ETMusicFile setAutomaticallyMakeNewInstancesPersistent: true.
 
-		uuid := (NSUserDefaults standardUserDefaults stringForKey: 'MellodieObjectContextUUID').
+		uuid := (NSUserDefaults standardUserDefaults UUIDForKey: 'MellodieObjectContextUUID').
 		(uuid == nil) ifTrue: [ self newContext. ]
 		             ifFalse: [ self loadContextWithUUID: uuid. ].
+		
+		ctxt setDelegate: self.
 
 		^ self.
 	]
 
 	addFile: path [
-		(self KnownExtensions containsObject: (path pathExtension))
+		(self knownExtensions containsObject: (path pathExtension))
 		    ifTrue: [ mainModel addMember: (ETMusicFile alloc initWithPath: path). ]
 	]
 
@@ -95,35 +110,35 @@ NSObject subclass: MelodieController
 		| openPanel |
 
 		openPanel := NSOpenPanel openPanel.
-		openPanel setAllowsMultipleSelection: 1.
-		openPanel setCanChooseDirectories: 1.
-		openPanel runModalForTypes: (self KnownExtensions).
+		openPanel setAllowsMultipleSelection: true.
+		openPanel setCanChooseDirectories: true.
+		openPanel runModalForTypes: (self knownExtensions).
 
 		openPanel filenames foreach: [ :path | self addPath: path ].
-		mainContainer reloadAndUpdateLayout.
+		mainLayoutItemGroup reloadAndUpdateLayout.
 	]
 
 	undo: sender [
 		ctxt undo.
-		self reloadModelVariablesFromContext.
-		mainContainer reloadAndUpdateLayout.
-		playlistContainer reloadAndUpdateLayout.
 	]
 
 	redo: sender [	
 		ctxt redo.
-		self reloadModelVariablesFromContext.
-		mainContainer reloadAndUpdateLayout.
-		playlistContainer reloadAndUpdateLayout.
 	]
 
 	addURL: sender [
-		| string |
+		| string URL |
 
 		addURLWindow orderOut: self.
-		string := URLTextField stringValue stringByAddingPercentEscapesUsingEncoding: @NSUTF8StringEncoding. 
-		mainModel addMember: (ETMusicFile alloc initWithURL:(NSURL URLWithString:string)).
-		mainContainer reloadAndUpdateLayout.
+		string := URLTextField stringValue stringByAddingPercentEscapesUsingEncoding: @NSUTF8StringEncoding.
+		URL := NSURL URLWithString: string.
+
+		mainModel addMember: 
+			((URL relativePath pathExtension lowercaseString isEqualToString: 'pls')
+				ifTrue: [ ETPlaylist playlistForPLSFileAtURL: URL ]
+				ifFalse: [ ETMusicFile alloc initWithURL: URL ]).
+
+		mainLayoutItemGroup reloadAndUpdateLayout.
 	]
 
 	newPlaylist: sender [
@@ -131,39 +146,45 @@ NSObject subclass: MelodieController
 
 		newPlaylist := ETPlaylist new.
 		"Put a sample radio stream in the playlist."
-		newPlaylist addMember:(ETMusicFile alloc initWithURL:
-		    (NSURL URLWithString: 'http://scfire-chi0l-1.stream.aol.com/stream/1018')).
+		newPlaylist addMember:
+			(ETPlaylist playlistForPLSFileAtURL: (NSURL URLWithString: 'http://somafm.com/groovesalad.pls')).
 		playlistModel addMember: newPlaylist.
-		playlistContainer reloadAndUpdateLayout.
+		playlistLayoutItemGroup reloadAndUpdateLayout.
 	]
 
 	awakeFromNib [
 		| layout |
 
+		'known extensions: ' log.
+		self knownExtensions foreach: [ :ext | ext log ].
+
 		layout := ETOutlineLayout layout.
 	
-		layout setDisplayName: 'Title' forProperty: 'kETTitleProperty'.
-		layout setDisplayName: 'Artist' forProperty: 'kETArtistProperty'.
-		layout setDisplayName: 'Album' forProperty: 'kETAlbumProperty'.
-		layout setDisplayName: 'URL' forProperty: 'kETURLProperty'.
+		layout setDisplayName: 'Title' forProperty: 'kETTitleProperty';
+			setDisplayName: 'Artist' forProperty: 'kETArtistProperty';
+			setDisplayName: 'Album' forProperty: 'kETAlbumProperty';
+			setDisplayName: 'URL' forProperty: 'kETURLProperty'.
 	
 		layout setDisplayedProperties:
 		    {'icon'. 'kETTitleProperty'. 'kETArtistProperty'. 'kETAlbumProperty'. 'kETURLProperty' }.
 
-		mainContainer setSource: (mainContainer layoutItem).
-		mainContainer layoutItem setRepresentedObject: mainModel.
-		mainContainer setLayout: layout.
-		mainContainer setHasVerticalScroller: 1.
-		mainContainer setTarget: self.
-		mainContainer reloadAndUpdateLayout.
-		mainContainer setDoubleAction: 'doubleClickInContainer:'.
+		mainLayoutItemGroup := ETLayoutItem itemGroupWithRepresentedObject: mainModel.
+		mainLayoutItemGroup setSource: mainLayoutItemGroup;
+			setSupervisorView: mainContainer;
+			setLayout: layout;
+			reloadAndUpdateLayout.
+		mainContainer setHasVerticalScroller: true;
+			setTarget: self;
+			setDoubleAction: 'doubleClickInContainer:'.
 
-		playlistContainer setSource: (playlistContainer layoutItem).
-		playlistContainer layoutItem setRepresentedObject: playlistModel.
-		playlistContainer setLayout: (ETOutlineLayout layout).
-		playlistContainer setHasVerticalScroller: 0.
-		playlistContainer setTarget: self.
-		playlistContainer setDoubleAction: 'doubleClickInContainer:'.
+		playlistLayoutItemGroup := ETLayoutItem itemGroupWithRepresentedObject: playlistModel.
+		playlistLayoutItemGroup setSource: playlistLayoutItemGroup;
+			setSupervisorView: playlistContainer;
+			setLayout: (ETOutlineLayout layout);
+			reloadAndUpdateLayout.
+		playlistContainer setHasVerticalScroller: false;
+			setTarget: self;
+			setDoubleAction: 'doubleClickInContainer:'.
 
 		search setDelegate: self.
 
@@ -172,24 +193,32 @@ NSObject subclass: MelodieController
 		                                forKeys: { 'MusicPlayerController' }).
 	]
 
+	" COObjectContext delegate method "
+	objectContextDidMergeObjects: notif [
+		'Merge occurred, reloading models from context and updating container layouts..' log.
+		self reloadModelVariablesFromContext.
+		mainLayoutItemGroup reloadAndUpdateLayout.
+		playlistLayoutItemGroup reloadAndUpdateLayout.
+	]
+
 	controlTextDidChange: notif [
 		smartGroup == nil ifTrue: [ self smartGroupOn. ].
 		(search stringValue length = 0)
 		    ifTrue: [ 
-			mainContainer layoutItem setRepresentedObject: mainModel.
+			mainLayoutItemGroup setRepresentedObject: mainModel.
 		]  ifFalse: [
-			mainContainer layoutItem setRepresentedObject: smartGroup.
+			mainLayoutItemGroup setRepresentedObject: smartGroup.
 			smartGroup setPredicate:
 			    (NSPredicate predicateWithFormat: '(%K CONTAINS[cd] %@) OR (%K CONTAINS[cd] %@)'
 			        argumentArray: {'kETTitleProperty' . search stringValue . 'kETAlbumProperty' . search stringValue }).
 		].
-		mainContainer reloadAndUpdateLayout.
+		mainLayoutItemGroup reloadAndUpdateLayout.
 	]
 
 	smartGroupOn [
 		smartGroup := COSmartGroup alloc init.
 		smartGroup setTarget: mainModel.
-		mainContainer layoutItem setRepresentedObject: smartGroup.
+		mainLayoutItemGroup setRepresentedObject: smartGroup.
 	]
 	
 	clearSearch: sender [
@@ -198,6 +227,6 @@ NSObject subclass: MelodieController
 	]
 
 	doubleClickInContainer: sender [
-		musicPlayerController playLayoutItem: (sender doubleClickedItem) start: 1.
+		musicPlayerController playLayoutItem: (sender doubleClickedItem) start: true.
 	]
 ]
