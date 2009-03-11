@@ -22,7 +22,7 @@ COREOBJECT_LIBS = -lCoreObject -lEtoileSerialize
 ETOILE_UI_LIBS = -lEtoileUI
 
 export ETOILE_CORE_LIBS = $(ETOILE_FOUNDATION_LIBS) $(COREOBJECT_LIBS) $(ETOILE_UI_LIBS) 
-export SMALLTALK_LIBS = -lEtoileFoundation -lLanguageKit -lSmalltalkKit -lSmalltalkSupport
+export SMALLTALK_LIBS = -lEtoileFoundation -lLanguageKit -lSmalltalkSupport
 
 ### Installation Control ###
 
@@ -58,9 +58,9 @@ PROJECT_NAME ?= $(notdir $(PROJECT_DIR))
 # to be wrong on this one).
 
 prefix = $(if $1,\
-             $(if $(shell find $1 -maxdepth 1 -name etoile.make),\
+             $(if $(wildcard $1/etoile.make),\
                  $(dir \
-                     $(shell find $1 -maxdepth 1 -name etoile.make)),\
+                     $(wildcard $1/etoile.make)),\
                  $(call prefix,\
                      $(patsubst %/$(notdir $1),%, $1))),\
              $(warning No makefile etoile.make found in the repository tree.))
@@ -269,9 +269,21 @@ export ADDITIONAL_LIB_DIRS += -L$(BUILD_DIR)
 # explicitly linked. 
 # For example, if you use EtoileFoundation that links to EtoileXML but you don't 
 # reference any EtoileXML symbols and doesn't link it. In this last case without 
-# -rpath-link, a warning would be logged:
+# a custom LD_LIBRARY_PATH or -rpath-link, a warning would be logged:
 # /usr/bin/ld: warning: libEtoileXML.so.0, needed by /testEtoile/Build/libEtoileFoundation.so, not found (try using -rpath or -rpath-link)
-export ADDITIONAL_LDFLAGS += -Wl,-rpath-link $(BUILD_DIR)
+# If -rpath-link is used, it overrides the search paths for shared libraries, so 
+# only installed static libraries are visible to the linker, but not the shared 
+# ones. That's why to allow the linking of shared libraries that are located 
+# outside of BUILD_DIR, '-rpath-link $(BUILD_DIR)' is not enough and 
+# LD_LIBRARY_PATH value has to be appended.
+# Unlike shared libraries installed in standard locations such as /usr/lib, 
+# GNUstep libraries doesn't seem to be affected by -rpath-link, not sure why... 
+# Perhaps because gnustep-make is bypassing it for GNUstep install paths or core 
+# libraries in one way or another.
+# We use LD_LIBRARY_PATH by default, since it is known to work well on various 
+# platforms.
+#export ADDITIONAL_LDFLAGS += -Wl,-rpath-link $(BUILD_DIR):$(LD_LIBRARY_PATH)
+export LD_LIBRARY_PATH := $(BUILD_DIR):$(LD_LIBRARY_PATH)
 
 # We disable warnings about #import being deprecated. They occur with old GCC
 # version (before 4.0 iirc).
