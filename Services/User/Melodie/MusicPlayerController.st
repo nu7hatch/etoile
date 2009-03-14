@@ -67,7 +67,7 @@ NSObject subclass: MusicPlayerController
 
 	previous: sender [
 		self syncHistory.
-		history previous.
+		history back.
 		self playHistory: player isPlaying.
 		uiUpdateTimer fire.
 	]
@@ -84,7 +84,7 @@ NSObject subclass: MusicPlayerController
 		" TODO: rebuild the queue when the playlist is modified. "
 		self syncHistory.
 		history setFuture: newQueue objectEnumerator.
-		history next.
+		history forward.
 		self playHistory: shouldStart.
 		uiUpdateTimer fire.
 	]
@@ -129,7 +129,7 @@ NSObject subclass: MusicPlayerController
 		currentURL == newURL ifFalse: [
 			currentURL := newURL.
 			newSize := player queueSize.
-			queueSize - newSize timesRepeat: [ history next ].
+			queueSize - newSize timesRepeat: [ history forward ].
 			queueSize := newSize.
 			songLabel setStringValue:
 				history currentObject representedObject displayName.
