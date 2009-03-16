@@ -13,7 +13,7 @@ We only install hal and omit libhal-dev because we access HAL through D-Bus (we 
 
 Oniguruma library (libonig) that is required by OgreKit wasn't available as a package before Gutsy Gibbon. If you use an older Ubuntu version, before building Etoile you should configure, compile and install the version available in the Subversion repository at path etoile/trunk/Dependencies.
 
-LLVM version (llvm-libs) that is currently required by Smalltalk and LanguageKit isn't the release 2.2 presently packaged in Ubuntu, but the latest 2.4 release or the developement trunk version of the LLVM repository (See INSTALL).
+LLVM version (llvm-libs) that is currently required by Smalltalk and LanguageKit isn't the release 2.2 presently packaged in Ubuntu, but the latest 2.4 release or the developement trunk version of the LLVM repository (See INSTALL).  The packaged version of LLVM 2.4 shipped with some Ubuntu releases appears to be incorrectly linked and causes run-time errors with LanguageKit.  Compiling LLVM from source on Ubuntu appears to work.
 
 
 Main Dependencies
