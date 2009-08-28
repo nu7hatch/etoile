@@ -287,7 +287,7 @@ export LD_LIBRARY_PATH := $(BUILD_DIR):$(LD_LIBRARY_PATH)
 
 # We disable warnings about #import being deprecated. They occur with old GCC
 # version (before 4.0 iirc).
-export ADDITIONAL_OBJCFLAGS += -Wno-import -Werror -Wno-unused -Wno-implicit
+export ADDITIONAL_OBJCFLAGS += -Wno-import -Wno-unused -Wno-implicit
 
 # For test bundles, we must link UnitKit
 ifeq ($(test), yes)

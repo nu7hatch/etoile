@@ -14,7 +14,7 @@ MediaKit_HEADER_FILES = \
 				MKMusicPlayer.h\
 				MKSoundDevice.h
 
-ADDITIONAL_OBJCFLAGS = -std=c99 -g -Werror `pkg-config libavcodec --cflags`
+ADDITIONAL_OBJCFLAGS = -std=c99 -g `pkg-config libavcodec --cflags`
 ADDITIONAL_OBJCFLAGS += `pkg-config libavcodec --cflags`
 ADDITIONAL_OBJCFLAGS += `pkg-config libavformat --cflags`
 

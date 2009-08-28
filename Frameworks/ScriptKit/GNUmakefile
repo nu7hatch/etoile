@@ -11,7 +11,7 @@ ScriptKit_HEADER_FILES = \
 				  ScriptCenter.h\
 				  Tell.h
 
-ADDITIONAL_OBJCFLAGS = -std=c99 -g -Werror 
+ADDITIONAL_OBJCFLAGS = -std=c99 -g 
 
 ADDITIONAL_LDFLAGS += -lgnustep-gui 
 

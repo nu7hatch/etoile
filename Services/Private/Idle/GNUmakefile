@@ -23,7 +23,7 @@ Idle_LANGUAGES = English
 Idle_OBJC_FILES = \
 	XIdle.m
 
-ADDITIONAL_OBJCFLAGS = -std=c99 -g -Werror
+ADDITIONAL_OBJCFLAGS = -std=c99 -g
 ADDITIONAL_INCLUDE_DIRS += -I/usr/X11R6/include
 ADDITIONAL_LIB_DIRS += -L/usr/X11R6/lib -lX11 -lXss
 
